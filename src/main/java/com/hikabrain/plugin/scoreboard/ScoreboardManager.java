@@ -171,13 +171,12 @@ public class ScoreboardManager {
             "&7&m-----------"
         };
         
-        // Score décroissant pour l'ordre (plus haut = plus haut dans le sidebar)
-        int score = lines.length;
+        // Score à 0 pour toutes les lignes (affiche juste "0" à droite)
         for (int i = 0; i < lines.length; i++) {
             String parsed = parseColor(lines[i]);
             
-            // Identifiant simple
-            String identifier = "l" + i;
+            // Identifiant unique pour la ligne
+            String identifier = String.valueOf(i);
             
             // Créer l'équipe pour cette ligne
             org.bukkit.scoreboard.Team mcTeam;
@@ -188,20 +187,14 @@ public class ScoreboardManager {
                 mcTeam = board.registerNewTeam(teamName);
             }
             
-            // Ajouter des espaces pour "masquer" le score à droite
-            // Minecraft limit = 40 caractères, on ajoute des espaces invisibles
-            String invisibleSpaces = "                    ";
-            String prefix = parsed;
-            String suffix = ChatColor.RESET + invisibleSpaces;
-            
-            mcTeam.setPrefix(prefix);
-            mcTeam.setSuffix(suffix);
+            // Texte complet dans le prefix
+            mcTeam.setPrefix(parsed);
+            mcTeam.setSuffix("");
             
             mcTeam.addEntry(identifier);
             
-            // Score pour l'ordre
-            objective.getScore(identifier).setScore(score);
-            score--;
+            // Score à 0 pour toutes les lignes (minimaliste)
+            objective.getScore(identifier).setScore(0);
         }
     }
 
