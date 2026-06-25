@@ -1,0 +1,19 @@
+name: HikaBrain
+version: 1.0.0
+main: com.hikabrain.plugin.HikaBrainPlugin
+api-version: 1.21
+author: Claude
+description: Plugin de minijeu Hikabrain (capture de zone par équipes) inspiré de l'automatisation type ScreamingBedwars
+
+commands:
+  hb:
+    description: Commande principale du plugin Hikabrain
+    usage: /hb <create|delete|list|setlobby|setspawn|setcapture|setgamezone|start|stop|join|leave|info>
+
+permissions:
+  hikabrain.admin:
+    description: Permission pour administrer le jeu Hikabrain
+    default: op
+  hikabrain.play:
+    description: Permission pour jouer au Hikabrain
+    default: true

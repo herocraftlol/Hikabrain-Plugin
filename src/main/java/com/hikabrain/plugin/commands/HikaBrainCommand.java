@@ -1,0 +1,625 @@
+package com.hikabrain.plugin.commands;
+
+import com.hikabrain.plugin.HikaBrainPlugin;
+import com.hikabrain.plugin.game.Arena;
+import com.hikabrain.plugin.game.ArenaManager;
+import com.hikabrain.plugin.game.CuboidRegion;
+import com.hikabrain.plugin.game.GameManager;
+import com.hikabrain.plugin.game.GameState;
+import com.hikabrain.plugin.game.Team;
+import com.hikabrain.plugin.util.MessageUtil;
+import org.bukkit.Location;
+import org.bukkit.command.Command;
+import org.bukkit.command.CommandExecutor;
+import org.bukkit.command.CommandSender;
+import org.bukkit.command.TabCompleter;
+import org.bukkit.entity.Player;
+
+import java.util.*;
+
+/**
+ * Gère la commande /hb et tous ses sous-arguments.
+ *
+ * Le plugin gère plusieurs arènes HikaBrain nommées et indépendantes ; presque toutes
+ * les commandes (autres que join/leave/list) attendent donc un nom d'arène en paramètre :
+ *   /hb create <nom>                          - crée une nouvelle arène vide
+ *   /hb delete <nom>                          - supprime une arène
+ *   /hb list                                  - liste toutes les arènes
+ *   /hb setlobby <nom>                        - définit le lobby (à ta position)
+ *   /hb setspawn <nom> <red|blue>              - définit le spawn d'une équipe
+ *   /hb setcapture <nom> <red|blue> <pos1|pos2> - définit une zone de capture
+ *   /hb setgamezone <nom> <pos1|pos2>          - définit + capture la zone de jeu protégée
+ *   /hb join <nom>                            - rejoindre une arène
+ *   /hb leave                                 - quitter l'arène en cours
+ *   /hb start <nom>                           - forcer le démarrage
+ *   /hb stop <nom>                            - forcer l'arrêt
+ *   /hb info <nom>                            - infos sur une arène
+ *
+ * Pour la sélection des coins de zone, on utilise une astuce simple en deux étapes :
+ * pos1 enregistre le premier coin à la position du joueur, pos2 enregistre le second
+ * et finalise la zone.
+ */
+public class HikaBrainCommand implements CommandExecutor, TabCompleter {
+
+    private final HikaBrainPlugin plugin;
+
+    // Stocke temporairement le coin 1 d'une zone de capture en attendant le coin 2,
+    // par couple (nom d'arène + équipe).
+    private final Map<String, Location> pendingCaptureCorner1 = new HashMap<>();
+
+    // Stocke temporairement le coin 1 de la zone de jeu globale, par nom d'arène.
+    private final Map<String, Location> pendingGameZoneCorner1 = new HashMap<>();
+
+    public HikaBrainCommand(HikaBrainPlugin plugin) {
+        this.plugin = plugin;
+    }
+
+    @Override
+    public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        if (args.length == 0) {
+            sendHelp(sender);
+            return true;
+        }
+
+        String sub = args[0].toLowerCase(Locale.ROOT);
+
+        switch (sub) {
+            case "create" -> handleCreate(sender, args);
+            case "delete" -> handleDelete(sender, args);
+            case "list" -> handleList(sender);
+            case "setlobby" -> handleSetLobby(sender, args);
+            case "setspawn" -> handleSetSpawn(sender, args);
+            case "setcapture" -> handleSetCapture(sender, args);
+            case "setgamezone" -> handleSetGameZone(sender, args);
+            case "join" -> handleJoin(sender, args);
+            case "leave" -> handleLeave(sender);
+            case "start" -> handleStart(sender, args);
+            case "stop" -> handleStop(sender, args);
+            case "info" -> handleInfo(sender, args);
+            case "stats" -> handleStats(sender);
+            case "resetstats" -> handleResetStats(sender);
+            // Scoreboard commands
+            case "setsbserver" -> handleSetSbServer(sender, args);
+            case "setsbgame" -> handleSetSbGame(sender, args);
+            case "setsbtitle" -> handleSetSbTitle(sender, args);
+            case "setsblines" -> handleSetSbLines(sender, args);
+            case "reloadsb" -> handleReloadSb(sender);
+            case "sbinfo" -> handleSbInfo(sender);
+            default -> sendHelp(sender);
+        }
+        return true;
+    }
+
+    // ================= GESTION DES ARÈNES (ADMIN) =================
+
+    private void handleCreate(CommandSender sender, String[] args) {
+        if (!sender.hasPermission("hikabrain.admin")) {
+            MessageUtil.send(sender, "&cTu n'as pas la permission.");
+            return;
+        }
+        if (args.length < 2) {
+            MessageUtil.send(sender, "&cUsage: /hb create <nom>");
+            return;
+        }
+        String name = args[1];
+        boolean created = plugin.getArenaManager().create(name);
+        MessageUtil.send(sender, created
+                ? "&aArène '" + name + "' créée. Configure-la avec /hb setlobby " + name + ", etc."
+                : "&cUne arène '" + name + "' existe déjà.");
+    }
+
+    private void handleDelete(CommandSender sender, String[] args) {
+        if (!sender.hasPermission("hikabrain.admin")) {
+            MessageUtil.send(sender, "&cTu n'as pas la permission.");
+            return;
+        }
+        if (args.length < 2) {
+            MessageUtil.send(sender, "&cUsage: /hb delete <nom>");
+            return;
+        }
+        String name = args[1];
+        boolean deleted = plugin.getArenaManager().delete(name);
+        MessageUtil.send(sender, deleted ? "&aArène '" + name + "' supprimée." : "&cAucune arène '" + name + "' trouvée.");
+    }
+
+    private void handleList(CommandSender sender) {
+        ArenaManager am = plugin.getArenaManager();
+        Set<String> names = am.getNames();
+        if (names.isEmpty()) {
+            MessageUtil.send(sender, "&7Aucune arène configurée. Utilise /hb create <nom> pour en créer une.");
+            return;
+        }
+        MessageUtil.send(sender, "&8&m----------&r &bArènes HikaBrain &8&m----------");
+        for (String name : names) {
+            GameManager gm = am.get(name);
+            MessageUtil.send(sender, "&e" + name + " &7- État: &f" + gm.getState()
+                    + " &7- Joueurs: &f" + gm.getPlayerCount()
+                    + " &7- Configurée: " + (gm.getArena().isFullyConfigured() ? "&aOui" : "&cNon"));
+        }
+    }
+
+    // ================= SETUP (ADMIN) =================
+
+    /**
+     * Récupère l'arène désignée par args[nameIndex] et envoie un message d'erreur si elle
+     * n'existe pas. Renvoie null si l'arène n'existe pas (l'appelant doit alors arrêter le traitement).
+     */
+    private GameManager resolveArena(CommandSender sender, String[] args, int nameIndex) {
+        if (args.length <= nameIndex) {
+            return null;
+        }
+        GameManager gm = plugin.getArenaManager().get(args[nameIndex]);
+        if (gm == null) {
+            MessageUtil.send(sender, "&cAucune arène nommée '" + args[nameIndex] + "' n'existe. Utilise /hb create " + args[nameIndex] + " d'abord.");
+        }
+        return gm;
+    }
+
+    private void handleSetLobby(CommandSender sender, String[] args) {
+        if (!checkAdminAndPlayer(sender)) return;
+        if (args.length < 2) {
+            MessageUtil.send(sender, "&cUsage: /hb setlobby <nom>");
+            return;
+        }
+        GameManager gm = resolveArena(sender, args, 1);
+        if (gm == null) return;
+        Player player = (Player) sender;
+
+        gm.getArena().setLobbySpawn(player.getLocation());
+        gm.saveArenaConfig();
+
+        MessageUtil.send(sender, "&aLe point de lobby de '" + args[1] + "' a été défini à ta position.");
+    }
+
+    private void handleSetSpawn(CommandSender sender, String[] args) {
+        if (!checkAdminAndPlayer(sender)) return;
+        if (args.length < 3) {
+            MessageUtil.send(sender, "&cUsage: /hb setspawn <nom> <red|blue>");
+            return;
+        }
+        GameManager gm = resolveArena(sender, args, 1);
+        if (gm == null) return;
+        Player player = (Player) sender;
+
+        Team team = parseTeam(args[2]);
+        if (team == null) {
+            MessageUtil.send(sender, "&cÉquipe invalide. Utilise 'red' ou 'blue'.");
+            return;
+        }
+
+        gm.getArena().setSpawn(team, player.getLocation());
+        gm.saveArenaConfig();
+
+        MessageUtil.send(sender, "&aLe spawn de l'équipe " + team.getColoredName() + " &asur '" + args[1] + "' a été défini à ta position.");
+    }
+
+    private void handleSetCapture(CommandSender sender, String[] args) {
+        if (!checkAdminAndPlayer(sender)) return;
+        if (args.length < 4) {
+            MessageUtil.send(sender, "&cUsage: /hb setcapture <nom> <red|blue> <pos1|pos2>");
+            return;
+        }
+        GameManager gm = resolveArena(sender, args, 1);
+        if (gm == null) return;
+        Player player = (Player) sender;
+
+        Team team = parseTeam(args[2]);
+        if (team == null) {
+            MessageUtil.send(sender, "&cÉquipe invalide. Utilise 'red' ou 'blue'.");
+            return;
+        }
+
+        String posArg = args[3].toLowerCase(Locale.ROOT);
+        String pendingKey = args[1].toLowerCase(Locale.ROOT) + ":" + team.name();
+
+        if (posArg.equals("pos1")) {
+            pendingCaptureCorner1.put(pendingKey, player.getLocation());
+            MessageUtil.send(sender, "&aCoin 1 de la zone de capture &7" + team.getColoredName()
+                    + "&a enregistré. Place-toi au coin opposé et fais &7/hb setcapture " + args[1] + " " + args[2] + " pos2");
+        } else if (posArg.equals("pos2")) {
+            Location corner1 = pendingCaptureCorner1.get(pendingKey);
+            if (corner1 == null) {
+                MessageUtil.send(sender, "&cTu dois d'abord définir le coin 1 avec /hb setcapture " + args[1] + " " + args[2] + " pos1");
+                return;
+            }
+            Location corner2 = player.getLocation();
+            if (corner1.getWorld() == null || !corner1.getWorld().equals(corner2.getWorld())) {
+                MessageUtil.send(sender, "&cLes deux coins doivent être dans le même monde !");
+                return;
+            }
+
+            CuboidRegion region = new CuboidRegion(corner1, corner2);
+            gm.getArena().setCaptureZone(team, region);
+            pendingCaptureCorner1.remove(pendingKey);
+            gm.saveArenaConfig();
+
+            MessageUtil.send(sender, "&aZone de capture de l'équipe " + team.getColoredName() + " &asur '" + args[1] + "' définie avec succès !");
+        } else {
+            MessageUtil.send(sender, "&cUsage: /hb setcapture <nom> <red|blue> <pos1|pos2>");
+        }
+    }
+
+    /**
+     * Définit la zone de jeu globale (protection des blocs + restauration de la map).
+     * Une fois les deux coins posés, capture immédiatement un snapshot de tous les blocs
+     * actuellement présents dans la zone : c'est cet état qui sera restauré à chaque round.
+     */
+    private void handleSetGameZone(CommandSender sender, String[] args) {
+        if (!checkAdminAndPlayer(sender)) return;
+        if (args.length < 3) {
+            MessageUtil.send(sender, "&cUsage: /hb setgamezone <nom> <pos1|pos2>");
+            return;
+        }
+        GameManager gm = resolveArena(sender, args, 1);
+        if (gm == null) return;
+        Player player = (Player) sender;
+
+        String posArg = args[2].toLowerCase(Locale.ROOT);
+        String arenaKey = args[1].toLowerCase(Locale.ROOT);
+
+        if (posArg.equals("pos1")) {
+            pendingGameZoneCorner1.put(arenaKey, player.getLocation());
+            MessageUtil.send(sender, "&aCoin 1 de la zone de jeu enregistré. Place-toi au coin opposé et fais &7/hb setgamezone " + args[1] + " pos2");
+        } else if (posArg.equals("pos2")) {
+            Location corner1 = pendingGameZoneCorner1.get(arenaKey);
+            if (corner1 == null) {
+                MessageUtil.send(sender, "&cTu dois d'abord définir le coin 1 avec /hb setgamezone " + args[1] + " pos1");
+                return;
+            }
+            Location corner2 = player.getLocation();
+            if (corner1.getWorld() == null || !corner1.getWorld().equals(corner2.getWorld())) {
+                MessageUtil.send(sender, "&cLes deux coins doivent être dans le même monde !");
+                return;
+            }
+
+            CuboidRegion region = new CuboidRegion(corner1, corner2);
+            gm.getArena().setGameZone(region);
+            pendingGameZoneCorner1.remove(arenaKey);
+            gm.saveArenaConfig();
+
+            MessageUtil.send(sender, "&aZone de jeu définie ! Capture du snapshot de la map en cours...");
+            gm.captureGameZone();
+            MessageUtil.send(sender, "&aSnapshot de la map capturé avec succès. Elle sera restaurée à chaque round.");
+        } else {
+            MessageUtil.send(sender, "&cUsage: /hb setgamezone <nom> <pos1|pos2>");
+        }
+    }
+
+    // ================= JOUEUR =================
+
+    private void handleJoin(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player player)) {
+            MessageUtil.send(sender, "&cCette commande doit être exécutée par un joueur.");
+            return;
+        }
+        if (args.length < 2) {
+            MessageUtil.send(sender, "&cUsage: /hb join <nom>");
+            return;
+        }
+        ArenaManager am = plugin.getArenaManager();
+        GameManager gm = am.get(args[1]);
+        if (gm == null) {
+            MessageUtil.send(sender, "&cAucune arène nommée '" + args[1] + "' n'existe.");
+            return;
+        }
+
+        GameManager current = am.findArenaOf(player);
+        if (current != null) {
+            MessageUtil.send(sender, "&cTu es déjà dans une partie (" + current.getName() + "). Fais /hb leave d'abord.");
+            return;
+        }
+
+        gm.addPlayer(player);
+    }
+
+    private void handleLeave(CommandSender sender) {
+        if (!(sender instanceof Player player)) {
+            MessageUtil.send(sender, "&cCette commande doit être exécutée par un joueur.");
+            return;
+        }
+        GameManager gm = plugin.getArenaManager().findArenaOf(player);
+        if (gm == null) {
+            MessageUtil.send(sender, "&cTu n'es pas dans une partie.");
+            return;
+        }
+        gm.removePlayer(player);
+    }
+
+    private void handleInfo(CommandSender sender, String[] args) {
+        ArenaManager am = plugin.getArenaManager();
+
+        if (args.length < 2) {
+            // Sans nom précisé : si le joueur est en partie, affiche son arène actuelle.
+            if (sender instanceof Player player) {
+                GameManager current = am.findArenaOf(player);
+                if (current != null) {
+                    printArenaInfo(sender, current);
+                    return;
+                }
+            }
+            MessageUtil.send(sender, "&cUsage: /hb info <nom>");
+            return;
+        }
+
+        GameManager gm = am.get(args[1]);
+        if (gm == null) {
+            MessageUtil.send(sender, "&cAucune arène nommée '" + args[1] + "' n'existe.");
+            return;
+        }
+        printArenaInfo(sender, gm);
+    }
+
+    private void printArenaInfo(CommandSender sender, GameManager gm) {
+        Arena arena = gm.getArena();
+        MessageUtil.send(sender, "&8&m----------&r &bHikaBrain: " + gm.getName() + " &8&m----------");
+        MessageUtil.send(sender, "&7État : &f" + gm.getState());
+        MessageUtil.send(sender, "&7Joueurs en partie : &f" + gm.getPlayerCount());
+        MessageUtil.send(sender, "&7Map configurée : " + (arena.isFullyConfigured() ? "&aOui" : "&cNon"));
+        MessageUtil.send(sender, "&7Zone de jeu (protection) : " + (gm.getArenaSnapshot().isCaptured() ? "&aOui" : "&cNon configurée"));
+        MessageUtil.send(sender, "&c● Rouge: &f" + gm.getScore(Team.RED) + "  &9● Bleu: &f" + gm.getScore(Team.BLUE));
+    }
+
+    // ================= ADMIN: START/STOP =================
+
+    private void handleStart(CommandSender sender, String[] args) {
+        if (!sender.hasPermission("hikabrain.admin")) {
+            MessageUtil.send(sender, "&cTu n'as pas la permission.");
+            return;
+        }
+        if (args.length < 2) {
+            MessageUtil.send(sender, "&cUsage: /hb start <nom>");
+            return;
+        }
+        GameManager gm = resolveArena(sender, args, 1);
+        if (gm == null) return;
+
+        if (!gm.getArena().isFullyConfigured()) {
+            MessageUtil.send(sender, "&cLa map n'est pas complètement configurée (lobby/spawns/zones manquants).");
+            return;
+        }
+        if (gm.getState() == GameState.PLAYING || gm.getState() == GameState.ROUND_RESET) {
+            MessageUtil.send(sender, "&cUne partie est déjà en cours sur cette arène.");
+            return;
+        }
+        boolean started = gm.forceStart();
+        MessageUtil.send(sender, started ? "&aPartie démarrée de force." : "&cImpossible de démarrer : il faut au moins un joueur dans chaque équipe.");
+    }
+
+    private void handleStop(CommandSender sender, String[] args) {
+        if (!sender.hasPermission("hikabrain.admin")) {
+            MessageUtil.send(sender, "&cTu n'as pas la permission.");
+            return;
+        }
+        if (args.length < 2) {
+            MessageUtil.send(sender, "&cUsage: /hb stop <nom>");
+            return;
+        }
+        GameManager gm = resolveArena(sender, args, 1);
+        if (gm == null) return;
+
+        gm.forceStop();
+        MessageUtil.send(sender, "&aPartie arrêtée sur '" + args[1] + "', retour au lobby.");
+    }
+
+    // ================= SCOREBOARD (ADMIN) =================
+
+    private void handleSetSbServer(CommandSender sender, String[] args) {
+        if (!sender.hasPermission("hikabrain.admin")) {
+            MessageUtil.send(sender, "&cTu n'as pas la permission.");
+            return;
+        }
+        if (args.length < 2) {
+            MessageUtil.send(sender, "&cUsage: /hb setsbserver <nom_du_serveur>");
+            return;
+        }
+        String serverName = args[1];
+        plugin.getScoreboardManager().setServerName(serverName);
+        MessageUtil.send(sender, "&aNom du serveur défini sur: &f" + serverName);
+    }
+
+    private void handleSetSbGame(CommandSender sender, String[] args) {
+        if (!sender.hasPermission("hikabrain.admin")) {
+            MessageUtil.send(sender, "&cTu n'as pas la permission.");
+            return;
+        }
+        if (args.length < 2) {
+            MessageUtil.send(sender, "&cUsage: /hb setsbgame <nom_du_jeu>");
+            return;
+        }
+        String gameName = args[1];
+        plugin.getScoreboardManager().setGameName(gameName);
+        MessageUtil.send(sender, "&aNom du jeu défini sur: &f" + gameName);
+    }
+
+    private void handleSetSbTitle(CommandSender sender, String[] args) {
+        if (!sender.hasPermission("hikabrain.admin")) {
+            MessageUtil.send(sender, "&cTu n'as pas la permission.");
+            return;
+        }
+        if (args.length < 2) {
+            MessageUtil.send(sender, "&cUsage: /hb setsbtitle <titre> (utilise & pour les couleurs)");
+            return;
+        }
+        // Reconstruire le titre à partir de tous les arguments
+        StringBuilder title = new StringBuilder();
+        for (int i = 1; i < args.length; i++) {
+            if (i > 1) title.append(" ");
+            title.append(args[i]);
+        }
+        plugin.getScoreboardManager().setTitle(title.toString());
+        MessageUtil.send(sender, "&aTitre du scoreboard défini sur: &f" + title);
+    }
+
+    private void handleSetSbLines(CommandSender sender, String[] args) {
+        if (!sender.hasPermission("hikabrain.admin")) {
+            MessageUtil.send(sender, "&cTu n'as pas la permission.");
+            return;
+        }
+        if (args.length < 2) {
+            MessageUtil.send(sender, "&cUsage: /hb setsblines <ligne1> | <ligne2> | ...");
+            MessageUtil.send(sender, "&7Variables disponibles: %server%, %game%, %red_score%, %blue_score%, %players%, %elapsed_time%");
+            MessageUtil.send(sender, "&7Sépare les lignes par des | (pipe character)");
+            return;
+        }
+        // Reconstruire les lignes à partir de tous les arguments séparés par |
+        StringBuilder allArgs = new StringBuilder();
+        for (int i = 1; i < args.length; i++) {
+            if (i > 1) allArgs.append(" ");
+            allArgs.append(args[i]);
+        }
+        
+        String[] linesArray = allArgs.toString().split("\\|");
+        List<String> lines = new ArrayList<>();
+        for (String line : linesArray) {
+            lines.add(line.trim());
+        }
+        
+        plugin.getScoreboardManager().setLines(lines);
+        MessageUtil.send(sender, "&aLignes du scoreboard mises à jour. (" + lines.size() + " lignes)");
+    }
+
+    private void handleReloadSb(CommandSender sender) {
+        if (!sender.hasPermission("hikabrain.admin")) {
+            MessageUtil.send(sender, "&cTu n'as pas la permission.");
+            return;
+        }
+        plugin.getScoreboardManager().reload();
+        MessageUtil.send(sender, "&aConfiguration du scoreboard rechargée.");
+    }
+
+    private void handleSbInfo(CommandSender sender) {
+        if (!sender.hasPermission("hikabrain.admin")) {
+            MessageUtil.send(sender, "&cTu n'as pas la permission.");
+            return;
+        }
+        MessageUtil.send(sender, "&8&m----------&r &bScoreboard &8&m----------");
+        MessageUtil.send(sender, "&7Titre: &f" + plugin.getScoreboardManager().getTitle());
+        MessageUtil.send(sender, "&7Serveur: &f" + plugin.getScoreboardManager().getServerName());
+        MessageUtil.send(sender, "&7Jeu: &f" + plugin.getScoreboardManager().getGameName());
+        MessageUtil.send(sender, "&7Lignes: &f" + plugin.getConfig().getStringList("scoreboard.lines").size());
+        MessageUtil.send(sender, "&8&m----------&r &7Commandes &8&m----------");
+        MessageUtil.send(sender, "&e/hb setsbserver <nom> &7- Définir le nom du serveur");
+        MessageUtil.send(sender, "&e/hb setsbgame <nom> &7- Définir le nom du jeu");
+        MessageUtil.send(sender, "&e/hb setsbtitle <titre> &7- Définir le titre");
+        MessageUtil.send(sender, "&e/hb setsblines <lignes> &7- Définir les lignes (séparées par |)");
+        MessageUtil.send(sender, "&e/hb reloadsb &7- Recharger la config");
+    }
+
+    // ================= STATISTIQUES =================
+
+    private void handleStats(CommandSender sender) {
+        MessageUtil.send(sender, "&8&m----------&r &bStats HikaBrain &8&m----------");
+        MessageUtil.send(sender, "&f&l▸ &cÉquipe Rouge");
+        MessageUtil.send(sender, "&f  Kills: &c" + plugin.getStatsManager().getRedKills() + " &7/ Deaths: &c" + plugin.getStatsManager().getRedDeaths() + " &7/ K/D: &c" + plugin.getStatsManager().getRedKD());
+        MessageUtil.send(sender, "&f  Victoires: &c" + plugin.getStatsManager().getRedWins());
+        MessageUtil.send(sender, "&f&l▸ &9Équipe Bleu");
+        MessageUtil.send(sender, "&f  Kills: &9" + plugin.getStatsManager().getBlueKills() + " &7/ Deaths: &9" + plugin.getStatsManager().getBlueDeaths() + " &7/ K/D: &9" + plugin.getStatsManager().getBlueKD());
+        MessageUtil.send(sender, "&f  Victoires: &9" + plugin.getStatsManager().getBlueWins());
+        MessageUtil.send(sender, "&8&m----------&r");
+        MessageUtil.send(sender, "&fParties jouées: &7" + plugin.getStatsManager().getTotalGames());
+        MessageUtil.send(sender, "&fCaptures totales: &7" + plugin.getStatsManager().getTotalCaptures());
+        MessageUtil.send(sender, "&8&m----------&r");
+    }
+
+    private void handleResetStats(CommandSender sender) {
+        if (!sender.hasPermission("hikabrain.admin")) {
+            MessageUtil.send(sender, "&cTu n'as pas la permission.");
+            return;
+        }
+        plugin.getStatsManager().resetStats();
+        MessageUtil.send(sender, "&aToutes les statistiques ont été réinitialisées.");
+    }
+
+    // ================= UTILITAIRES =================
+
+    private boolean checkAdminAndPlayer(CommandSender sender) {
+        if (!sender.hasPermission("hikabrain.admin")) {
+            MessageUtil.send(sender, "&cTu n'as pas la permission.");
+            return false;
+        }
+        if (!(sender instanceof Player)) {
+            MessageUtil.send(sender, "&cCette commande doit être exécutée par un joueur (elle utilise ta position).");
+            return false;
+        }
+        return true;
+    }
+
+    private Team parseTeam(String arg) {
+        return switch (arg.toLowerCase(Locale.ROOT)) {
+            case "red", "rouge" -> Team.RED;
+            case "blue", "bleu" -> Team.BLUE;
+            default -> null;
+        };
+    }
+
+    private void sendHelp(CommandSender sender) {
+        MessageUtil.send(sender, "&8&m----------&r &bHikaBrain &8&m----------");
+        MessageUtil.send(sender, "&e/hb join <nom> &7- Rejoindre une arène");
+        MessageUtil.send(sender, "&e/hb leave &7- Quitter la partie en cours");
+        MessageUtil.send(sender, "&e/hb list &7- Lister toutes les arènes");
+        MessageUtil.send(sender, "&e/hb info [nom] &7- Voir l'état d'une arène");
+        MessageUtil.send(sender, "&e/hb stats &7- Voir les statistiques");
+        if (sender.hasPermission("hikabrain.admin")) {
+            MessageUtil.send(sender, "&c/hb create <nom> &7- Créer une nouvelle arène");
+            MessageUtil.send(sender, "&c/hb delete <nom> &7- Supprimer une arène");
+            MessageUtil.send(sender, "&c/hb setlobby <nom> &7- Définir le point de lobby");
+            MessageUtil.send(sender, "&c/hb setspawn <nom> <red|blue> &7- Définir le spawn d'une équipe");
+            MessageUtil.send(sender, "&c/hb setcapture <nom> <red|blue> <pos1|pos2> &7- Définir la zone de capture");
+            MessageUtil.send(sender, "&c/hb setgamezone <nom> <pos1|pos2> &7- Définir la zone de jeu (protection + restauration)");
+            MessageUtil.send(sender, "&c/hb start <nom> &7- Forcer le démarrage");
+            MessageUtil.send(sender, "&c/hb stop <nom> &7- Forcer l'arrêt");
+            MessageUtil.send(sender, "&c/hb resetstats &7- Réinitialiser les statistiques");
+            MessageUtil.send(sender, "&8&m----------&r &dScoreboard &8&m----------");
+            MessageUtil.send(sender, "&d/hb setsbserver <nom> &7- Définir le nom du serveur");
+            MessageUtil.send(sender, "&d/hb setsbgame <nom> &7- Définir le nom du jeu");
+            MessageUtil.send(sender, "&d/hb setsbtitle <titre> &7- Définir le titre");
+            MessageUtil.send(sender, "&d/hb setsblines <lignes> &7- Définir les lignes (| pour séparer)");
+            MessageUtil.send(sender, "&d/hb reloadsb &7- Recharger la config");
+            MessageUtil.send(sender, "&d/hb sbinfo &7- Voir les infos du scoreboard");
+        }
+    }
+
+    @Override
+    public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
+        if (args.length == 1) {
+            List<String> options = new ArrayList<>(List.of("join", "leave", "info", "list", "stats"));
+            if (sender.hasPermission("hikabrain.admin")) {
+                options.addAll(List.of("create", "delete", "setlobby", "setspawn", "setcapture", "setgamezone", "start", "stop"));
+                options.addAll(List.of("setsbserver", "setsbgame", "setsbtitle", "setsblines", "reloadsb", "sbinfo"));
+                options.addAll(List.of("resetstats"));
+            }
+            return filterStartingWith(options, args[0]);
+        }
+
+        String sub = args[0].toLowerCase(Locale.ROOT);
+
+        // Le 2e argument est presque toujours un nom d'arène existant (sauf pour "create").
+        if (args.length == 2 && Set.of("join", "info", "delete", "setlobby", "setspawn", "setcapture", "setgamezone", "start", "stop").contains(sub)) {
+            return filterStartingWith(new ArrayList<>(plugin.getArenaManager().getNames()), args[1]);
+        }
+
+        if (args.length == 3 && (sub.equals("setspawn") || sub.equals("setcapture"))) {
+            return filterStartingWith(List.of("red", "blue"), args[2]);
+        }
+
+        if (args.length == 3 && sub.equals("setgamezone")) {
+            return filterStartingWith(List.of("pos1", "pos2"), args[2]);
+        }
+
+        if (args.length == 4 && sub.equals("setcapture")) {
+            return filterStartingWith(List.of("pos1", "pos2"), args[3]);
+        }
+
+        return Collections.emptyList();
+    }
+
+    private List<String> filterStartingWith(List<String> options, String prefix) {
+        List<String> result = new ArrayList<>();
+        for (String option : options) {
+            if (option.toLowerCase(Locale.ROOT).startsWith(prefix.toLowerCase(Locale.ROOT))) {
+                result.add(option);
+            }
+        }
+        return result;
+    }
+}
