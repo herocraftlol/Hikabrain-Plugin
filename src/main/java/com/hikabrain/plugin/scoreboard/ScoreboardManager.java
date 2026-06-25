@@ -110,7 +110,7 @@ public class ScoreboardManager {
     private Scoreboard createNewScoreboard(GameManager gm) {
         Scoreboard board = Bukkit.getScoreboardManager().getNewScoreboard();
         
-        // Créer les équipes Minecraft pour le TAB
+        // Créer les équipes Minecraft pour le TAB (couleurs des joueurs)
         org.bukkit.scoreboard.Team redTeam = board.registerNewTeam("red");
         redTeam.setPrefix(ChatColor.RED + "");
         redTeam.setDisplayName("Rouge");
@@ -118,6 +118,11 @@ public class ScoreboardManager {
         org.bukkit.scoreboard.Team blueTeam = board.registerNewTeam("blue");
         blueTeam.setPrefix(ChatColor.BLUE + "");
         blueTeam.setDisplayName("Bleu");
+        
+        // Créer une équipe vide pour les entrées du sidebar (n'apparaît pas dans le TAB)
+        org.bukkit.scoreboard.Team sidebarTeam = board.registerNewTeam("sidebar");
+        sidebarTeam.setPrefix("");
+        sidebarTeam.setDisplayName("");
         
         // Créer l'objectif pour le sidebar
         Objective objective = board.registerNewObjective("hikabrain", Criteria.DUMMY, parseColor(title));
@@ -171,29 +176,28 @@ public class ScoreboardManager {
             "&7&m-----------"
         };
         
-        // Score à 0 pour toutes les lignes (affiche juste "0" à droite)
+        // Score à 0 pour toutes les lignes
         for (int i = 0; i < lines.length; i++) {
             String parsed = parseColor(lines[i]);
             
-            // Identifiant unique pour la ligne
+            // Identifiant simple (n'apparaît pas dans le TAB si pas dans une équipe)
             String identifier = String.valueOf(i);
             
-            // Créer l'équipe pour cette ligne
+            // Créer une équipe pour cette ligne uniquement (pas de collision)
             org.bukkit.scoreboard.Team mcTeam;
-            String teamName = "sb_team_" + i;
+            String teamName = "sb_" + i;
             if (board.getTeam(teamName) != null) {
                 mcTeam = board.getTeam(teamName);
             } else {
                 mcTeam = board.registerNewTeam(teamName);
             }
             
-            // Texte complet dans le prefix
+            // Texte dans le prefix
             mcTeam.setPrefix(parsed);
             mcTeam.setSuffix("");
-            
             mcTeam.addEntry(identifier);
             
-            // Score à 0 pour toutes les lignes (minimaliste)
+            // Score à 0 pour toutes les lignes
             objective.getScore(identifier).setScore(0);
         }
     }
