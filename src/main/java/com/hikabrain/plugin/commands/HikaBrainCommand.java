@@ -213,7 +213,7 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
         String pendingKey = args[1].toLowerCase(Locale.ROOT) + ":" + team.name();
 
         if (posArg.equals("pos1")) {
-            pendingCaptureCorner1.put(pendingKey, player.getLocation());
+            pendingCaptureCorner1.put(pendingKey, player.getTargetBlock(null, 5).getLocation());
             MessageUtil.send(sender, "&aCoin 1 de la zone de capture &7" + team.getColoredName()
                     + "&a enregistré. Place-toi au coin opposé et fais &7/hb setcapture " + args[1] + " " + args[2] + " pos2");
         } else if (posArg.equals("pos2")) {
@@ -222,7 +222,7 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
                 MessageUtil.send(sender, "&cTu dois d'abord définir le coin 1 avec /hb setcapture " + args[1] + " " + args[2] + " pos1");
                 return;
             }
-            Location corner2 = player.getLocation();
+            Location corner2 = player.getTargetBlock(null, 5).getLocation();
             if (corner1.getWorld() == null || !corner1.getWorld().equals(corner2.getWorld())) {
                 MessageUtil.send(sender, "&cLes deux coins doivent être dans le même monde !");
                 return;
@@ -258,7 +258,7 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
         String arenaKey = args[1].toLowerCase(Locale.ROOT);
 
         if (posArg.equals("pos1")) {
-            pendingGameZoneCorner1.put(arenaKey, player.getLocation());
+            pendingGameZoneCorner1.put(arenaKey, player.getTargetBlock(null, 5).getLocation());
             MessageUtil.send(sender, "&aCoin 1 de la zone de jeu enregistré. Place-toi au coin opposé et fais &7/hb setgamezone " + args[1] + " pos2");
         } else if (posArg.equals("pos2")) {
             Location corner1 = pendingGameZoneCorner1.get(arenaKey);
@@ -266,7 +266,7 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
                 MessageUtil.send(sender, "&cTu dois d'abord définir le coin 1 avec /hb setgamezone " + args[1] + " pos1");
                 return;
             }
-            Location corner2 = player.getLocation();
+            Location corner2 = player.getTargetBlock(null, 5).getLocation();
             if (corner1.getWorld() == null || !corner1.getWorld().equals(corner2.getWorld())) {
                 MessageUtil.send(sender, "&cLes deux coins doivent être dans le même monde !");
                 return;
