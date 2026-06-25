@@ -174,7 +174,9 @@ public class ScoreboardManager {
         int score = lines.length;
         for (int i = 0; i < lines.length; i++) {
             String parsed = parseColor(lines[i]);
-            String identifier = "line_" + i;
+            
+            // Identifiants simples (chiffres) pour le sidebar
+            String identifier = String.valueOf(i);
             
             // Créer l'équipe pour cette ligne
             org.bukkit.scoreboard.Team mcTeam;
@@ -185,6 +187,7 @@ public class ScoreboardManager {
                 mcTeam = board.registerNewTeam(teamName);
             }
             
+            // Tout le texte dans le prefix
             String prefix = parsed;
             String suffix = "";
             
