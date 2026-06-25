@@ -135,6 +135,13 @@ public class GameManager {
     }
 
     /**
+     * Retourne le nombre de joueurs dans une équipe donnée.
+     */
+    public int getPlayerCountForTeam(Team team) {
+        return (int) playerTeams.values().stream().filter(t -> t == team).count();
+    }
+
+    /**
      * Fait rejoindre un joueur au lobby d'attente. Renvoie false si la partie n'est pas joignable.
      */
     public boolean addPlayer(Player player) {
@@ -212,11 +219,50 @@ public class GameManager {
         return redCount <= blueCount ? Team.RED : Team.BLUE;
     }
 
+    /**
+     * Change l'équipe d'un joueur et met à jour son item de sélection d'équipe.
+     */
+    public boolean changePlayerTeam(Player player, Team newTeam) {
+        UUID uuid = player.getUniqueId();
+        if (!playerTeams.containsKey(uuid)) {
+            return false;
+        }
+        
+        // Ne pas permettre le changement d'équipe pendant la partie
+        if (state == GameState.PLAYING || state == GameState.ROUND_RESET || state == GameState.COUNTDOWN) {
+            return false;
+        }
+        
+        Team oldTeam = playerTeams.get(uuid);
+        if (oldTeam == newTeam) {
+            return false;
+        }
+        
+        playerTeams.put(uuid, newTeam);
+        
+        // Mettre à jour l'item de sélection d'équipe
+        player.getInventory().setItem(KitManager.TEAM_SELECT_SLOT, KitManager.createTeamSelectorItem(newTeam));
+        
+        // Mettre à jour l'armure
+        KitManager.equipArmor(player, newTeam);
+        
+        MessageUtil.send(player, plugin.getConfig().getString("messages.team-changed", "")
+                .replace("%team%", newTeam.getColoredName()));
+        
+        return true;
+    }
+
     private void preparePlayerForLobby(Player player) {
         player.setGameMode(GameMode.ADVENTURE);
         player.getInventory().clear();
         player.setHealth(20);
         player.setFoodLevel(20);
+        
+        // Donner le sel d'équipe (terracotta coloré)
+        Team team = playerTeams.get(player.getUniqueId());
+        player.getInventory().setItem(KitManager.TEAM_SELECT_SLOT, KitManager.createTeamSelectorItem(team));
+        
+        // Donner le diamant de démarrage forcé aux admins
         if (player.hasPermission("hikabrain.admin")) {
             player.getInventory().setItem(KitManager.FORCESTART_SLOT, KitManager.createForceStartItem());
         }

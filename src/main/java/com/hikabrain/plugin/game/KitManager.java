@@ -12,21 +12,27 @@ import org.bukkit.persistence.PersistentDataType;
 
 /**
  * Fabrique et applique le kit de départ HikaBrain :
- * - Slot 0 : réservé au diamant admin (lobby uniquement)
- * - Slot 1 : épée en fer, incassable
- * - Slot 2 : pioche en fer, incassable
- * - Slot 3 : pomme dorée (regivée à chaque mort / point marqué)
- * - Offhand : 64 grès lisse (regivé à 64 dès qu'il en manque)
- * - Armure en cuir complète teintée selon l'équipe, incassable, avec le nom de l'équipe gravé
+ * Pendant la partie :
+ * - Slot 0 : épée en fer, incassable
+ * - Slot 1 : pioche en fer, incassable
+ * - Slot 2 : pomme dorée (regivée à chaque mort / point marqué)
+ * - Slot 8 : blocs (grès lisse) en offhand
+ * Pendant le lobby :
+ * - Slot 0 : diamant admin (pour forcer le démarrage)
+ * - Slot 2 : sel d'équipe (terracotta coloré pour changer d'équipe)
+ * - Offhand : 64 grès lisse
+ * Armure en cuir complète teintée selon l'équipe, incassable, avec le nom de l'équipe gravé
  */
 public final class KitManager {
 
-    // Slot 0 : réservé au diamant admin (lobby uniquement)
+    // Slots pour le lobby
     public static final int FORCESTART_SLOT = 0;
-    // Slots décalés pour laisser le slot 0 au diamant admin au lobby
-    private static final int SWORD_SLOT = 1;
-    private static final int PICKAXE_SLOT = 2;
-    private static final int GAPPLE_SLOT = 3;
+    public static final int TEAM_SELECT_SLOT = 2;
+    
+    // Slots pour le jeu (pas de décalage car le lobby utilise des slots différents)
+    private static final int SWORD_SLOT = 0;
+    private static final int PICKAXE_SLOT = 1;
+    private static final int GAPPLE_SLOT = 2;
 
     public static final Material OFFHAND_BLOCK_MATERIAL = Material.SMOOTH_SANDSTONE;
     public static final int OFFHAND_BLOCK_AMOUNT = 64;
@@ -36,12 +42,18 @@ public final class KitManager {
      * dans un clic, plutôt que de comparer un nom affiché (fragile face aux traductions/styles).
      */
     private static NamespacedKey forceStartKey;
+    
+    /**
+     * Clé persistante pour identifier l'item de sélection d'équipe.
+     */
+    private static NamespacedKey teamSelectorKey;
 
     private KitManager() {
     }
 
     public static void init(org.bukkit.plugin.Plugin plugin) {
         forceStartKey = new NamespacedKey(plugin, "force_start_item");
+        teamSelectorKey = new NamespacedKey(plugin, "team_selector_item");
     }
 
     /**
@@ -61,6 +73,48 @@ public final class KitManager {
     }
 
     /**
+     * Crée l'item de sélection d'équipe (terracotta coloré).
+     * Utilisé au lobby pour permettre aux joueurs de changer d'équipe.
+     */
+    public static ItemStack createTeamSelectorItem(Team team) {
+        Material material = team == Team.RED ? Material.RED_TERRACOTTA : Material.BLUE_TERRACOTTA;
+        ItemStack item = new ItemStack(material);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            String teamName = team.getColoredName();
+            meta.setDisplayName(teamName + ChatColor.WHITE + " - Sélection d'équipe");
+            meta.setLore(java.util.List.of(
+                ChatColor.GRAY + "Clique pour rejoindre cette équipe",
+                ChatColor.GRAY + "Équipe actuelle: " + teamName
+            ));
+            meta.getPersistentDataContainer().set(teamSelectorKey, PersistentDataType.STRING, team.name());
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
+    /**
+     * Met à jour la couleur de l'item de sélection d'équipe selon la nouvelle équipe.
+     */
+    public static void updateTeamSelectorItem(ItemStack item, Team team) {
+        if (item == null || !item.hasItemMeta()) return;
+        ItemMeta meta = item.getItemMeta();
+        if (meta == null) return;
+        
+        Material material = team == Team.RED ? Material.RED_TERRACOTTA : Material.BLUE_TERRACOTTA;
+        item.setType(material);
+        
+        String teamName = team.getColoredName();
+        meta.setDisplayName(teamName + ChatColor.WHITE + " - Sélection d'équipe");
+        meta.setLore(java.util.List.of(
+            ChatColor.GRAY + "Clique pour rejoindre cette équipe",
+            ChatColor.GRAY + "Équipe actuelle: " + teamName
+        ));
+        meta.getPersistentDataContainer().set(teamSelectorKey, PersistentDataType.STRING, team.name());
+        item.setItemMeta(meta);
+    }
+
+    /**
      * Détermine si l'ItemStack donné est bien l'item "forcer le démarrage" (et non un diamant
      * normal que le joueur aurait par ailleurs).
      */
@@ -70,6 +124,37 @@ public final class KitManager {
         }
         ItemMeta meta = item.getItemMeta();
         return meta != null && meta.getPersistentDataContainer().has(forceStartKey, PersistentDataType.BYTE);
+    }
+
+    /**
+     * Détermine si l'ItemStack donné est l'item de sélection d'équipe.
+     */
+    public static boolean isTeamSelectorItem(ItemStack item) {
+        if (item == null || !item.hasItemMeta()) {
+            return false;
+        }
+        ItemMeta meta = item.getItemMeta();
+        return meta != null && meta.getPersistentDataContainer().has(teamSelectorKey, PersistentDataType.STRING);
+    }
+
+    /**
+     * Récupère l'équipe sélectionnée par l'item de sélection d'équipe.
+     */
+    public static Team getTeamFromSelectorItem(ItemStack item) {
+        if (item == null || !item.hasItemMeta()) {
+            return null;
+        }
+        ItemMeta meta = item.getItemMeta();
+        if (meta == null) return null;
+        
+        String teamName = meta.getPersistentDataContainer().get(teamSelectorKey, PersistentDataType.STRING);
+        if (teamName == null) return null;
+        
+        try {
+            return Team.valueOf(teamName);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
     /**
@@ -111,7 +196,7 @@ public final class KitManager {
         }
     }
 
-    private static void equipArmor(org.bukkit.entity.Player player, Team team) {
+    public static void equipArmor(org.bukkit.entity.Player player, Team team) {
         ItemStack helmet = new ItemStack(Material.LEATHER_HELMET);
         ItemStack chestplate = new ItemStack(Material.LEATHER_CHESTPLATE);
         ItemStack leggings = new ItemStack(Material.LEATHER_LEGGINGS);

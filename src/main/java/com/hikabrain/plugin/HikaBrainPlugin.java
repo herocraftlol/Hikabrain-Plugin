@@ -9,6 +9,7 @@ import com.hikabrain.plugin.listeners.PlayerConnectionListener;
 import com.hikabrain.plugin.listeners.PlayerDamageListener;
 import com.hikabrain.plugin.listeners.PlayerDeathListener;
 import com.hikabrain.plugin.listeners.PlayerMoveListener;
+import com.hikabrain.plugin.listeners.TeamSelectListener;
 import com.hikabrain.plugin.scoreboard.ScoreboardManager;
 import com.hikabrain.plugin.stats.StatsManager;
 import org.bukkit.GameRule;
@@ -47,6 +48,7 @@ public class HikaBrainPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new PlayerDamageListener(this), this);
         getServer().getPluginManager().registerEvents(new PlayerMoveListener(this), this);
         getServer().getPluginManager().registerEvents(new PlayerDeathListener(this), this);
+        getServer().getPluginManager().registerEvents(new TeamSelectListener(this), this);
         getServer().getPluginManager().registerEvents(new ArenaProtectionListener(this), this);
         getServer().getPluginManager().registerEvents(new ForceStartItemListener(this), this);
 

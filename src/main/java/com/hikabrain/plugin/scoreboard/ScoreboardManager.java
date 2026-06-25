@@ -49,24 +49,23 @@ public class ScoreboardManager {
         
         if (objectiveLines.isEmpty()) {
             objectiveLines = Arrays.asList(
-                "&7&m--------------------",
+                "&6&lHikaBrain",
+                "&7&m---------------",
+                "&c&l▸ &fRouge: &c%red_score%",
+                "&9&l▸ &fBleu: &9%blue_score%",
+                "&7&m---------------",
+                "&fJoueurs: &b%players%",
                 "&fServeur: &b" + stripColor(serverName),
                 "&fJeu: &6" + stripColor(gameName),
-                "&7&m--------------------",
-                "&f&l▸ &c❤ &fRouge: &c%red_score%",
-                "&f&l▸ &9❤ &9Bleu: &9%blue_score%",
-                "&7&m--------------------",
-                "&f&l▸ &cKills: &c%red_kills% &7/ &cDeaths: &c%red_deaths%",
-                "&f&l▸ &9Kills: &9%blue_kills% &7/ &9Deaths: &9%blue_deaths%",
-                "&7&m--------------------",
-                "&f&l▸ &cVictoires: &c%red_wins%",
-                "&f&l▸ &9Victoires: &9%blue_wins%",
-                "&7&m--------------------",
-                "&f&l▸ &cK/D: &c%red_kd%",
-                "&f&l▸ &9K/D: &9%blue_kd%",
-                "&7&m--------------------",
+                "&7&m---------------",
+                "&cK/D Rouge: &c%red_kills%&7/&c%red_deaths%",
+                "&9K/D Bleu: &9%blue_kills%&7/&9%blue_deaths%",
+                "&7&m---------------",
+                "&fVictoires Rouge: &c%red_wins%",
+                "&fVictoires Bleu: &9%blue_wins%",
+                "&7&m---------------",
                 "&fTemps: &e%elapsed_time%",
-                "&7&m--------------------"
+                "&7&m---------------"
             );
         }
     }
@@ -164,17 +163,29 @@ public class ScoreboardManager {
     private Scoreboard createScoreboard(String title, String objectiveName, int players, int redScore, int blueScore, int elapsedSeconds, int redWins, int blueWins, int redKills, int redDeaths, int blueKills, int blueDeaths, double redKD, double blueKD) {
         Scoreboard board = Bukkit.getScoreboardManager().getNewScoreboard();
         
+        // Supprimer les anciens objectifs s'ils existent
+        for (Objective obj : board.getObjectives()) {
+            obj.unregister();
+        }
+        
+        // Supprimer les anciennes équipes
+        for (org.bukkit.scoreboard.Team team : board.getTeams()) {
+            team.unregister();
+        }
+        
         // Créer l'objectif avec le titre
-        Objective objective = board.registerNewObjective(objectiveName, Criteria.DUMMY, title);
+        String safeObjectiveName = "hikabrain_scoreboard"; // Nom fixe pour éviter les doublons
+        Objective objective = board.registerNewObjective(safeObjectiveName, Criteria.DUMMY, title);
         objective.setDisplaySlot(DisplaySlot.SIDEBAR);
 
         // Ajouter les lignes
         int score = objectiveLines.size();
-        for (String line : objectiveLines) {
+        for (int i = 0; i < objectiveLines.size(); i++) {
+            String line = objectiveLines.get(i);
             String parsed = parseLine(line, players, redScore, blueScore, elapsedSeconds, redWins, blueWins, redKills, redDeaths, blueKills, blueDeaths, redKD, blueKD);
-            org.bukkit.scoreboard.Team mcTeam = board.registerNewTeam("line_" + score);
-            String identifier = ChatColor.stripColor(parsed);
-            if (identifier.isEmpty()) identifier = "blank_" + score;
+            
+            // Créer un identifiant unique et sûr pour cette ligne
+            String identifier = "line_" + i;
             
             // Diviser la ligne si elle est trop longue (limite de 48 caractères par équipe)
             String prefix;
@@ -191,6 +202,13 @@ public class ScoreboardManager {
                 prefix = parsed;
             }
             
+            // Vérifier si l'équipe existe déjà
+            org.bukkit.scoreboard.Team mcTeam;
+            if (board.getTeam("team_" + i) != null) {
+                mcTeam = board.getTeam("team_" + i);
+            } else {
+                mcTeam = board.registerNewTeam("team_" + i);
+            }
             mcTeam.addEntry(identifier);
             mcTeam.setPrefix(prefix);
             mcTeam.setSuffix(suffix);
