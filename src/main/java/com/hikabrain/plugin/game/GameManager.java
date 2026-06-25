@@ -10,6 +10,7 @@ import org.bukkit.scheduler.BukkitTask;
 
 import java.io.File;
 import java.util.*;
+import java.util.Collections;
 
 /**
  * Gère l'intégralité du cycle de vie d'une partie HikaBrain pour UNE arène nommée :
@@ -132,6 +133,13 @@ public class GameManager {
 
     public int getPlayerCount() {
         return playerTeams.size();
+    }
+
+    /**
+     * Retourne la map des équipes des joueurs.
+     */
+    public Map<UUID, Team> getPlayerTeams() {
+        return Collections.unmodifiableMap(playerTeams);
     }
 
     /**
@@ -348,12 +356,7 @@ public class GameManager {
         startOffhandReplenishTask();
 
         // Mettre à jour le scoreboard pour tous les joueurs
-        for (UUID uuid : playerTeams.keySet()) {
-            Player player = Bukkit.getPlayer(uuid);
-            if (player != null) {
-                plugin.getScoreboardManager().onGameStart(player);
-            }
-        }
+        plugin.getScoreboardManager().onGameStart(this);
 
         broadcast(plugin.getConfig().getString("messages.game-start", ""));
     }

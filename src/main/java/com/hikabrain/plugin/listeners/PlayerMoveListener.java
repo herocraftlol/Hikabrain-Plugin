@@ -9,10 +9,10 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerMoveEvent;
 
 /**
- * Détecte les déplacements des joueurs en partie pour savoir s'ils viennent
- * de pénétrer dans la zone de capture adverse (capture instantanée).
- * Gère également l'immobilisation pendant les comptes à rebours et la mort
- * automatique si un joueur sort de la zone de jeu.
+ * Gère les déplacements des joueurs :
+ * - Capture de zone adverse
+ * - Immobilisation pendant ROUND_RESET uniquement (pas pendant COUNTDOWN)
+ * - Mort automatique si le joueur sort de la zone de jeu
  */
 public class PlayerMoveListener implements Listener {
 
@@ -31,37 +31,45 @@ public class PlayerMoveListener implements Listener {
             return;
         }
 
-        // Vérifier si le joueur essaie de bouger pendant un compte à rebours (COUNTDOWN ou ROUND_RESET)
         GameState state = gm.getState();
-        if (state == GameState.COUNTDOWN || state == GameState.ROUND_RESET) {
+
+        // FREEZE pendant ROUND_RESET uniquement (après un point marqué)
+        // Les joueurs sont libres pendant COUNTDOWN (30 secondes de lobby)
+        if (state == GameState.ROUND_RESET) {
             // On ignore les micro-mouvements (juste la tête qui tourne)
-            if (event.getFrom().getBlockX() == event.getTo().getBlockX()
-                    && event.getFrom().getBlockY() == event.getTo().getBlockY()
-                    && event.getFrom().getBlockZ() == event.getTo().getBlockZ()) {
+            if (isSameBlock(event.getFrom(), event.getTo())) {
                 return;
             }
-            // Immobiliser le joueur - le ramener à sa position précédente
+            // Immobiliser le joueur
             event.setTo(event.getFrom());
             return;
         }
 
-        // On ignore les micro-mouvements pendant la partie
-        if (event.getFrom().getBlockX() == event.getTo().getBlockX()
-                && event.getFrom().getBlockY() == event.getTo().getBlockY()
-                && event.getFrom().getBlockZ() == event.getTo().getBlockZ()) {
+        // On ignore les micro-mouvements
+        if (isSameBlock(event.getFrom(), event.getTo())) {
             return;
         }
 
-        // Vérifier si le joueur est hors de la zone de jeu (uniquement pendant PLAYING)
+        // Pendant PLAYING : vérifier si le joueur sort de la zone
         if (state == GameState.PLAYING) {
             if (!gm.getArena().isInGameZone(player.getLocation())) {
-                // Tuer le joueur et le téléporter à son spawn
                 player.setHealth(0);
                 return;
             }
         }
 
         // Gérer le mouvement normal (capture de zone)
-        gm.handlePlayerMove(player);
+        if (state == GameState.PLAYING) {
+            gm.handlePlayerMove(player);
+        }
+    }
+
+    /**
+     * Vérifie si deux locations sont dans le même bloc
+     */
+    private boolean isSameBlock(org.bukkit.Location from, org.bukkit.Location to) {
+        return from.getBlockX() == to.getBlockX()
+                && from.getBlockY() == to.getBlockY()
+                && from.getBlockZ() == to.getBlockZ();
     }
 }

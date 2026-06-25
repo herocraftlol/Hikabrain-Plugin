@@ -5,6 +5,7 @@ import com.hikabrain.plugin.game.GameManager;
 import com.hikabrain.plugin.game.GameState;
 import com.hikabrain.plugin.game.KitManager;
 import com.hikabrain.plugin.game.Team;
+import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -18,6 +19,7 @@ import org.bukkit.inventory.ItemStack;
  */
 public class TeamSelectListener implements Listener {
 
+    private static final int MAX_PLAYERS_PER_TEAM = 8;
     private final HikaBrainPlugin plugin;
 
     public TeamSelectListener(HikaBrainPlugin plugin) {
@@ -40,8 +42,14 @@ public class TeamSelectListener implements Listener {
             return;
         }
 
+        // Empêcher le clic droit de consommer l'item
+        if (event.getAction() == Action.RIGHT_CLICK_AIR || event.getAction() == Action.RIGHT_CLICK_BLOCK) {
+            event.setCancelled(true);
+        }
+
         // Ne permettre le changement d'équipe que pendant l'état WAITING (lobby)
         if (gm.getState() != GameState.WAITING) {
+            player.sendMessage(ChatColor.RED + "Vous ne pouvez pas changer d'équipe pendant la partie !");
             return;
         }
 
@@ -51,30 +59,38 @@ public class TeamSelectListener implements Listener {
             return;
         }
 
-        // Empêcher le clic droit de consommer l'item
-        if (event.getAction() == Action.RIGHT_CLICK_AIR || event.getAction() == Action.RIGHT_CLICK_BLOCK) {
-            event.setCancelled(true);
-        }
-
         // Vérifier si le joueur est déjà dans cette équipe
         Team currentTeam = gm.getTeam(player);
         if (currentTeam == targetTeam) {
-            // Déjà dans cette équipe, ne rien faire
+            // Déjà dans cette équipe, informer le joueur
+            player.sendMessage(ChatColor.YELLOW + "Vous êtes déjà dans l'équipe " + targetTeam.getColoredName() + ChatColor.YELLOW + " !");
             return;
         }
 
-        // Vérifier si l'équipe cible n'est pas pleine
-        long targetTeamCount = gm.getPlayerCountForTeam(targetTeam);
-        long currentTeamCount = gm.getPlayerCountForTeam(currentTeam);
-        
-        // Calculer le nombre max par équipe (approximatif)
-        int maxPerTeam = plugin.getConfig().getInt("max-players", 16) / 2;
-        if (targetTeamCount >= maxPerTeam) {
-            player.sendMessage(org.bukkit.ChatColor.RED + "L'équipe " + targetTeam.getColoredName() + org.bukkit.ChatColor.RED + " est pleine !");
+        // Vérifier si l'équipe cible n'est pas pleine (max 8 par équipe)
+        int targetTeamCount = gm.getPlayerCountForTeam(targetTeam);
+        if (targetTeamCount >= MAX_PLAYERS_PER_TEAM) {
+            player.sendMessage(ChatColor.RED + "L'équipe " + targetTeam.getColoredName() + ChatColor.RED + " est pleine (8/8) !");
             return;
+        }
+
+        // Vérifier si l'équipe actuelle ne va pas être vide (si c'est la dernière personne)
+        int currentTeamCount = gm.getPlayerCountForTeam(currentTeam);
+        if (currentTeamCount <= 1) {
+            // Vérifier si l'autre équipe n'est pas aussi pleine
+            int otherTeamCount = gm.getPlayerCountForTeam(targetTeam);
+            if (otherTeamCount >= MAX_PLAYERS_PER_TEAM) {
+                player.sendMessage(ChatColor.RED + "Impossible de quitter votre équipe : l'autre équipe est pleine et vous êtes le dernier !");
+                return;
+            }
+            // Si l'autre équipe n'est pas pleine, on peut quand même changer
         }
 
         // Changer l'équipe
-        gm.changePlayerTeam(player, targetTeam);
+        if (gm.changePlayerTeam(player, targetTeam)) {
+            player.sendMessage(ChatColor.GREEN + "Vous avez rejoint l'équipe " + targetTeam.getColoredName() + ChatColor.GREEN + " !");
+        } else {
+            player.sendMessage(ChatColor.RED + "Impossible de changer d'équipe !");
+        }
     }
 }

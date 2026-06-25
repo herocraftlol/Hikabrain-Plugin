@@ -71,6 +71,7 @@ messages:
   join: "&aTu as rejoint la partie ! &7(%current%/%max%)"
   leave: "&cTu as quitté la partie."
   team-assigned: "&7Tu es dans l'équipe %team%"
+  team-changed: "&aTu as rejoint l'équipe %team%"
   countdown-start: "&eLa partie commence dans &6%time%&e secondes !"
   game-start: "&a&lLA PARTIE COMMENCE !"
   point-scored: "&6+%points% point(s) pour l'équipe %team% &7(%score%/%win%)"

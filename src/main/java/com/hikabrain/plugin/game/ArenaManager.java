@@ -104,6 +104,13 @@ public class ArenaManager {
         return Collections.unmodifiableCollection(arenas.values());
     }
 
+    /**
+     * Alias pour getAll() pour compatibilité.
+     */
+    public Collection<GameManager> getAllGameManagers() {
+        return getAll();
+    }
+
     public Set<String> getNames() {
         return Collections.unmodifiableSet(arenas.keySet());
     }
