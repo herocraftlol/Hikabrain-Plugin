@@ -448,13 +448,10 @@ public class GameManager {
 
         Team playerTeam = playerTeams.get(player.getUniqueId());
         Team enemyTeam = playerTeam.opponent();
-        
-        // DEBUG
-        plugin.getLogger().info("[DEBUG] Joueur: " + player.getName() + " Equipe: " + playerTeam + " Position: " + player.getLocation().getBlockX() + "," + player.getLocation().getBlockY() + "," + player.getLocation().getBlockZ());
-        plugin.getLogger().info("[DEBUG] Zone de capture adverse: " + enemyTeam + " Contient? " + arena.isInCaptureZone(enemyTeam, player.getLocation()));
 
-        if (arena.isInCaptureZone(enemyTeam, player.getLocation())) {
-            plugin.getLogger().info("[DEBUG] POINT MARQUE PAR: " + playerTeam);
+        // Vérifier la position des yeux du joueur (plus fiable pour les zones au sol)
+        Location eyeLoc = player.getEyeLocation();
+        if (arena.isInCaptureZone(enemyTeam, eyeLoc)) {
             scorePoint(playerTeam);
         }
     }

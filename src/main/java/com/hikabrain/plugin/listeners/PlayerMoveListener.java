@@ -50,17 +50,14 @@ public class PlayerMoveListener implements Listener {
             return;
         }
 
-        // Pendant PLAYING : vérifier si le joueur sort de la zone
-        if (state == GameState.PLAYING) {
-            if (!gm.getArena().isInGameZone(player.getLocation())) {
-                player.setHealth(0);
-                return;
-            }
-        }
-
-        // Gérer le mouvement normal (capture de zone)
+        // Pendant PLAYING : vérifier la capture AVANT la mort hors zone
         if (state == GameState.PLAYING) {
             gm.handlePlayerMove(player);
+            
+            // Ensuite vérifier si le joueur sort de la zone (après le scoring)
+            if (!gm.getArena().isInGameZone(player.getLocation())) {
+                player.setHealth(0);
+            }
         }
     }
 
