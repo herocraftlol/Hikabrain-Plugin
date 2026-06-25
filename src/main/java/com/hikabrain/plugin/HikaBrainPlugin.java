@@ -7,6 +7,7 @@ import com.hikabrain.plugin.listeners.ArenaProtectionListener;
 import com.hikabrain.plugin.listeners.ForceStartItemListener;
 import com.hikabrain.plugin.listeners.PlayerConnectionListener;
 import com.hikabrain.plugin.listeners.PlayerDamageListener;
+import com.hikabrain.plugin.listeners.PlayerDeathListener;
 import com.hikabrain.plugin.listeners.PlayerMoveListener;
 import com.hikabrain.plugin.scoreboard.ScoreboardManager;
 import com.hikabrain.plugin.stats.StatsManager;
