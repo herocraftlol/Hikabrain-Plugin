@@ -2,8 +2,6 @@ package com.hikabrain.plugin.scoreboard;
 
 import com.hikabrain.plugin.HikaBrainPlugin;
 import com.hikabrain.plugin.game.GameManager;
-import com.hikabrain.plugin.game.GameState;
-import com.hikabrain.plugin.stats.StatsManager;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
@@ -21,15 +19,11 @@ public class ScoreboardManager {
 
     private final HikaBrainPlugin plugin;
     
-    // Scoreboard SHARED par arène (une seule instance par arène, pas par joueur)
-    private final Map<String, Scoreboard> arenaScoreboards = new HashMap<>();
-    private final Map<String, Integer> arenaStartTimes = new HashMap<>();
-    private final Set<UUID> playersWithBoard = new HashSet<>();
+    // Scoreboard PAR JOUEUR (pour afficher leur K/D personnel)
+    private final Map<UUID, Scoreboard> playerScoreboards = new HashMap<>();
     
     private BukkitTask updateTask;
 
-    private String serverName;
-    private String gameName;
     private String title;
 
     public ScoreboardManager(HikaBrainPlugin plugin) {
@@ -42,10 +36,7 @@ public class ScoreboardManager {
      * Charge la configuration du scoreboard depuis config.yml
      */
     public void loadConfig() {
-        String basePath = "scoreboard.";
-        serverName = plugin.getConfig().getString(basePath + "server-name", "&b&lHEROCRAFT");
-        gameName = plugin.getConfig().getString(basePath + "game-name", "&6&lHikaBrain");
-        title = plugin.getConfig().getString(basePath + "title", "&8[&b&lHEROCRAFT&8] &6&lHikaBrain");
+        title = plugin.getConfig().getString("scoreboard.title", "&8[&b&lHEROCRAFT&8] &6&lHikaBrain");
     }
 
     /**
@@ -53,7 +44,7 @@ public class ScoreboardManager {
      */
     private void startUpdateTask() {
         updateTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
-            updateAllArenaScoreboards();
+            updateAllPlayerScoreboards();
         }, 0L, 20L);
     }
 
@@ -65,89 +56,75 @@ public class ScoreboardManager {
             updateTask.cancel();
             updateTask = null;
         }
-        for (UUID uuid : new HashSet<>(playersWithBoard)) {
+        for (UUID uuid : new HashSet<>(playerScoreboards.keySet())) {
             Player player = Bukkit.getPlayer(uuid);
             if (player != null) {
                 player.setScoreboard(Bukkit.getScoreboardManager().getMainScoreboard());
             }
         }
-        playersWithBoard.clear();
-        arenaScoreboards.clear();
-        arenaStartTimes.clear();
+        playerScoreboards.clear();
     }
 
     /**
-     * Met à jour le scoreboard quand un joueur rejoint
+     * Crée et affiche le scoreboard pour un joueur
      */
     public void showScoreboard(Player player, GameManager gm) {
-        String arenaName = gm.getName();
-        
-        // Récupérer ou créer le scoreboard partagé pour cette arène
-        Scoreboard board = arenaScoreboards.computeIfAbsent(arenaName, k -> createNewScoreboard(gm));
-        
-        playersWithBoard.add(player.getUniqueId());
+        Scoreboard board = createPlayerScoreboard(player, gm);
+        playerScoreboards.put(player.getUniqueId(), board);
         player.setScoreboard(board);
-        
-        // Enregistrer le temps de début si la partie a commencé
-        if (gm.getState() == GameState.PLAYING || gm.getState() == GameState.ROUND_RESET) {
-            if (!arenaStartTimes.containsKey(arenaName)) {
-                arenaStartTimes.put(arenaName, (int) (System.currentTimeMillis() / 1000));
-            }
-        }
     }
 
     /**
      * Supprime le scoreboard d'un joueur
      */
     public void removeScoreboard(Player player) {
-        playersWithBoard.remove(player.getUniqueId());
+        playerScoreboards.remove(player.getUniqueId());
         player.setScoreboard(Bukkit.getScoreboardManager().getMainScoreboard());
     }
 
     /**
-     * Crée un nouveau scoreboard partagé pour une arène
+     * Crée un scoreboard pour un joueur spécifique
      */
-    private Scoreboard createNewScoreboard(GameManager gm) {
+    private Scoreboard createPlayerScoreboard(Player player, GameManager gm) {
         Scoreboard board = Bukkit.getScoreboardManager().getNewScoreboard();
-        
-        // Créer les équipes Minecraft pour le TAB (couleurs des joueurs)
-        org.bukkit.scoreboard.Team redTeam = board.registerNewTeam("red");
-        redTeam.setPrefix(ChatColor.RED + "");
-        redTeam.setDisplayName("Rouge");
-        
-        org.bukkit.scoreboard.Team blueTeam = board.registerNewTeam("blue");
-        blueTeam.setPrefix(ChatColor.BLUE + "");
-        blueTeam.setDisplayName("Bleu");
-        
-        // Créer une équipe vide pour les entrées du sidebar (n'apparaît pas dans le TAB)
-        org.bukkit.scoreboard.Team sidebarTeam = board.registerNewTeam("sidebar");
-        sidebarTeam.setPrefix("");
-        sidebarTeam.setDisplayName("");
         
         // Créer l'objectif pour le sidebar
         Objective objective = board.registerNewObjective("hikabrain", Criteria.DUMMY, parseColor(title));
         objective.setDisplaySlot(DisplaySlot.SIDEBAR);
         
-        // Ajouter les lignes du sidebar
-        addSidebarLines(board, objective, gm);
+        // Ajouter les lignes du sidebar avec le K/D du joueur
+        addPlayerSidebarLines(board, objective, player, gm);
         
         return board;
     }
 
     /**
-     * Ajoute les lignes du sidebar
+     * Ajoute les lignes du sidebar pour un joueur spécifique
      */
-    private void addSidebarLines(Scoreboard board, Objective objective, GameManager gm) {
+    private void addPlayerSidebarLines(Scoreboard board, Objective objective, Player player, GameManager gm) {
         int redScore = gm.getScore(com.hikabrain.plugin.game.Team.RED);
         int blueScore = gm.getScore(com.hikabrain.plugin.game.Team.BLUE);
         int players = gm.getPlayerCount();
         
-        // Lignes du sidebar simplifié
+        // K/D personnel du joueur
+        int kills = gm.getPlayerKills(player.getUniqueId());
+        int deaths = gm.getPlayerDeaths(player.getUniqueId());
+        double kd = deaths > 0 ? (double) kills / deaths : kills;
+        String kdStr = String.format("%.1f", kd);
+        
+        // Couleur selon l'équipe
+        com.hikabrain.plugin.game.Team team = gm.getTeam(player);
+        String teamColor = team == com.hikabrain.plugin.game.Team.RED ? "&c" : "&9";
+        String teamName = team == com.hikabrain.plugin.game.Team.RED ? "Rouge" : "Bleu";
+        
+        // Lignes du sidebar
+        int teamScore = team == com.hikabrain.plugin.game.Team.RED ? redScore : blueScore;
         String[] lines = {
             "&6&lHikaBrain",
             "&7" + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500,
-            "&c\u2764 &fRouge: &c" + redScore + "&7/&c5",
-            "&9\u2764 &fBleu: &9" + blueScore + "&7/&95",
+            teamColor + "\u2764 " + teamName + ": " + teamColor + teamScore + "&7/&f5",
+            "&7" + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500,
+            "&fTon K/D: &a" + kills + "&7/&c" + deaths + " &8(&a" + kdStr + "&8)",
             "&7" + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500,
             "&fJoueurs: &b" + players
         };
@@ -155,107 +132,53 @@ public class ScoreboardManager {
         // Score à 0 pour toutes les lignes
         for (int i = 0; i < lines.length; i++) {
             String parsed = parseColor(lines[i]);
-            
-            // Identifiant simple (n'apparaît pas dans le TAB si pas dans une équipe)
             String identifier = String.valueOf(i);
             
-            // Créer une équipe pour cette ligne uniquement (pas de collision)
             org.bukkit.scoreboard.Team mcTeam;
-            String teamName = "sb_" + i;
-            if (board.getTeam(teamName) != null) {
-                mcTeam = board.getTeam(teamName);
+            String teamName2 = "sb_" + i;
+            if (board.getTeam(teamName2) != null) {
+                mcTeam = board.getTeam(teamName2);
             } else {
-                mcTeam = board.registerNewTeam(teamName);
+                mcTeam = board.registerNewTeam(teamName2);
             }
             
-            // Texte dans le prefix
             mcTeam.setPrefix(parsed);
             mcTeam.setSuffix("");
             mcTeam.addEntry(identifier);
-            
-            // Score à 0 pour toutes les lignes
             objective.getScore(identifier).setScore(0);
         }
     }
 
     /**
-     * Met à jour tous les scoreboards partagés
+     * Met à jour tous les scoreboards des joueurs
      */
-    private void updateAllArenaScoreboards() {
-        // Supprimer les arènes qui n'existent plus
-        Set<String> activeArenas = new HashSet<>();
-        for (com.hikabrain.plugin.game.GameManager gm : plugin.getArenaManager().getAllGameManagers()) {
-            String arenaName = gm.getName();
-            activeArenas.add(arenaName);
-            
-            // Vérifier si le scoreboard existe
-            if (!arenaScoreboards.containsKey(arenaName)) {
-                continue;
-            }
-            
-            Scoreboard board = arenaScoreboards.get(arenaName);
-            
-            // Mettre à jour les équipes du TAB avec les joueurs actuels
-            updatePlayerTeams(board, gm);
-            
-            // Recréer le sidebar avec les nouvelles valeurs
-            updateSidebar(board, gm);
-            
-            // Rafraîchir le scoreboard pour tous les joueurs de cette arène
-            refreshPlayersInArena(arenaName, board, gm);
-        }
+    private void updateAllPlayerScoreboards() {
+        // Supprimer les joueurs qui ne jouent plus
+        playerScoreboards.keySet().removeIf(uuid -> {
+            Player player = Bukkit.getPlayer(uuid);
+            if (player == null) return true;
+            GameManager gm = plugin.getArenaManager().findArenaOf(player);
+            return gm == null || !gm.isPlaying(player);
+        });
         
-        // Nettoyer les arènes inactives
-        arenaScoreboards.keySet().removeIf(name -> !activeArenas.contains(name));
-        arenaStartTimes.keySet().removeIf(name -> !activeArenas.contains(name));
-    }
-
-    /**
-     * Met à jour les équipes du TAB avec les joueurs actuels
-     */
-    private void updatePlayerTeams(Scoreboard board, GameManager gm) {
-        org.bukkit.scoreboard.Team redTeam = board.getTeam("red");
-        org.bukkit.scoreboard.Team blueTeam = board.getTeam("blue");
-        
-        if (redTeam == null || blueTeam == null) return;
-        
-        // Vider les équipes
-        Set<String> redPlayers = new HashSet<>(redTeam.getEntries());
-        Set<String> bluePlayers = new HashSet<>(blueTeam.getEntries());
-        
-        for (String entry : redPlayers) {
-            redTeam.removeEntry(entry);
-        }
-        for (String entry : bluePlayers) {
-            blueTeam.removeEntry(entry);
-        }
-        
-        // Ajouter les joueurs actuels avec leur K/D
-        for (UUID uuid : gm.getPlayerTeams().keySet()) {
+        // Mettre à jour chaque scoreboard
+        for (UUID uuid : new HashSet<>(playerScoreboards.keySet())) {
             Player player = Bukkit.getPlayer(uuid);
             if (player == null) continue;
             
-            int kills = gm.getPlayerKills(uuid);
-            int deaths = gm.getPlayerDeaths(uuid);
-            String kdSuffix = ChatColor.GRAY + " [" + kills + "/" + deaths + "]";
+            GameManager gm = plugin.getArenaManager().findArenaOf(player);
+            if (gm == null || !gm.isPlaying(player)) continue;
             
-            com.hikabrain.plugin.game.Team team = gm.getPlayerTeams().get(uuid);
-            if (team == com.hikabrain.plugin.game.Team.RED) {
-                redTeam.setSuffix(kdSuffix);
-                redTeam.addEntry(player.getName());
-            } else if (team == com.hikabrain.plugin.game.Team.BLUE) {
-                blueTeam.setSuffix(kdSuffix);
-                blueTeam.addEntry(player.getName());
-            }
+            Scoreboard board = playerScoreboards.get(uuid);
+            updatePlayerSidebar(board, player, gm);
+            player.setScoreboard(board);
         }
     }
 
     /**
-     * Met à jour le sidebar
+     * Met à jour le sidebar pour un joueur
      */
-    private void updateSidebar(Scoreboard board, GameManager gm) {
-        String arenaName = gm.getName();
-        
+    private void updatePlayerSidebar(Scoreboard board, Player player, GameManager gm) {
         // Récupérer ou créer l'objectif
         Objective objective = board.getObjective("hikabrain");
         if (objective == null) {
@@ -263,12 +186,11 @@ public class ScoreboardManager {
             objective.setDisplaySlot(DisplaySlot.SIDEBAR);
         }
         
-        // Supprimer les anciennes entrées du sidebar
+        // Supprimer les anciennes entrées
         Set<org.bukkit.scoreboard.Team> oldTeams = new HashSet<>(board.getTeams());
         for (org.bukkit.scoreboard.Team team : oldTeams) {
-            if (team.getName().startsWith("sb_team_")) {
+            if (team.getName().startsWith("sb_")) {
                 for (String entry : team.getEntries()) {
-                    objective.getScore(entry).setScore(-999); // Score bidon pour标识
                     board.resetScores(entry);
                 }
                 team.unregister();
@@ -276,58 +198,23 @@ public class ScoreboardManager {
         }
         
         // Recréer les lignes
-        addSidebarLines(board, objective, gm);
+        addPlayerSidebarLines(board, objective, player, gm);
     }
 
-    /**
-     * Rafraîchit le scoreboard pour tous les joueurs d'une arène
-     */
-    private void refreshPlayersInArena(String arenaName, Scoreboard board, GameManager gm) {
-        for (UUID uuid : new HashSet<>(playersWithBoard)) {
-            Player player = Bukkit.getPlayer(uuid);
-            if (player == null) continue;
-            
-            if (gm.isPlaying(player)) {
-                player.setScoreboard(board);
-            }
-        }
-    }
-
-    /**
-     * Called when game starts to record start time
-     */
     public void onGameStart(GameManager gm) {
-        String arenaName = gm.getName();
-        arenaStartTimes.put(arenaName, (int) (System.currentTimeMillis() / 1000));
+        // Pas besoin pour le système par joueur
     }
 
-    /**
-     * Called when game resets to lobby to clear start time
-     */
     public void onLobbyReset(GameManager gm) {
-        String arenaName = gm.getName();
-        arenaStartTimes.remove(arenaName);
+        // Pas besoin pour le système par joueur
     }
 
-    /**
-     * Called when round resets to refresh the scoreboard
-     */
     public void onRoundReset(GameManager gm) {
-        // Le scoreboard sera mis à jour automatiquement
-    }
-
-    private String formatTime(int seconds) {
-        int minutes = seconds / 60;
-        int secs = seconds % 60;
-        return String.format("%02d:%02d", minutes, secs);
+        // Pas besoin pour le système par joueur
     }
 
     private String parseColor(String text) {
         return ChatColor.translateAlternateColorCodes('&', text);
-    }
-
-    private String stripColor(String text) {
-        return ChatColor.stripColor(parseColor(text));
     }
 
     public void reload() {
@@ -335,32 +222,11 @@ public class ScoreboardManager {
         loadConfig();
     }
 
-    public String getServerName() {
-        return serverName;
-    }
-
-    public String getGameName() {
-        return gameName;
-    }
-
     public String getTitle() {
         return title;
     }
 
-    public void setServerName(String name) {
-        this.serverName = name;
-    }
-
-    public void setGameName(String name) {
-        this.gameName = name;
-    }
-
     public void setTitle(String title) {
         this.title = title;
-    }
-
-    // Méthode requise pour compatibilité (non utilisée dans le nouveau système)
-    public void setLines(java.util.List<String> lines) {
-        // Les lignes sont maintenant codées en dur pour plus de fiabilité
     }
 }
