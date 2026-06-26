@@ -355,6 +355,7 @@ public class GameManager {
         teleportAllToSpawns();
         applyColoredNames();
         startOffhandReplenishTask();
+        startCaptureScheduler();
 
         // Mettre à jour le scoreboard pour tous les joueurs
         plugin.getScoreboardManager().onGameStart(this);
@@ -439,19 +440,46 @@ public class GameManager {
     }
 
     /**
-     * Appelée par le listener de mouvement à chaque fois qu'un joueur en partie se déplace.
-     * Si le joueur entre dans la zone de capture adverse, marque le point instantanément.
+     * Vérifie la capture pour tous les joueurs (appelé chaque tick).
      */
-    public void handlePlayerMove(Player player) {
+    public void checkCaptureZone() {
         if (state != GameState.PLAYING) return;
-        if (!playerTeams.containsKey(player.getUniqueId())) return;
-
-        Team playerTeam = playerTeams.get(player.getUniqueId());
-        Team enemyTeam = playerTeam.opponent();
-
-        // Vérifier si le joueur est dans la zone de capture adverse
-        if (arena.isInCaptureZone(enemyTeam, player.getLocation())) {
-            scorePoint(playerTeam);
+        
+        for (UUID playerId : playerTeams.keySet()) {
+            Player player = Bukkit.getPlayer(playerId);
+            if (player == null || !player.isOnline()) continue;
+            
+            Team playerTeam = playerTeams.get(playerId);
+            Team enemyTeam = playerTeam.opponent();
+            
+            if (arena.isInCaptureZone(enemyTeam, player.getLocation())) {
+                scorePoint(playerTeam);
+                break; // Un seul point à la fois
+            }
+        }
+    }
+    
+    private BukkitTask captureSchedulerTask;
+    
+    /**
+     * Démarre le scheduler qui vérifie la capture à chaque tick.
+     */
+    public void startCaptureScheduler() {
+        if (captureSchedulerTask != null) {
+            captureSchedulerTask.cancel();
+        }
+        captureSchedulerTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+            checkCaptureZone();
+        }, 1L, 1L); // Toutes les 50ms (1 tick)
+    }
+    
+    /**
+     * Arrête le scheduler de capture.
+     */
+    public void stopCaptureScheduler() {
+        if (captureSchedulerTask != null) {
+            captureSchedulerTask.cancel();
+            captureSchedulerTask = null;
         }
     }
 
@@ -533,6 +561,8 @@ public class GameManager {
             roundResetTask.cancel();
             roundResetTask = null;
         }
+        
+        stopCaptureScheduler();
 
         // Enregistrer la victoire dans les statistiques
         plugin.getStatsManager().addWin(winner);
