@@ -4,10 +4,16 @@ import com.hikabrain.plugin.HikaBrainPlugin;
 import com.hikabrain.plugin.util.MessageUtil;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
+import org.bukkit.FireworkEffect;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
+import org.bukkit.Color;
+import org.bukkit.Sound;
+import org.bukkit.entity.Firework;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.meta.FireworkMeta;
 import org.bukkit.scheduler.BukkitTask;
+import org.bukkit.util.Vector;
 
 import java.io.File;
 import java.util.*;
@@ -46,6 +52,9 @@ public class GameManager {
     private BukkitTask offhandReplenishTask;
     private int countdownSecondsLeft;
     private int roundResetSecondsLeft;
+
+    // Joueurs actuellement gelés (après un point marqué)
+    private final Set<UUID> frozenPlayers = new HashSet<>();
 
     public GameManager(HikaBrainPlugin plugin, String arenaName) {
         this.plugin = plugin;
@@ -196,6 +205,12 @@ public class GameManager {
             return;
         }
         playerTeams.remove(uuid);
+
+        // Dégeler si besoin
+        if (frozenPlayers.remove(uuid)) {
+            player.setWalkSpeed(0.2f);
+            player.setFlySpeed(0.1f);
+        }
         MessageUtil.send(player, plugin.getConfig().getString("messages.leave", ""));
         
         // Restaurer la position pré-lobby si disponible
@@ -410,6 +425,45 @@ public class GameManager {
         }
     }
 
+    /**
+     * Vérifie si un joueur est actuellement gelé.
+     */
+    public boolean isFrozen(Player player) {
+        return frozenPlayers.contains(player.getUniqueId());
+    }
+
+    /**
+     * Gèle tous les joueurs en partie : vitesse à 0 + vélocité nulle.
+     */
+    private void freezeAllPlayers() {
+        for (UUID uuid : playerTeams.keySet()) {
+            Player player = Bukkit.getPlayer(uuid);
+            if (player != null) {
+                frozenPlayers.add(uuid);
+                player.setWalkSpeed(0f);
+                player.setFlySpeed(0f);
+                player.setVelocity(new Vector(0, 0, 0));
+                // Bloquer aussi les inputs via GameMode Adventure pour éviter les interactions
+                player.setAllowFlight(false);
+            }
+        }
+    }
+
+    /**
+     * Dégèle tous les joueurs et restaure leur vitesse normale.
+     */
+    private void unfreezeAllPlayers() {
+        for (UUID uuid : frozenPlayers) {
+            Player player = Bukkit.getPlayer(uuid);
+            if (player != null) {
+                player.setWalkSpeed(0.2f);
+                player.setFlySpeed(0.1f);
+                player.setVelocity(new Vector(0, 0, 0));
+            }
+        }
+        frozenPlayers.clear();
+    }
+
     private void teleportAllToSpawns() {
         for (UUID uuid : playerTeams.keySet()) {
             Player player = Bukkit.getPlayer(uuid);
@@ -540,6 +594,9 @@ public class GameManager {
         teleportAllForRoundReset();
         arenaSnapshot.restore();
 
+        // Geler les joueurs immédiatement après téléportation
+        freezeAllPlayers();
+
         roundResetSecondsLeft = plugin.getConfig().getInt("round-reset-countdown", 5);
 
         roundResetTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
@@ -548,11 +605,26 @@ public class GameManager {
                     roundResetTask.cancel();
                     roundResetTask = null;
                 }
+                // Dégeler avant de reprendre
+                unfreezeAllPlayers();
                 state = GameState.PLAYING;
                 broadcast("&a&lÀ vous de jouer !");
+                // Son de départ
+                playSoundToAll(Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.5f, 1.2f);
                 return;
             }
+
             broadcast("&eProchain round dans &6" + roundResetSecondsLeft + "&e...");
+
+            // Sons du décompte : tic-tac à partir de 3
+            if (roundResetSecondsLeft <= 3) {
+                float pitch = roundResetSecondsLeft == 1 ? 1.4f : 0.9f;
+                playSoundToAll(Sound.BLOCK_NOTE_BLOCK_PLING, 1.0f, pitch);
+            } else {
+                // Tic discret pour les secondes au-delà de 3
+                playSoundToAll(Sound.BLOCK_NOTE_BLOCK_HAT, 0.5f, 0.8f);
+            }
+
             roundResetSecondsLeft--;
         }, 0L, 20L);
     }
@@ -600,6 +672,10 @@ public class GameManager {
         for (UUID uuid : playerTeams.keySet()) {
             Player player = Bukkit.getPlayer(uuid);
             if (player != null) {
+                // Dégeler (au cas où un point venait d'être marqué)
+                frozenPlayers.remove(uuid);
+                player.setWalkSpeed(0.2f);
+                player.setFlySpeed(0.1f);
                 // Mettre en spectateur
                 player.setGameMode(GameMode.SPECTATOR);
                 
@@ -656,6 +732,10 @@ public class GameManager {
         }
 
         int delay = plugin.getConfig().getInt("restart-delay", 5);
+
+        // Lancer des feux d'artifice aux spawns des joueurs de l'équipe gagnante
+        launchVictoryFireworks(winner, delay);
+
         Bukkit.getScheduler().runTaskLater(plugin, this::resetToLobby, delay * 20L);
     }
 
@@ -667,6 +747,7 @@ public class GameManager {
             roundResetTask.cancel();
             roundResetTask = null;
         }
+        unfreezeAllPlayers();
         resetToLobby();
     }
 
@@ -675,6 +756,8 @@ public class GameManager {
             offhandReplenishTask.cancel();
             offhandReplenishTask = null;
         }
+        // S'assurer que personne n'est encore gelé
+        unfreezeAllPlayers();
         clearColoredNames(playerTeams.keySet());
         for (UUID uuid : new ArrayList<>(playerTeams.keySet())) {
             Player player = Bukkit.getPlayer(uuid);
@@ -724,7 +807,66 @@ public class GameManager {
             roundResetTask.cancel();
             roundResetTask = null;
         }
+        unfreezeAllPlayers();
         resetToLobby();
+    }
+
+    // ================= SONS & EFFETS =================
+
+    /**
+     * Joue un son à tous les joueurs en partie, depuis leur propre position.
+     */
+    private void playSoundToAll(Sound sound, float volume, float pitch) {
+        for (UUID uuid : playerTeams.keySet()) {
+            Player player = Bukkit.getPlayer(uuid);
+            if (player != null) {
+                player.playSound(player.getLocation(), sound, volume, pitch);
+            }
+        }
+    }
+
+    /**
+     * Lance des feux d'artifice aux couleurs de l'équipe gagnante pendant toute la durée
+     * de l'écran de victoire.
+     */
+    private void launchVictoryFireworks(Team winner, int durationSeconds) {
+        Color primary = (winner == Team.RED) ? Color.RED : Color.BLUE;
+        Color secondary = (winner == Team.RED) ? Color.ORANGE : Color.AQUA;
+
+        // Lancer 2 salves séparées par 1.5 secondes pendant la durée du délai
+        int salves = Math.max(1, durationSeconds - 1);
+        for (int i = 0; i < salves; i++) {
+            long delayTicks = i * 30L; // toutes les 1.5s
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                for (UUID uuid : playerTeams.keySet()) {
+                    Player player = Bukkit.getPlayer(uuid);
+                    if (player == null) continue;
+                    spawnFirework(player.getLocation().add(0, 1, 0), primary, secondary);
+                }
+            }, delayTicks);
+        }
+    }
+
+    /**
+     * Fait apparaître un feu d'artifice à une location donnée.
+     */
+    private void spawnFirework(Location location, Color primary, Color secondary) {
+        Firework fw = location.getWorld().spawn(location, Firework.class);
+        FireworkMeta meta = fw.getFireworkMeta();
+        meta.setPower(1);
+        meta.addEffect(FireworkEffect.builder()
+                .with(FireworkEffect.Type.BURST)
+                .withColor(primary)
+                .withFade(secondary)
+                .withFlicker()
+                .withTrail()
+                .build());
+        meta.addEffect(FireworkEffect.builder()
+                .with(FireworkEffect.Type.STAR)
+                .withColor(secondary)
+                .withFade(primary)
+                .build());
+        fw.setFireworkMeta(meta);
     }
 
     // ================= UTILITAIRE =================

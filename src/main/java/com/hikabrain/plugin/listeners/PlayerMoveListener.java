@@ -3,15 +3,18 @@ package com.hikabrain.plugin.listeners;
 import com.hikabrain.plugin.HikaBrainPlugin;
 import com.hikabrain.plugin.game.GameManager;
 import com.hikabrain.plugin.game.GameState;
+import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerMoveEvent;
+import org.bukkit.util.Vector;
 
 /**
  * Gère les déplacements des joueurs :
- * - Capture de zone adverse
- * - Immobilisation pendant ROUND_RESET uniquement (pas pendant COUNTDOWN)
+ * - Immobilisation propre quand le joueur est gelé (après un point marqué)
+ *   Le joueur peut toujours regarder autour de lui (yaw/pitch conservés).
  * - Mort automatique si le joueur sort de la zone de jeu
  */
 public class PlayerMoveListener implements Listener {
@@ -22,7 +25,7 @@ public class PlayerMoveListener implements Listener {
         this.plugin = plugin;
     }
 
-    @EventHandler
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onMove(PlayerMoveEvent event) {
         Player player = event.getPlayer();
         GameManager gm = plugin.getArenaManager().findArenaOf(player);
@@ -31,21 +34,28 @@ public class PlayerMoveListener implements Listener {
             return;
         }
 
-        GameState state = gm.getState();
+        // FREEZE propre : bloquer tout déplacement du corps, autoriser la tête
+        if (gm.isFrozen(player)) {
+            Location from = event.getFrom();
+            Location to = event.getTo();
 
-        // FREEZE pendant ROUND_RESET uniquement (après un point marqué)
-        // Les joueurs sont libres pendant COUNTDOWN (30 secondes de lobby)
-        if (state == GameState.ROUND_RESET) {
-            // On ignore les micro-mouvements (juste la tête qui tourne)
-            if (isSameBlock(event.getFrom(), event.getTo())) {
-                return;
+            if (from.getBlockX() != to.getBlockX()
+                    || from.getBlockY() != to.getBlockY()
+                    || from.getBlockZ() != to.getBlockZ()) {
+                // Conserver yaw/pitch du "to" pour que le joueur puisse regarder
+                Location fixed = from.clone();
+                fixed.setYaw(to.getYaw());
+                fixed.setPitch(to.getPitch());
+                event.setTo(fixed);
+                // Annuler aussi la vélocité résiduelle (saut, knockback, etc.)
+                player.setVelocity(new Vector(0, 0, 0));
             }
-            // Immobiliser le joueur
-            event.setTo(event.getFrom());
             return;
         }
 
-        // On ignore les micro-mouvements
+        GameState state = gm.getState();
+
+        // Ignorer les micro-mouvements (juste la tête)
         if (isSameBlock(event.getFrom(), event.getTo())) {
             return;
         }
@@ -58,10 +68,7 @@ public class PlayerMoveListener implements Listener {
         }
     }
 
-    /**
-     * Vérifie si deux locations sont dans le même bloc
-     */
-    private boolean isSameBlock(org.bukkit.Location from, org.bukkit.Location to) {
+    private boolean isSameBlock(Location from, Location to) {
         return from.getBlockX() == to.getBlockX()
                 && from.getBlockY() == to.getBlockY()
                 && from.getBlockZ() == to.getBlockZ();
