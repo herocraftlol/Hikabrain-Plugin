@@ -42,9 +42,11 @@ public class PlayerDeathListener implements Listener {
         if (killer != null && gm.isPlaying(killer) && !killer.equals(victim)) {
             // Le kill est comptabilisé pour l'équipe du tueur
             plugin.getStatsManager().addKill(gm.getTeam(killer));
+            gm.addKill(gm.getTeam(killer));
         }
 
         // Le death est comptabilisé pour l'équipe de la victime
         plugin.getStatsManager().addDeath(gm.getTeam(victim));
+        gm.addDeath(gm.getTeam(victim));
     }
 }

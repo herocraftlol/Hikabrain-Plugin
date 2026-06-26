@@ -351,6 +351,7 @@ public class GameManager {
     private void startGame() {
         state = GameState.PLAYING;
         resetScores();
+        resetStats();
         arenaSnapshot.restore();
         teleportAllToSpawns();
         applyColoredNames();
@@ -475,6 +476,12 @@ public class GameManager {
     }
     
     private BukkitTask captureSchedulerTask;
+    
+    // Stats de la partie en cours
+    private int redKills = 0;
+    private int redDeaths = 0;
+    private int blueKills = 0;
+    private int blueDeaths = 0;
     
     /**
      * Démarre le scheduler qui vérifie la capture à chaque tick.
@@ -727,5 +734,29 @@ public class GameManager {
                 player.sendMessage(message);
             }
         }
+    }
+    
+    // ================= STATS PARTIE =================
+    
+    public int getRedKills() { return redKills; }
+    public int getRedDeaths() { return redDeaths; }
+    public int getBlueKills() { return blueKills; }
+    public int getBlueDeaths() { return blueDeaths; }
+    
+    public void addKill(Team team) {
+        if (team == Team.RED) redKills++;
+        else blueKills++;
+    }
+    
+    public void addDeath(Team team) {
+        if (team == Team.RED) redDeaths++;
+        else blueDeaths++;
+    }
+    
+    public void resetStats() {
+        redKills = 0;
+        redDeaths = 0;
+        blueKills = 0;
+        blueDeaths = 0;
     }
 }

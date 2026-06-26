@@ -138,42 +138,30 @@ public class ScoreboardManager {
      * Ajoute les lignes du sidebar
      */
     private void addSidebarLines(Scoreboard board, Objective objective, GameManager gm) {
-        String arenaName = gm.getName();
-        int elapsed = arenaStartTimes.containsKey(arenaName) 
-            ? (int) (System.currentTimeMillis() / 1000) - arenaStartTimes.get(arenaName) 
-            : 0;
-        
         int redScore = gm.getScore(com.hikabrain.plugin.game.Team.RED);
         int blueScore = gm.getScore(com.hikabrain.plugin.game.Team.BLUE);
         int players = gm.getPlayerCount();
         
-        StatsManager stats = plugin.getStatsManager();
-        int redKills = stats.getRedKills();
-        int redDeaths = stats.getRedDeaths();
-        int blueKills = stats.getBlueKills();
-        int blueDeaths = stats.getBlueDeaths();
-        double redKD = stats.getRedKD();
-        double blueKD = stats.getBlueKD();
+        // Stats de la partie en cours
+        int redKills = gm.getRedKills();
+        int redDeaths = gm.getRedDeaths();
+        int blueKills = gm.getBlueKills();
+        int blueDeaths = gm.getBlueDeaths();
         
-        // Lignes du sidebar
+        String redKD = redDeaths > 0 ? String.format("%.1f", (double) redKills / redDeaths) : redKills + ".0";
+        String blueKD = blueDeaths > 0 ? String.format("%.1f", (double) blueKills / blueDeaths) : blueKills + ".0";
+        
+        // Lignes du sidebar simplifié
         String[] lines = {
             "&6&lHikaBrain",
-            "&7&m-----------",
-            "&c\u2764 &fRouge: &c" + redScore,
-            "&9\u2764 &fBleu: &9" + blueScore,
-            "&7&m-----------",
-            "&fJoueurs: &b" + players,
-            "&fServeur: &b" + stripColor(serverName),
-            "&fJeu: &6" + stripColor(gameName),
-            "&7&m-----------",
-            "&cK/D: &c" + redKills + "&7/&c" + redDeaths,
-            "&9K/D: &9" + blueKills + "&7/&9" + blueDeaths,
-            "&7&m-----------",
-            "&cWins: &c" + stats.getRedWins(),
-            "&9Wins: &9" + stats.getBlueWins(),
-            "&7&m-----------",
-            "&fTemps: &e" + formatTime(elapsed),
-            "&7&m-----------"
+            "&7" + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500,
+            "&c\u2764 &fRouge: &c" + redScore + "&7/&c5",
+            "&9\u2764 &fBleu: &9" + blueScore + "&7/&95",
+            "&7" + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500,
+            "&fK/D Rouge: &c" + redKills + "&7/&c" + redDeaths + " &8(&c" + redKD + "&8)",
+            "&fK/D Bleu: &9" + blueKills + "&7/&9" + blueDeaths + " &8(&9" + blueKD + "&8)",
+            "&7" + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500,
+            "&fJoueurs: &b" + players
         };
         
         // Score à 0 pour toutes les lignes
