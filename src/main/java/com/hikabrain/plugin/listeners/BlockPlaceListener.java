@@ -10,7 +10,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockPlaceEvent;
 
 /**
- * Empêche de poser des blocs dans les zones de capture.
+ * Empêche de poser des blocs dans les zones de capture adverse.
  */
 public class BlockPlaceListener implements Listener {
 
