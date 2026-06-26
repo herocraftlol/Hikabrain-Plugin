@@ -142,24 +142,12 @@ public class ScoreboardManager {
         int blueScore = gm.getScore(com.hikabrain.plugin.game.Team.BLUE);
         int players = gm.getPlayerCount();
         
-        // Stats de la partie en cours
-        int redKills = gm.getRedKills();
-        int redDeaths = gm.getRedDeaths();
-        int blueKills = gm.getBlueKills();
-        int blueDeaths = gm.getBlueDeaths();
-        
-        String redKD = redDeaths > 0 ? String.format("%.1f", (double) redKills / redDeaths) : redKills + ".0";
-        String blueKD = blueDeaths > 0 ? String.format("%.1f", (double) blueKills / blueDeaths) : blueKills + ".0";
-        
         // Lignes du sidebar simplifié
         String[] lines = {
             "&6&lHikaBrain",
             "&7" + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500,
             "&c\u2764 &fRouge: &c" + redScore + "&7/&c5",
             "&9\u2764 &fBleu: &9" + blueScore + "&7/&95",
-            "&7" + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500,
-            "&fK/D Rouge: &c" + redKills + "&7/&c" + redDeaths + " &8(&c" + redKD + "&8)",
-            "&fK/D Bleu: &9" + blueKills + "&7/&9" + blueDeaths + " &8(&9" + blueKD + "&8)",
             "&7" + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500,
             "&fJoueurs: &b" + players
         };
@@ -242,15 +230,21 @@ public class ScoreboardManager {
             blueTeam.removeEntry(entry);
         }
         
-        // Ajouter les joueurs actuels
+        // Ajouter les joueurs actuels avec leur K/D
         for (UUID uuid : gm.getPlayerTeams().keySet()) {
             Player player = Bukkit.getPlayer(uuid);
             if (player == null) continue;
             
+            int kills = gm.getPlayerKills(uuid);
+            int deaths = gm.getPlayerDeaths(uuid);
+            String kdSuffix = ChatColor.GRAY + " [" + kills + "/" + deaths + "]";
+            
             com.hikabrain.plugin.game.Team team = gm.getPlayerTeams().get(uuid);
             if (team == com.hikabrain.plugin.game.Team.RED) {
+                redTeam.setSuffix(kdSuffix);
                 redTeam.addEntry(player.getName());
             } else if (team == com.hikabrain.plugin.game.Team.BLUE) {
+                blueTeam.setSuffix(kdSuffix);
                 blueTeam.addEntry(player.getName());
             }
         }

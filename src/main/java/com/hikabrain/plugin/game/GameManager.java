@@ -477,11 +477,15 @@ public class GameManager {
     
     private BukkitTask captureSchedulerTask;
     
-    // Stats de la partie en cours
+    // Stats de la partie en cours (par équipe)
     private int redKills = 0;
     private int redDeaths = 0;
     private int blueKills = 0;
     private int blueDeaths = 0;
+    
+    // Stats de la partie en cours (par joueur)
+    private Map<UUID, Integer> playerKills = new HashMap<>();
+    private Map<UUID, Integer> playerDeaths = new HashMap<>();
     
     /**
      * Démarre le scheduler qui vérifie la capture à chaque tick.
@@ -743,9 +747,16 @@ public class GameManager {
     public int getBlueKills() { return blueKills; }
     public int getBlueDeaths() { return blueDeaths; }
     
+    public int getPlayerKills(UUID uuid) { return playerKills.getOrDefault(uuid, 0); }
+    public int getPlayerDeaths(UUID uuid) { return playerDeaths.getOrDefault(uuid, 0); }
+    
     public void addKill(Team team) {
         if (team == Team.RED) redKills++;
         else blueKills++;
+    }
+    
+    public void addPlayerKill(UUID uuid) {
+        playerKills.put(uuid, playerKills.getOrDefault(uuid, 0) + 1);
     }
     
     public void addDeath(Team team) {
@@ -753,10 +764,16 @@ public class GameManager {
         else blueDeaths++;
     }
     
+    public void addPlayerDeath(UUID uuid) {
+        playerDeaths.put(uuid, playerDeaths.getOrDefault(uuid, 0) + 1);
+    }
+    
     public void resetStats() {
         redKills = 0;
         redDeaths = 0;
         blueKills = 0;
         blueDeaths = 0;
+        playerKills.clear();
+        playerDeaths.clear();
     }
 }
