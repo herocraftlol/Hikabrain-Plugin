@@ -229,4 +229,11 @@ public class ScoreboardManager {
     public void setTitle(String title) {
         this.title = title;
     }
+    
+    // Méthodes de compatibilité (non utilisées dans le nouveau système)
+    public void setServerName(String name) {}
+    public void setGameName(String name) {}
+    public String getServerName() { return "HEROCRAFT"; }
+    public String getGameName() { return "HikaBrain"; }
+    public void setLines(java.util.List<String> lines) {}
 }
