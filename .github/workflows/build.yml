@@ -21,7 +21,7 @@ jobs:
         cache: 'maven'
     
     - name: Build with Maven
-      run: mvn clean package -DskipTests
+      run: rm -rf ~/.m2/repository/com/hikabrain && mvn clean package -DskipTests
     
     - name: Rename JAR
       run: mv target/HikaBrain.jar target/HikaBrain-1.0.2.jar
