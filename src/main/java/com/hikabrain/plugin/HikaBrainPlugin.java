@@ -52,6 +52,7 @@ public class HikaBrainPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new ArenaProtectionListener(this), this);
         getServer().getPluginManager().registerEvents(new ForceStartItemListener(this), this);
         getServer().getPluginManager().registerEvents(new PlayerItemListener(this), this);
+        getServer().getPluginManager().registerEvents(new BlockPlaceListener(this), this);
 
         getLogger().info("HikaBrain activé ! (" + arenaManager.getNames().size() + " arène(s) chargée(s))");
     }
