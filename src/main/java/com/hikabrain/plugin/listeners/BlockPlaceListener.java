@@ -17,8 +17,6 @@ import org.bukkit.event.block.BlockPlaceEvent;
  */
 public class BlockPlaceListener implements Listener {
 
-    private static final int SPAWN_RADIUS = 3; // Rayon autour du spawn où les blocs sont interdits
-
     private final HikaBrainPlugin plugin;
 
     public BlockPlaceListener(HikaBrainPlugin plugin) {
@@ -47,6 +45,7 @@ public class BlockPlaceListener implements Listener {
         }
         
         // Vérifier si le bloc est placé dans une zone de spawn (les deux équipes)
+        // Zone de spawn: X ±0, Y ±1 (donc 2 blocs de hauteur), Z ±0
         Location redSpawn = gm.getArena().getSpawn(Team.RED);
         Location blueSpawn = gm.getArena().getSpawn(Team.BLUE);
         
@@ -56,7 +55,7 @@ public class BlockPlaceListener implements Listener {
     }
 
     /**
-     * Vérifie si une location est dans la zone de spawn (rayon de 3 blocs autour du spawn)
+     * Vérifie si une location est dans la zone de spawn (X±0, Y±1, Z±0)
      */
     private boolean isInSpawnZone(Location blockLoc, Location spawnLoc) {
         if (spawnLoc == null || blockLoc.getWorld() == null || !blockLoc.getWorld().equals(spawnLoc.getWorld())) {
@@ -67,6 +66,7 @@ public class BlockPlaceListener implements Listener {
         int dy = Math.abs(blockLoc.getBlockY() - spawnLoc.getBlockY());
         int dz = Math.abs(blockLoc.getBlockZ() - spawnLoc.getBlockZ());
         
-        return dx <= SPAWN_RADIUS && dy <= SPAWN_RADIUS && dz <= SPAWN_RADIUS;
+        // X et Z doivent être exactement le même bloc, Y peut être spawnY ou spawnY+1
+        return dx <= 0 && dy <= 1 && dz <= 0;
     }
 }
