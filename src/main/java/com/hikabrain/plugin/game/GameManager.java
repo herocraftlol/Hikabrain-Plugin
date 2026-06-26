@@ -449,9 +449,13 @@ public class GameManager {
         Team playerTeam = playerTeams.get(player.getUniqueId());
         Team enemyTeam = playerTeam.opponent();
 
-        // Vérifier la position des yeux du joueur (plus fiable pour les zones au sol)
-        Location eyeLoc = player.getEyeLocation();
-        if (arena.isInCaptureZone(enemyTeam, eyeLoc)) {
+        // Vérifier plusieurs hauteurs du corps du joueur (pieds, ventre, yeux)
+        // pour que les zones de capture de 1 bloc de hauteur fonctionnent
+        Location loc = player.getLocation();
+        
+        if (arena.isInCaptureZone(enemyTeam, loc) ||                           // Pieds
+            arena.isInCaptureZone(enemyTeam, loc.clone().add(0, 0.9, 0)) ||   // Ventre
+            arena.isInCaptureZone(enemyTeam, player.getEyeLocation())) {       // Yeux
             scorePoint(playerTeam);
         }
     }
