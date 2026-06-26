@@ -99,41 +99,67 @@ public class ScoreboardManager {
     }
 
     /**
-     * Ajoute les lignes du sidebar pour un joueur spécifique
+     * Codes couleur Minecraft utilisés comme "entrées" invisibles pour chaque ligne du sidebar.
+     * Une entrée différente est nécessaire par ligne, mais elle ne doit jamais s'afficher :
+     * on utilise donc une suite de codes couleur (invisibles, car ChatColor ne produit aucun
+     * caractère visible) plutôt qu'un simple chiffre "0", "1", "2"... qui apparaissait à
+     * l'écran à droite de chaque ligne.
+     */
+    private static final char[] INVISIBLE_CODES = {
+        '0','1','2','3','4','5','6','7','8','9','a','b','c','d','e','f'
+    };
+
+    /**
+     * Construit une entrée unique et invisible pour la ligne d'index donné.
+     * Chaque ligne a besoin d'une entrée distincte dans le scoreboard, mais le texte de
+     * cette entrée ne doit produire aucun caractère affiché.
+     */
+    private String invisibleEntry(int index) {
+        StringBuilder sb = new StringBuilder();
+        // On combine les codes pour garantir l'unicité même au-delà de 16 lignes
+        sb.append(ChatColor.COLOR_CHAR).append(INVISIBLE_CODES[index % INVISIBLE_CODES.length]);
+        sb.append(ChatColor.COLOR_CHAR).append(INVISIBLE_CODES[(index / INVISIBLE_CODES.length) % INVISIBLE_CODES.length]);
+        sb.append(ChatColor.RESET);
+        return sb.toString();
+    }
+
+    /**
+     * Ajoute les lignes du sidebar pour un joueur spécifique.
+     * Affiche : le score des deux équipes, le nombre de joueurs par équipe,
+     * et le K/D personnel du joueur.
      */
     private void addPlayerSidebarLines(Scoreboard board, Objective objective, Player player, GameManager gm) {
-        int redScore = gm.getScore(com.hikabrain.plugin.game.Team.RED);
-        int blueScore = gm.getScore(com.hikabrain.plugin.game.Team.BLUE);
-        int players = gm.getPlayerCount();
-        
-        // K/D personnel du joueur
+        com.hikabrain.plugin.game.Team RED = com.hikabrain.plugin.game.Team.RED;
+        com.hikabrain.plugin.game.Team BLUE = com.hikabrain.plugin.game.Team.BLUE;
+
+        int redScore = gm.getScore(RED);
+        int blueScore = gm.getScore(BLUE);
+        int redPlayers = gm.getPlayerCountForTeam(RED);
+        int bluePlayers = gm.getPlayerCountForTeam(BLUE);
+
+        // K/D personnel du joueur (kills / deaths, ou kills si aucune mort -> ratio standard)
         int kills = gm.getPlayerKills(player.getUniqueId());
         int deaths = gm.getPlayerDeaths(player.getUniqueId());
         double kd = deaths > 0 ? (double) kills / deaths : kills;
         String kdStr = String.format("%.1f", kd);
-        
-        // Couleur selon l'équipe
-        com.hikabrain.plugin.game.Team team = gm.getTeam(player);
-        String teamColor = team == com.hikabrain.plugin.game.Team.RED ? "&c" : "&9";
-        String teamName = team == com.hikabrain.plugin.game.Team.RED ? "Rouge" : "Bleu";
-        
-        // Lignes du sidebar
-        int teamScore = team == com.hikabrain.plugin.game.Team.RED ? redScore : blueScore;
+
+        // Lignes du sidebar : scores des deux équipes + effectifs + K/D du joueur
         String[] lines = {
             "&6&lHikaBrain",
             "&7" + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500,
-            teamColor + "\u2764 " + teamName + ": " + teamColor + teamScore + "&7/&f5",
+            "&c\u2764 Rouge: &c" + redScore + "&7/&f5 &7(&c" + redPlayers + " joueur" + (redPlayers == 1 ? "" : "s") + "&7)",
+            "&9\u2764 Bleu: &9" + blueScore + "&7/&f5 &7(&9" + bluePlayers + " joueur" + (bluePlayers == 1 ? "" : "s") + "&7)",
             "&7" + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500,
-            "&fTon K/D: &a" + kills + "&7/&c" + deaths + " &8(&a" + kdStr + "&8)",
-            "&7" + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500,
-            "&fJoueurs: &b" + players
+            "&fTon K/D: &a" + kills + "&7/&c" + deaths + " &8(&a" + kdStr + "&8)"
         };
-        
-        // Score à 0 pour toutes les lignes
+
+        // Une entrée invisible distincte par ligne : le prefix de l'équipe scoreboard porte
+        // tout le texte affiché, et comme l'entrée elle-même est invisible, aucun chiffre
+        // parasite n'apparaît plus à droite de la ligne.
         for (int i = 0; i < lines.length; i++) {
             String parsed = parseColor(lines[i]);
-            String identifier = String.valueOf(i);
-            
+            String identifier = invisibleEntry(i);
+
             org.bukkit.scoreboard.Team mcTeam;
             String teamName2 = "sb_" + i;
             if (board.getTeam(teamName2) != null) {
@@ -141,7 +167,7 @@ public class ScoreboardManager {
             } else {
                 mcTeam = board.registerNewTeam(teamName2);
             }
-            
+
             mcTeam.setPrefix(parsed);
             mcTeam.setSuffix("");
             mcTeam.addEntry(identifier);
