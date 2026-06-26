@@ -449,13 +449,16 @@ public class GameManager {
         Team playerTeam = playerTeams.get(player.getUniqueId());
         Team enemyTeam = playerTeam.opponent();
 
-        // Vérifier plusieurs hauteurs du corps du joueur (pieds, ventre, yeux)
-        // pour que les zones de capture de 1 bloc de hauteur fonctionnent
+        // Vérifier si le joueur est dans la zone de capture adverse
         Location loc = player.getLocation();
         
-        if (arena.isInCaptureZone(enemyTeam, loc) ||                           // Pieds
-            arena.isInCaptureZone(enemyTeam, loc.clone().add(0, 0.9, 0)) ||   // Ventre
-            arena.isInCaptureZone(enemyTeam, player.getEyeLocation())) {       // Yeux
+        // Debug temporaire
+        plugin.getLogger().info("[CAPTURE DEBUG] Joueur: " + player.getName() + " Equipe: " + playerTeam);
+        plugin.getLogger().info("[CAPTURE DEBUG] Position: " + loc.getBlockX() + "," + loc.getBlockY() + "," + loc.getBlockZ());
+        plugin.getLogger().info("[CAPTURE DEBUG] Zone adverse (" + enemyTeam + "): " + arena.isInCaptureZone(enemyTeam, loc));
+        
+        if (arena.isInCaptureZone(enemyTeam, loc)) {
+            plugin.getLogger().info("[CAPTURE DEBUG] CAPTURE DETECTEE!");
             scorePoint(playerTeam);
         }
     }
