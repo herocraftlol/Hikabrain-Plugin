@@ -507,20 +507,8 @@ public class GameManager {
             Team playerTeam = playerTeams.get(playerId);
             Team enemyTeam = playerTeam.opponent();
             
-            // Debug: tracer la position exacte du joueur et la zone
+            // Vérifier la capture
             Location loc = player.getLocation();
-            CuboidRegion zone = arena.getCaptureZone(enemyTeam);
-            if (zone != null) {
-                int px = loc.getBlockX();
-                int pz = loc.getBlockZ();
-                int py = loc.getBlockY();
-                plugin.getLogger().info("[CAPTURE] " + player.getName() + " pos=" + loc.getBlockX() + "," + loc.getBlockY() + "," + loc.getBlockZ() 
-                    + " zoneMinX=" + Math.min(zone.getCorner1().getBlockX(), zone.getCorner2().getBlockX())
-                    + " zoneMaxX=" + Math.max(zone.getCorner1().getBlockX(), zone.getCorner2().getBlockX())
-                    + " zoneMinZ=" + Math.min(zone.getCorner1().getBlockZ(), zone.getCorner2().getBlockZ())
-                    + " zoneMaxZ=" + Math.max(zone.getCorner1().getBlockZ(), zone.getCorner2().getBlockZ())
-                    + " inZone=" + arena.isInCaptureZone(enemyTeam, loc));
-            }
             
             if (arena.isInCaptureZone(enemyTeam, player.getLocation())) {
                 scorePoint(playerTeam);
