@@ -450,15 +450,7 @@ public class GameManager {
         Team enemyTeam = playerTeam.opponent();
 
         // Vérifier si le joueur est dans la zone de capture adverse
-        Location loc = player.getLocation();
-        
-        // Debug temporaire
-        plugin.getLogger().info("[CAPTURE DEBUG] Joueur: " + player.getName() + " Equipe: " + playerTeam);
-        plugin.getLogger().info("[CAPTURE DEBUG] Position: " + loc.getBlockX() + "," + loc.getBlockY() + "," + loc.getBlockZ());
-        plugin.getLogger().info("[CAPTURE DEBUG] Zone adverse (" + enemyTeam + "): " + arena.isInCaptureZone(enemyTeam, loc));
-        
-        if (arena.isInCaptureZone(enemyTeam, loc)) {
-            plugin.getLogger().info("[CAPTURE DEBUG] CAPTURE DETECTEE!");
+        if (arena.isInCaptureZone(enemyTeam, player.getLocation())) {
             scorePoint(playerTeam);
         }
     }
