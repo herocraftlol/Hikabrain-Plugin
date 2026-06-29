@@ -6,14 +6,16 @@ import com.hikabrain.plugin.stats.StatsManager.GameMode;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
+import org.bukkit.Chunk;
 import org.bukkit.Location;
+import org.bukkit.NamespacedKey;
 import org.bukkit.World;
-import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
+import org.bukkit.persistence.PersistentDataType;
 
 import java.io.File;
 import java.io.IOException;
@@ -22,59 +24,101 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Gère un hologramme de leaderboard HikaBrain affiché via des ArmorStands invisibles.
+ * Gère UN hologramme de leaderboard HikaBrain, placé librement dans n'importe quel monde,
+ * totalement indépendant des arènes et du lobby du jeu.
  *
- * L'hologramme affiche les stats (Victoires, Kills, Deaths, K/D) pour Rouge et Bleu,
- * avec un bouton de mode (1v1 / 2v2 / 3v3 / 4v4) cliquable (voir StatsHologramListener).
+ * ── Persistance ──────────────────────────────────────────────────────────────
+ *  • La position et le mode actif sont écrits dans hologram.yml à chaque modification.
+ *  • Chaque ArmorStand reçoit un tag PDC (PersistentDataContainer) "hikabrain:hologram"
+ *    avec la valeur "stats". Au (re)démarrage, le chunk est forcé en mémoire et tous
+ *    les ArmorStands portant ce tag sont supprimés AVANT de respawner l'hologramme.
+ *    Ainsi, même si les UUIDs changent entre redémarrages, on ne laisse jamais de
+ *    doublons orphelins.
  *
- * Position et mode actuel sont persistés dans hologram.yml.
- *
- * Structure verticale (espacement 0.25 block) :
- *   [Ligne 0]  ══ HikaBrain Stats ══         (titre)
- *   [Ligne 1]  [ 1v1 ] [ 2v2 ] [ 3v3 ] [ 4v4 ]   (modes – ArmorStand "tab")
- *   [Ligne 2]  ──────────────────────
- *   [Ligne 3]  ❤ Équipe Rouge
- *   [Ligne 4]    Victoires : XX
- *   [Ligne 5]    Kills : XX  Deaths : XX  K/D : X.X
- *   [Ligne 6]  ──────────────────────
- *   [Ligne 7]  ❤ Équipe Bleue
- *   [Ligne 8]    Victoires : XX
- *   [Ligne 9]    Kills : XX  Deaths : XX  K/D : X.X
- *   [Ligne 10] ──────────────────────
- *   [Ligne 11] Parties jouées : XX   Captures : XX
+ * ── Structure visuelle (espacement 0.27 block, haut → bas) ───────────────────
+ *   ══ HikaBrain Stats ══                           (titre, AQUA BOLD)
+ *   [1v1] [2v2] [3v3] [4v4]                        (tabs cliquables)
+ *   ─────────────────────                           (séparateur)
+ *   ❤ Équipe Rouge                                  (BOLD RED)
+ *     Victoires : XX
+ *     Kills : XX  Deaths : XX  K/D : X.X
+ *   ─────────────────────
+ *   ❤ Équipe Bleue                                  (BOLD BLUE)
+ *     Victoires : XX
+ *     Kills : XX  Deaths : XX  K/D : X.X
+ *   ─────────────────────
+ *   Parties : XX   Captures : XX
  */
 public class StatsHologramManager {
 
-    private static final double LINE_GAP = 0.27;
-    private static final String HOLOGRAM_FILE = "hologram.yml";
+    // ── Constantes ─────────────────────────────────────────────────────────────
+
+    private static final double LINE_GAP       = 0.27;
+    private static final String HOLOGRAM_FILE  = "hologram.yml";
+    /** Valeur stockée dans le PDC pour identifier nos ArmorStands. */
+    private static final String PDC_VALUE      = "stats";
+
+    // ── État ───────────────────────────────────────────────────────────────────
 
     private final HikaBrainPlugin plugin;
     private final File             cfgFile;
     private FileConfiguration      cfg;
 
-    /** UUID des ArmorStands constituant l'hologramme (dans l'ordre haut→bas). */
+    /** Clé PDC pour marquer tous nos ArmorStands. */
+    private final NamespacedKey pdcKey;
+    /** Clé PDC supplémentaire pour identifier spécifiquement l'ArmorStand "tabs". */
+    private final NamespacedKey tabKey;
+
+    /** UUIDs des ArmorStands actifs (haut → bas). */
     private final List<UUID> lineEntities = new ArrayList<>();
 
-    /** UUID de l'ArmorStand "tab" cliquable (la ligne des modes). */
+    /** UUID de l'ArmorStand "tabs" cliquable. */
     private UUID tabEntityUUID = null;
 
-    private Location      hologramLocation = null;
-    private GameMode      currentMode      = GameMode.V1;
+    private Location hologramLocation = null;
+    private GameMode currentMode      = GameMode.V1;
+
+    // ── Constructeur ───────────────────────────────────────────────────────────
 
     public StatsHologramManager(HikaBrainPlugin plugin) {
         this.plugin  = plugin;
         this.cfgFile = new File(plugin.getDataFolder(), HOLOGRAM_FILE);
+        this.pdcKey  = new NamespacedKey(plugin, "hologram");
+        this.tabKey  = new NamespacedKey(plugin, "hologram_tab");
         loadConfig();
     }
 
-    // ── Config ─────────────────────────────────────────────────────────────────
+    // ── Config persistante ─────────────────────────────────────────────────────
 
     private void loadConfig() {
         if (!cfgFile.exists()) return;
         cfg = YamlConfiguration.loadConfiguration(cfgFile);
+
+        // Mode actif
         String modeStr = cfg.getString("current-mode", "1v1");
         for (GameMode m : GameMode.values()) {
             if (m.getLabel().equals(modeStr)) { currentMode = m; break; }
+        }
+
+        // Position sauvegardée → on charge le chunk et on respawne
+        if (cfg.contains("location.world")) {
+            String worldName = cfg.getString("location.world");
+            World world = plugin.getServer().getWorld(worldName);
+            if (world != null) {
+                double x = cfg.getDouble("location.x");
+                double y = cfg.getDouble("location.y");
+                double z = cfg.getDouble("location.z");
+                hologramLocation = new Location(world, x, y, z);
+                // Charger le chunk en mémoire (nécessaire avant de spawner des entités)
+                Chunk chunk = world.getChunkAt(hologramLocation);
+                world.addPluginChunkTicket(chunk.getX(), chunk.getZ(), plugin);
+                // Nettoyer les éventuels ArmorStands orphelins du run précédent
+                purgeOrphanArmorStands(world);
+                // Respawner proprement
+                buildLines();
+            } else {
+                plugin.getLogger().warning("[HikaBrain] Hologramme : monde '" + worldName + "' introuvable au démarrage.");
+            }
         }
     }
 
@@ -82,35 +126,43 @@ public class StatsHologramManager {
         if (cfg == null) cfg = new YamlConfiguration();
         cfg.set("current-mode", currentMode.getLabel());
         if (hologramLocation != null) {
-            cfg.set("location.world",  hologramLocation.getWorld().getName());
-            cfg.set("location.x",      hologramLocation.getX());
-            cfg.set("location.y",      hologramLocation.getY());
-            cfg.set("location.z",      hologramLocation.getZ());
+            cfg.set("location.world", hologramLocation.getWorld().getName());
+            cfg.set("location.x",     hologramLocation.getX());
+            cfg.set("location.y",     hologramLocation.getY());
+            cfg.set("location.z",     hologramLocation.getZ());
+        } else {
+            cfg.set("location", null);
         }
         try { cfg.save(cfgFile); }
-        catch (IOException e) { plugin.getLogger().warning("Impossible de sauvegarder hologram.yml: " + e.getMessage()); }
+        catch (IOException e) { plugin.getLogger().warning("[HikaBrain] Impossible de sauvegarder hologram.yml : " + e.getMessage()); }
     }
 
     // ── API publique ───────────────────────────────────────────────────────────
 
     /**
-     * Crée (ou recrée) l'hologramme à la position donnée, dans le mode actuel.
+     * Place (ou déplace) l'hologramme à la position donnée.
+     * Supprime l'ancien s'il existe, charge le chunk cible.
      */
     public void spawn(Location loc) {
-        despawn();
+        despawnEntities();   // retire les ArmorStands existants
         hologramLocation = loc.clone();
+        // Charger le chunk pour que les entités puissent être créées et restent en mémoire
+        Chunk chunk = loc.getWorld().getChunkAt(loc);
+        loc.getWorld().addPluginChunkTicket(chunk.getX(), chunk.getZ(), plugin);
         buildLines();
         saveConfig();
     }
 
-    /** Supprime l'hologramme s'il existe. */
+    /**
+     * Supprime l'hologramme (entités + config de position).
+     */
     public void despawn() {
-        for (UUID id : lineEntities) {
-            Entity e = plugin.getServer().getEntity(id);
-            if (e != null) e.remove();
+        if (hologramLocation != null) {
+            // Libérer le ticket de chunk
+            Chunk chunk = hologramLocation.getWorld().getChunkAt(hologramLocation);
+            hologramLocation.getWorld().removePluginChunkTicket(chunk.getX(), chunk.getZ(), plugin);
         }
-        lineEntities.clear();
-        tabEntityUUID = null;
+        despawnEntities();
         hologramLocation = null;
         saveConfig();
     }
@@ -122,26 +174,21 @@ public class StatsHologramManager {
         saveConfig();
     }
 
-    public GameMode getCurrentMode() { return currentMode; }
-
-    /** Rafraîchit les noms de tous les ArmorStands existants. */
+    /** Rafraîchit le contenu de l'hologramme (appelé après chaque fin de partie). */
     public void refresh() {
-        if (hologramLocation == null || lineEntities.isEmpty()) return;
-        // Supprime et recrée (plus simple que de mapper chaque ligne)
+        if (hologramLocation == null) return;
         Location saved = hologramLocation.clone();
-        despawn();
+        despawnEntities();
         hologramLocation = saved;
         buildLines();
     }
 
-    public boolean isSpawned() { return !lineEntities.isEmpty(); }
+    public boolean   isSpawned()       { return !lineEntities.isEmpty(); }
+    public Location  getLocation()     { return hologramLocation == null ? null : hologramLocation.clone(); }
+    public GameMode  getCurrentMode()  { return currentMode; }
+    public UUID      getTabEntityUUID(){ return tabEntityUUID; }
 
-    public Location getLocation() { return hologramLocation == null ? null : hologramLocation.clone(); }
-
-    /** Retourne l'UUID de l'ArmorStand représentant les tabs de mode (cliquable). */
-    public UUID getTabEntityUUID() { return tabEntityUUID; }
-
-    // ── Construction de l'hologramme ───────────────────────────────────────────
+    // ── Construction des lignes ────────────────────────────────────────────────
 
     private void buildLines() {
         StatsManager sm = plugin.getStatsManager();
@@ -150,83 +197,71 @@ public class StatsHologramManager {
 
         List<Component> lines = new ArrayList<>();
 
-        // Titre
+        // 0 — Titre
         lines.add(Component.text("══ HikaBrain Stats ══")
-                .color(NamedTextColor.AQUA)
-                .decorate(TextDecoration.BOLD));
+                .color(NamedTextColor.AQUA).decorate(TextDecoration.BOLD));
 
-        // Ligne onglets modes (sera l'ArmorStand cliquable)
+        // 1 — Tabs de mode (cliquable)
         lines.add(buildTabLine(m));
 
-        // Séparateur
-        lines.add(Component.text("─────────────────────").color(NamedTextColor.DARK_GRAY));
+        // 2 — Séparateur
+        lines.add(sep());
 
-        // Équipe Rouge
+        // 3‑5 — Équipe Rouge
         lines.add(Component.text("❤ Équipe Rouge").color(NamedTextColor.RED).decorate(TextDecoration.BOLD));
-        lines.add(Component.empty()
-                .append(Component.text("  Victoires : ").color(NamedTextColor.GRAY))
-                .append(Component.text(sm.getRedWins(m)).color(NamedTextColor.RED)));
-        lines.add(Component.empty()
-                .append(Component.text("  Kills : ").color(NamedTextColor.GRAY))
-                .append(Component.text(sm.getRedKills(m)).color(NamedTextColor.RED))
-                .append(Component.text("  Deaths : ").color(NamedTextColor.GRAY))
-                .append(Component.text(sm.getRedDeaths(m)).color(NamedTextColor.RED))
-                .append(Component.text("  K/D : ").color(NamedTextColor.GRAY))
-                .append(Component.text(sm.getRedKD(m)).color(NamedTextColor.GOLD)));
+        lines.add(gray("  Victoires : ").append(Component.text(sm.getRedWins(m)).color(NamedTextColor.RED)));
+        lines.add(gray("  Kills : ").append(Component.text(sm.getRedKills(m)).color(NamedTextColor.RED))
+                .append(gray("  Deaths : ")).append(Component.text(sm.getRedDeaths(m)).color(NamedTextColor.RED))
+                .append(gray("  K/D : ")).append(Component.text(sm.getRedKD(m)).color(NamedTextColor.GOLD)));
 
-        // Séparateur
-        lines.add(Component.text("─────────────────────").color(NamedTextColor.DARK_GRAY));
+        // 6 — Séparateur
+        lines.add(sep());
 
-        // Équipe Bleue
+        // 7‑9 — Équipe Bleue
         lines.add(Component.text("❤ Équipe Bleue").color(NamedTextColor.BLUE).decorate(TextDecoration.BOLD));
-        lines.add(Component.empty()
-                .append(Component.text("  Victoires : ").color(NamedTextColor.GRAY))
-                .append(Component.text(sm.getBlueWins(m)).color(NamedTextColor.BLUE)));
-        lines.add(Component.empty()
-                .append(Component.text("  Kills : ").color(NamedTextColor.GRAY))
-                .append(Component.text(sm.getBlueKills(m)).color(NamedTextColor.BLUE))
-                .append(Component.text("  Deaths : ").color(NamedTextColor.GRAY))
-                .append(Component.text(sm.getBlueDeaths(m)).color(NamedTextColor.BLUE))
-                .append(Component.text("  K/D : ").color(NamedTextColor.GRAY))
-                .append(Component.text(sm.getBlueKD(m)).color(NamedTextColor.GOLD)));
+        lines.add(gray("  Victoires : ").append(Component.text(sm.getBlueWins(m)).color(NamedTextColor.BLUE)));
+        lines.add(gray("  Kills : ").append(Component.text(sm.getBlueKills(m)).color(NamedTextColor.BLUE))
+                .append(gray("  Deaths : ")).append(Component.text(sm.getBlueDeaths(m)).color(NamedTextColor.BLUE))
+                .append(gray("  K/D : ")).append(Component.text(sm.getBlueKD(m)).color(NamedTextColor.GOLD)));
 
-        // Séparateur bas
-        lines.add(Component.text("─────────────────────").color(NamedTextColor.DARK_GRAY));
+        // 10 — Séparateur
+        lines.add(sep());
 
-        // Totaux
-        lines.add(Component.empty()
-                .append(Component.text("Parties : ").color(NamedTextColor.GRAY))
-                .append(Component.text(sm.getTotalGames()).color(NamedTextColor.WHITE))
-                .append(Component.text("   Captures : ").color(NamedTextColor.GRAY))
-                .append(Component.text(sm.getTotalCaptures()).color(NamedTextColor.WHITE)));
+        // 11 — Totaux
+        lines.add(gray("Parties : ").append(Component.text(sm.getTotalGames()).color(NamedTextColor.WHITE))
+                .append(gray("   Captures : ")).append(Component.text(sm.getTotalCaptures()).color(NamedTextColor.WHITE)));
 
-        // Spawner chaque ligne (haut → bas, donc index 0 est en haut)
+        // Spawner du haut vers le bas
         double topY = hologramLocation.getY() + (lines.size() - 1) * LINE_GAP;
         for (int i = 0; i < lines.size(); i++) {
             Location lineLoc = hologramLocation.clone();
             lineLoc.setY(topY - i * LINE_GAP);
-            ArmorStand as = spawnLine(w, lineLoc, lines.get(i));
+            ArmorStand as = spawnStand(w, lineLoc, lines.get(i));
             lineEntities.add(as.getUniqueId());
-            // L'index 1 = ligne des onglets = cliquable
-            if (i == 1) tabEntityUUID = as.getUniqueId();
+            if (i == 1) {
+                tabEntityUUID = as.getUniqueId();
+                // Tag PDC supplémentaire pour identifier le stand "tabs" après un redémarrage
+                as.getPersistentDataContainer().set(tabKey, PersistentDataType.STRING, "tab");
+            }
         }
     }
 
-    /** Construit la ligne des onglets de mode avec le mode actif mis en évidence. */
     private Component buildTabLine(GameMode active) {
         Component line = Component.empty();
         for (GameMode m : GameMode.values()) {
-            boolean isActive = m == active;
-            Component tab = Component.text("[" + m.getLabel() + "]")
-                    .color(isActive ? NamedTextColor.YELLOW : NamedTextColor.DARK_GRAY)
-                    .decoration(TextDecoration.BOLD, isActive)
-                    .decoration(TextDecoration.ITALIC, false);
-            line = line.append(Component.text(" ").color(NamedTextColor.DARK_GRAY)).append(tab);
+            boolean on = m == active;
+            line = line.append(Component.text(" ").color(NamedTextColor.DARK_GRAY))
+                       .append(Component.text("[" + m.getLabel() + "]")
+                               .color(on ? NamedTextColor.YELLOW : NamedTextColor.DARK_GRAY)
+                               .decoration(TextDecoration.BOLD,   on)
+                               .decoration(TextDecoration.ITALIC, false));
         }
         return line;
     }
 
-    private ArmorStand spawnLine(World world, Location loc, Component name) {
+    // ── Spawn / dépawn des entités ─────────────────────────────────────────────
+
+    private ArmorStand spawnStand(World world, Location loc, Component name) {
         ArmorStand as = (ArmorStand) world.spawnEntity(loc, EntityType.ARMOR_STAND);
         as.customName(name);
         as.setCustomNameVisible(true);
@@ -235,7 +270,45 @@ public class StatsHologramManager {
         as.setInvulnerable(true);
         as.setSmall(true);
         as.setCollidable(false);
-        as.setMarker(true);  // pas de hitbox physique, mais encore cliquable en Minecraft 1.17+
+        as.setMarker(true);
+        // Tag PDC pour identifier nos ArmorStands même après redémarrage
+        as.getPersistentDataContainer().set(pdcKey, PersistentDataType.STRING, PDC_VALUE);
         return as;
+    }
+
+    /** Retire uniquement les entités dont on a l'UUID en mémoire. */
+    private void despawnEntities() {
+        for (UUID id : lineEntities) {
+            Entity e = plugin.getServer().getEntity(id);
+            if (e != null) e.remove();
+        }
+        lineEntities.clear();
+        tabEntityUUID = null;
+    }
+
+    /**
+     * Parcourt toutes les entités du monde pour supprimer les ArmorStands
+     * qui portent notre tag PDC (reliquats d'un run précédent dont les UUIDs
+     * ne sont plus en mémoire).
+     */
+    private void purgeOrphanArmorStands(World world) {
+        for (Entity e : world.getEntities()) {
+            if (e instanceof ArmorStand as) {
+                String val = as.getPersistentDataContainer().get(pdcKey, PersistentDataType.STRING);
+                if (PDC_VALUE.equals(val)) {
+                    as.remove();
+                }
+            }
+        }
+    }
+
+    // ── Helpers ────────────────────────────────────────────────────────────────
+
+    private static Component sep() {
+        return Component.text("─────────────────────").color(NamedTextColor.DARK_GRAY);
+    }
+
+    private static Component gray(String text) {
+        return Component.text(text).color(NamedTextColor.GRAY);
     }
 }
