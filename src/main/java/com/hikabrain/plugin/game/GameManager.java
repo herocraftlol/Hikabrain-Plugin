@@ -324,9 +324,12 @@ public class GameManager {
         state = GameState.COUNTDOWN;
         int max = plugin.getConfig().getInt("max-players", 16);
         boolean isFull = playerTeams.size() >= max;
+        // Dès que le minimum de joueurs nécessaire pour lancer la partie est atteint,
+        // on réduit l'attente à 10 secondes plutôt que d'utiliser le long countdown par
+        // défaut : pas besoin de faire attendre tout le monde si la partie peut déjà commencer.
         countdownSecondsLeft = isFull
                 ? plugin.getConfig().getInt("lobby-countdown-fast", 10)
-                : plugin.getConfig().getInt("lobby-countdown", 30);
+                : plugin.getConfig().getInt("lobby-countdown-min-reached", 10);
 
         broadcast(plugin.getConfig().getString("messages.countdown-start", "")
                 .replace("%time%", String.valueOf(countdownSecondsLeft)));
@@ -566,10 +569,28 @@ public class GameManager {
                 .replace("%score%", String.valueOf(currentScore))
                 .replace("%win%", String.valueOf(winScore)));
 
+        // Affiche un titre à l'écran de tous les joueurs en partie pour bien marquer le point.
+        announceCaptureTitle(scoringTeam, currentScore, winScore);
+
         if (currentScore >= winScore) {
             endGame(scoringTeam);
         } else {
             startRoundReset();
+        }
+    }
+
+    /**
+     * Affiche un titre/sous-titre à tous les joueurs en partie quand un point est marqué,
+     * pour que la capture soit visible immédiatement même si le chat n'est pas regardé.
+     */
+    private void announceCaptureTitle(Team scoringTeam, int currentScore, int winScore) {
+        String title = scoringTeam.getColoredName() + " \u00a7lA MARQUÉ !";
+        String subtitle = "\u00a7f" + currentScore + " \u00a77- " + winScore;
+        for (UUID uuid : playerTeams.keySet()) {
+            Player player = Bukkit.getPlayer(uuid);
+            if (player != null) {
+                player.sendTitle(title, subtitle, 5, 40, 10);
+            }
         }
     }
 
@@ -651,7 +672,10 @@ public class GameManager {
         stopCaptureScheduler();
 
         // Enregistrer la victoire dans les statistiques
-        plugin.getStatsManager().addWin(winner);
+        int teamSize = Math.max(getPlayerCountForTeam(Team.RED), getPlayerCountForTeam(Team.BLUE));
+        plugin.getStatsManager().addWin(winner, teamSize);
+        // Rafraîchir l'hologramme si actif
+        plugin.getHologramManager().refresh();
 
         // Mettre tous les joueurs en spectateur et afficher l'écran de victoire
         List<String> redPlayers = new ArrayList<>();

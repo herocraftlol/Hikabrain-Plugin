@@ -7,6 +7,7 @@ import com.hikabrain.plugin.game.CuboidRegion;
 import com.hikabrain.plugin.game.GameManager;
 import com.hikabrain.plugin.game.GameState;
 import com.hikabrain.plugin.game.Team;
+import com.hikabrain.plugin.hologram.StatsHologramManager;
 import com.hikabrain.plugin.util.MessageUtil;
 import org.bukkit.Location;
 import org.bukkit.command.Command;
@@ -26,10 +27,12 @@ import java.util.*;
  *   /hb delete <nom>                          - supprime une arène
  *   /hb list                                  - liste toutes les arènes
  *   /hb setlobby <nom>                        - définit le lobby (à ta position)
- *   /hb setspawn <nom> <red|blue>              - définit le spawn d'une équipe
+ *   /hb setspawn <nom> <red|blue> <index>      - définit/remplace le spawn #index d'une équipe
+ *   /hb delspawn <nom> <red|blue> <index>      - supprime le spawn #index d'une équipe
  *   /hb setcapture <nom> <red|blue> <pos1|pos2> - définit une zone de capture
  *   /hb setgamezone <nom> <pos1|pos2>          - définit + capture la zone de jeu protégée
  *   /hb join <nom>                            - rejoindre une arène
+ *   /hb joinrandom                            - rejoindre une arène au hasard (priorité à celles déjà occupées)
  *   /hb leave                                 - quitter l'arène en cours
  *   /hb start <nom>                           - forcer le démarrage
  *   /hb stop <nom>                            - forcer l'arrêt
@@ -69,15 +72,20 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
             case "list" -> handleList(sender);
             case "setlobby" -> handleSetLobby(sender, args);
             case "setspawn" -> handleSetSpawn(sender, args);
+            case "delspawn" -> handleDelSpawn(sender, args);
             case "setcapture" -> handleSetCapture(sender, args);
             case "setgamezone" -> handleSetGameZone(sender, args);
             case "join" -> handleJoin(sender, args);
+            case "joinrandom" -> handleJoinRandom(sender);
+            case "arenas" -> handleArenasGui(sender);
             case "leave" -> handleLeave(sender);
             case "start" -> handleStart(sender, args);
             case "stop" -> handleStop(sender, args);
             case "info" -> handleInfo(sender, args);
             case "stats" -> handleStats(sender);
             case "resetstats" -> handleResetStats(sender);
+            case "holostats" -> handleHoloStats(sender);
+            case "holoremove" -> handleHoloRemove(sender);
             // Scoreboard commands
             case "setsbserver" -> handleSetSbServer(sender, args);
             case "setsbgame" -> handleSetSbGame(sender, args);
@@ -173,8 +181,9 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
 
     private void handleSetSpawn(CommandSender sender, String[] args) {
         if (!checkAdminAndPlayer(sender)) return;
-        if (args.length < 3) {
-            MessageUtil.send(sender, "&cUsage: /hb setspawn <nom> <red|blue>");
+        if (args.length < 4) {
+            MessageUtil.send(sender, "&cUsage: /hb setspawn <nom> <red|blue> <index>");
+            MessageUtil.send(sender, "&7L'index commence à 1. Utilise le prochain index disponible pour ajouter un nouveau spawn.");
             return;
         }
         GameManager gm = resolveArena(sender, args, 1);
@@ -187,10 +196,60 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
             return;
         }
 
-        gm.getArena().setSpawn(team, player.getLocation());
+        int index;
+        try {
+            index = Integer.parseInt(args[3]);
+        } catch (NumberFormatException e) {
+            MessageUtil.send(sender, "&cL'index doit être un nombre entier (ex: 1, 2, 3...).");
+            return;
+        }
+
+        int nextAvailable = gm.getArena().getSpawnCount(team) + 1;
+        boolean ok = gm.getArena().setSpawn(team, index, player.getLocation());
+        if (!ok) {
+            MessageUtil.send(sender, "&cIndex invalide. Le prochain index disponible pour cette équipe est &7" + nextAvailable + "&c.");
+            return;
+        }
         gm.saveArenaConfig();
 
-        MessageUtil.send(sender, "&aLe spawn de l'équipe " + team.getColoredName() + " &asur '" + args[1] + "' a été défini à ta position.");
+        boolean wasReplaced = index <= (nextAvailable - 1);
+        MessageUtil.send(sender, "&aLe spawn &7#" + index + " &ade l'équipe " + team.getColoredName()
+                + " &asur '" + args[1] + "' a été " + (wasReplaced ? "remplacé" : "défini") + " à ta position. &7(" + gm.getArena().getSpawnCount(team) + " spawn(s) au total pour cette équipe)");
+    }
+
+    private void handleDelSpawn(CommandSender sender, String[] args) {
+        if (!sender.hasPermission("hikabrain.admin")) {
+            MessageUtil.send(sender, "&cTu n'as pas la permission.");
+            return;
+        }
+        if (args.length < 4) {
+            MessageUtil.send(sender, "&cUsage: /hb delspawn <nom> <red|blue> <index>");
+            return;
+        }
+        GameManager gm = resolveArena(sender, args, 1);
+        if (gm == null) return;
+
+        Team team = parseTeam(args[2]);
+        if (team == null) {
+            MessageUtil.send(sender, "&cÉquipe invalide. Utilise 'red' ou 'blue'.");
+            return;
+        }
+
+        int index;
+        try {
+            index = Integer.parseInt(args[3]);
+        } catch (NumberFormatException e) {
+            MessageUtil.send(sender, "&cL'index doit être un nombre entier (ex: 1, 2, 3...).");
+            return;
+        }
+
+        boolean ok = gm.getArena().removeSpawn(team, index);
+        if (!ok) {
+            MessageUtil.send(sender, "&cIndex invalide. Cette équipe a actuellement &7" + gm.getArena().getSpawnCount(team) + " &cspawn(s).");
+            return;
+        }
+        gm.saveArenaConfig();
+        MessageUtil.send(sender, "&aSpawn &7#" + index + " &ade l'équipe " + team.getColoredName() + " &asupprimé sur '" + args[1] + "'.");
     }
 
     private void handleSetCapture(CommandSender sender, String[] args) {
@@ -312,6 +371,43 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
         gm.addPlayer(player);
     }
 
+    /**
+     * Rejoint automatiquement la "meilleure" arène disponible :
+     * - en priorité une arène qui a déjà des joueurs en attente (pour la compléter,
+     *   typiquement pour finir un 1v1 ou rejoindre une partie qui se remplit), en
+     *   choisissant celle qui en a le plus, et au hasard en cas d'égalité ;
+     * - sinon, une arène vide tirée au hasard parmi celles disponibles.
+     */
+    private void handleJoinRandom(CommandSender sender) {
+        if (!(sender instanceof Player player)) {
+            MessageUtil.send(sender, "&cCette commande doit être exécutée par un joueur.");
+            return;
+        }
+        ArenaManager am = plugin.getArenaManager();
+
+        GameManager current = am.findArenaOf(player);
+        if (current != null) {
+            MessageUtil.send(sender, "&cTu es déjà dans une partie (" + current.getName() + "). Fais /hb leave d'abord.");
+            return;
+        }
+
+        GameManager gm = am.findBestArenaForRandomJoin();
+        if (gm == null) {
+            MessageUtil.send(sender, "&cAucune arène disponible pour le moment. Réessaie plus tard.");
+            return;
+        }
+
+        gm.addPlayer(player);
+    }
+
+    private void handleArenasGui(CommandSender sender) {
+        if (!(sender instanceof Player player)) {
+            MessageUtil.send(sender, "&cCette commande doit être exécutée par un joueur.");
+            return;
+        }
+        plugin.getArenaGUI().open(player);
+    }
+
     private void handleLeave(CommandSender sender) {
         if (!(sender instanceof Player player)) {
             MessageUtil.send(sender, "&cCette commande doit être exécutée par un joueur.");
@@ -355,6 +451,7 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
         MessageUtil.send(sender, "&7État : &f" + gm.getState());
         MessageUtil.send(sender, "&7Joueurs en partie : &f" + gm.getPlayerCount());
         MessageUtil.send(sender, "&7Map configurée : " + (arena.isFullyConfigured() ? "&aOui" : "&cNon"));
+        MessageUtil.send(sender, "&7Spawns rouges : &c" + arena.getSpawnCount(Team.RED) + " &7/ Spawns bleus : &9" + arena.getSpawnCount(Team.BLUE));
         MessageUtil.send(sender, "&7Zone de jeu (protection) : " + (gm.getArenaSnapshot().isCaptured() ? "&aOui" : "&cNon configurée"));
         MessageUtil.send(sender, "&c● Rouge: &f" + gm.getScore(Team.RED) + "  &9● Bleu: &f" + gm.getScore(Team.BLUE));
     }
@@ -521,6 +618,35 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
         MessageUtil.send(sender, "&8&m----------&r");
     }
 
+    private void handleHoloStats(CommandSender sender) {
+        if (!sender.hasPermission("hikabrain.admin")) {
+            MessageUtil.send(sender, "&cTu n'as pas la permission.");
+            return;
+        }
+        if (!(sender instanceof Player player)) {
+            MessageUtil.send(sender, "&cCette commande doit être exécutée par un joueur.");
+            return;
+        }
+        StatsHologramManager hm = plugin.getHologramManager();
+        hm.spawn(player.getLocation());
+        MessageUtil.send(sender, "&aHologramme de stats spawné à ta position !");
+        MessageUtil.send(sender, "&7Clique sur la ligne des modes &e[1v1] [2v2] [3v3] [4v4] &7pour changer.");
+    }
+
+    private void handleHoloRemove(CommandSender sender) {
+        if (!sender.hasPermission("hikabrain.admin")) {
+            MessageUtil.send(sender, "&cTu n'as pas la permission.");
+            return;
+        }
+        StatsHologramManager hm = plugin.getHologramManager();
+        if (!hm.isSpawned()) {
+            MessageUtil.send(sender, "&cAucun hologramme actif.");
+            return;
+        }
+        hm.despawn();
+        MessageUtil.send(sender, "&aHologramme supprimé.");
+    }
+
     private void handleResetStats(CommandSender sender) {
         if (!sender.hasPermission("hikabrain.admin")) {
             MessageUtil.send(sender, "&cTu n'as pas la permission.");
@@ -555,6 +681,7 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
     private void sendHelp(CommandSender sender) {
         MessageUtil.send(sender, "&8&m----------&r &bHikaBrain &8&m----------");
         MessageUtil.send(sender, "&e/hb join <nom> &7- Rejoindre une arène");
+        MessageUtil.send(sender, "&e/hb joinrandom &7- Rejoindre une arène au hasard");
         MessageUtil.send(sender, "&e/hb leave &7- Quitter la partie en cours");
         MessageUtil.send(sender, "&e/hb list &7- Lister toutes les arènes");
         MessageUtil.send(sender, "&e/hb info [nom] &7- Voir l'état d'une arène");
@@ -563,12 +690,15 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
             MessageUtil.send(sender, "&c/hb create <nom> &7- Créer une nouvelle arène");
             MessageUtil.send(sender, "&c/hb delete <nom> &7- Supprimer une arène");
             MessageUtil.send(sender, "&c/hb setlobby <nom> &7- Définir le point de lobby");
-            MessageUtil.send(sender, "&c/hb setspawn <nom> <red|blue> &7- Définir le spawn d'une équipe");
+            MessageUtil.send(sender, "&c/hb setspawn <nom> <red|blue> <index> &7- Définir/remplacer un spawn d'équipe");
+            MessageUtil.send(sender, "&c/hb delspawn <nom> <red|blue> <index> &7- Supprimer un spawn d'équipe");
             MessageUtil.send(sender, "&c/hb setcapture <nom> <red|blue> <pos1|pos2> &7- Définir la zone de capture");
             MessageUtil.send(sender, "&c/hb setgamezone <nom> <pos1|pos2> &7- Définir la zone de jeu (protection + restauration)");
             MessageUtil.send(sender, "&c/hb start <nom> &7- Forcer le démarrage");
             MessageUtil.send(sender, "&c/hb stop <nom> &7- Forcer l'arrêt");
             MessageUtil.send(sender, "&c/hb resetstats &7- Réinitialiser les statistiques");
+            MessageUtil.send(sender, "&b/hb holostats &7- Spawner l'hologramme de stats à ta position");
+            MessageUtil.send(sender, "&b/hb holoremove &7- Supprimer l'hologramme de stats");
             MessageUtil.send(sender, "&8&m----------&r &dScoreboard &8&m----------");
             MessageUtil.send(sender, "&d/hb setsbserver <nom> &7- Définir le nom du serveur");
             MessageUtil.send(sender, "&d/hb setsbgame <nom> &7- Définir le nom du jeu");
@@ -582,11 +712,11 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            List<String> options = new ArrayList<>(List.of("join", "leave", "info", "list", "stats"));
+            List<String> options = new ArrayList<>(List.of("join", "joinrandom", "leave", "info", "list", "stats"));
             if (sender.hasPermission("hikabrain.admin")) {
-                options.addAll(List.of("create", "delete", "setlobby", "setspawn", "setcapture", "setgamezone", "start", "stop"));
+                options.addAll(List.of("create", "delete", "setlobby", "setspawn", "delspawn", "setcapture", "setgamezone", "start", "stop"));
                 options.addAll(List.of("setsbserver", "setsbgame", "setsbtitle", "setsblines", "reloadsb", "sbinfo"));
-                options.addAll(List.of("resetstats"));
+                options.addAll(List.of("resetstats", "holostats", "holoremove"));
             }
             return filterStartingWith(options, args[0]);
         }
@@ -594,11 +724,11 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
         String sub = args[0].toLowerCase(Locale.ROOT);
 
         // Le 2e argument est presque toujours un nom d'arène existant (sauf pour "create").
-        if (args.length == 2 && Set.of("join", "info", "delete", "setlobby", "setspawn", "setcapture", "setgamezone", "start", "stop").contains(sub)) {
+        if (args.length == 2 && Set.of("join", "info", "delete", "setlobby", "setspawn", "delspawn", "setcapture", "setgamezone", "start", "stop").contains(sub)) {
             return filterStartingWith(new ArrayList<>(plugin.getArenaManager().getNames()), args[1]);
         }
 
-        if (args.length == 3 && (sub.equals("setspawn") || sub.equals("setcapture"))) {
+        if (args.length == 3 && (sub.equals("setspawn") || sub.equals("delspawn") || sub.equals("setcapture"))) {
             return filterStartingWith(List.of("red", "blue"), args[2]);
         }
 
@@ -608,6 +738,10 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
 
         if (args.length == 4 && sub.equals("setcapture")) {
             return filterStartingWith(List.of("pos1", "pos2"), args[3]);
+        }
+
+        if (args.length == 4 && (sub.equals("setspawn") || sub.equals("delspawn"))) {
+            return filterStartingWith(List.of("1", "2", "3", "4"), args[3]);
         }
 
         return Collections.emptyList();

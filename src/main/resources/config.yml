@@ -8,10 +8,10 @@ min-players: 2
 # Nombre de joueurs maximum (au-delà, équilibrage par équipe)
 max-players: 16
 
-# Durée du compte à rebours du lobby (en secondes)
-lobby-countdown: 15
+# Durée du compte à rebours du lobby dès que le nombre minimum de joueurs est atteint (en secondes)
+lobby-countdown-min-reached: 10
 
-# Durée du compte à rebours quand le lobby est plein (accélère le départ)
+# Durée du compte à rebours quand le lobby est plein (accélère encore plus le départ)
 lobby-countdown-fast: 10
 
 # Nombre de points nécessaires pour gagner la partie

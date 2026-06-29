@@ -8,11 +8,15 @@ description: Plugin de minijeu Hikabrain (capture de zone par équipes) inspiré
 commands:
   hb:
     description: Commande principale du plugin Hikabrain
-    usage: /hb <create|delete|list|setlobby|setspawn|setcapture|setgamezone|start|stop|join|leave|info>
+    usage: /hb <create|delete|list|arenas|setlobby|setspawn|delspawn|setcapture|setgamezone|start|stop|join|joinrandom|leave|info|stats|holostats|holoremove>
+  arenas:
+    description: Ouvre le GUI de sélection d'arène
+    usage: /arenas
+    aliases: [arena]
 
 permissions:
   hikabrain.admin:
-    description: Permission pour administrer le jeu Hikabrain
+    description: Permission pour administrer le jeu Hikabrain (hologramme, reset, setup arènes…)
     default: op
   hikabrain.play:
     description: Permission pour jouer au Hikabrain

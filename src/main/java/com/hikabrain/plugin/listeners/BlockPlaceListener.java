@@ -44,13 +44,19 @@ public class BlockPlaceListener implements Listener {
             return;
         }
         
-        // Vérifier si le bloc est placé dans une zone de spawn (les deux équipes)
+        // Vérifier si le bloc est placé dans une zone de spawn (les deux équipes, tous leurs spawns)
         // Zone de spawn: X ±0, Y ±1 (donc 2 blocs de hauteur), Z ±0
-        Location redSpawn = gm.getArena().getSpawn(Team.RED);
-        Location blueSpawn = gm.getArena().getSpawn(Team.BLUE);
-        
-        if (isInSpawnZone(blockLoc, redSpawn) || isInSpawnZone(blockLoc, blueSpawn)) {
-            event.setCancelled(true);
+        for (Location spawn : gm.getArena().getSpawns(Team.RED)) {
+            if (isInSpawnZone(blockLoc, spawn)) {
+                event.setCancelled(true);
+                return;
+            }
+        }
+        for (Location spawn : gm.getArena().getSpawns(Team.BLUE)) {
+            if (isInSpawnZone(blockLoc, spawn)) {
+                event.setCancelled(true);
+                return;
+            }
         }
     }
 

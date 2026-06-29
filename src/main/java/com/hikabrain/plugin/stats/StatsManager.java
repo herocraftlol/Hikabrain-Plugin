@@ -11,235 +11,164 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Gère les statistiques globales d'HikaBrain :
- * - Victoires par équipe
- * - Kills et Deaths par équipe
- * - Ratio K/D
- * - Autres statistiques globales
- * 
- * Les statistiques sont sauvegardées dans un fichier séparé (stats.yml)
- * pour persister entre les redémarrages du serveur.
+ * Gère les statistiques globales d'HikaBrain par mode de jeu (1v1, 2v2, 3v3, 4v4).
+ * Les statistiques sont sauvegardées dans stats.yml, séparées par catégorie.
  */
 public class StatsManager {
 
-    private final HikaBrainPlugin plugin;
-    private final File statsFile;
-    private FileConfiguration statsConfig;
+    /** Les 4 modes supportés. */
+    public enum GameMode {
+        V1("1v1"), V2("2v2"), V3("3v3"), V4("4v4");
 
-    // Cache en mémoire des statistiques
-    private int redWins;
-    private int blueWins;
-    private int redKills;
-    private int redDeaths;
-    private int blueKills;
-    private int blueDeaths;
+        private final String label;
+        GameMode(String label) { this.label = label; }
+        public String getLabel() { return label; }
+
+        /** Résout le mode depuis le nombre de joueurs par équipe. */
+        public static GameMode fromTeamSize(int size) {
+            return switch (size) {
+                case 1  -> V1;
+                case 2  -> V2;
+                case 3  -> V3;
+                default -> V4;
+            };
+        }
+    }
+
+    private static String key(GameMode m, String stat) { return m.getLabel() + "." + stat; }
+
+    private final Map<GameMode, ModeStats> modes = new HashMap<>();
     private int totalGames;
     private int totalCaptures;
 
+    private final HikaBrainPlugin plugin;
+    private final File             statsFile;
+    private FileConfiguration      statsConfig;
+
     public StatsManager(HikaBrainPlugin plugin) {
-        this.plugin = plugin;
+        this.plugin    = plugin;
         this.statsFile = new File(plugin.getDataFolder(), "stats.yml");
+        for (GameMode m : GameMode.values()) modes.put(m, new ModeStats());
         loadStats();
     }
 
-    /**
-     * Charge les statistiques depuis le fichier stats.yml
-     */
     public void loadStats() {
         if (!statsFile.exists()) {
-            // Créer le fichier avec les valeurs par défaut
-            try {
-                statsFile.getParentFile().mkdirs();
-                statsFile.createNewFile();
-            } catch (IOException e) {
-                plugin.getLogger().severe("Impossible de créer stats.yml: " + e.getMessage());
-            }
+            try { statsFile.getParentFile().mkdirs(); statsFile.createNewFile(); }
+            catch (IOException e) { plugin.getLogger().severe("Impossible de créer stats.yml: " + e.getMessage()); }
         }
-
-        statsConfig = YamlConfiguration.loadConfiguration(statsFile);
-        
-        // Charger les statistiques en mémoire
-        redWins = statsConfig.getInt("wins.red", 0);
-        blueWins = statsConfig.getInt("wins.blue", 0);
-        redKills = statsConfig.getInt("kills.red", 0);
-        redDeaths = statsConfig.getInt("deaths.red", 0);
-        blueKills = statsConfig.getInt("kills.blue", 0);
-        blueDeaths = statsConfig.getInt("deaths.blue", 0);
-        totalGames = statsConfig.getInt("total-games", 0);
+        statsConfig   = YamlConfiguration.loadConfiguration(statsFile);
+        totalGames    = statsConfig.getInt("total-games",    0);
         totalCaptures = statsConfig.getInt("total-captures", 0);
+        for (GameMode m : GameMode.values()) {
+            ModeStats s  = modes.get(m);
+            s.redWins    = statsConfig.getInt(key(m, "wins.red"),    0);
+            s.blueWins   = statsConfig.getInt(key(m, "wins.blue"),   0);
+            s.redKills   = statsConfig.getInt(key(m, "kills.red"),   0);
+            s.redDeaths  = statsConfig.getInt(key(m, "deaths.red"),  0);
+            s.blueKills  = statsConfig.getInt(key(m, "kills.blue"),  0);
+            s.blueDeaths = statsConfig.getInt(key(m, "deaths.blue"), 0);
+        }
     }
 
-    /**
-     * Sauvegarde les statistiques dans le fichier stats.yml
-     */
     public void saveStats() {
-        statsConfig.set("wins.red", redWins);
-        statsConfig.set("wins.blue", blueWins);
-        statsConfig.set("kills.red", redKills);
-        statsConfig.set("deaths.red", redDeaths);
-        statsConfig.set("kills.blue", blueKills);
-        statsConfig.set("deaths.blue", blueDeaths);
-        statsConfig.set("total-games", totalGames);
+        statsConfig.set("total-games",    totalGames);
         statsConfig.set("total-captures", totalCaptures);
-        
-        try {
-            statsConfig.save(statsFile);
-        } catch (IOException e) {
-            plugin.getLogger().severe("Impossible de sauvegarder stats.yml: " + e.getMessage());
+        for (GameMode m : GameMode.values()) {
+            ModeStats s = modes.get(m);
+            statsConfig.set(key(m, "wins.red"),    s.redWins);
+            statsConfig.set(key(m, "wins.blue"),   s.blueWins);
+            statsConfig.set(key(m, "kills.red"),   s.redKills);
+            statsConfig.set(key(m, "deaths.red"),  s.redDeaths);
+            statsConfig.set(key(m, "kills.blue"),  s.blueKills);
+            statsConfig.set(key(m, "deaths.blue"), s.blueDeaths);
         }
+        try { statsConfig.save(statsFile); }
+        catch (IOException e) { plugin.getLogger().severe("Impossible de sauvegarder stats.yml: " + e.getMessage()); }
     }
 
-    /**
-     * Ajoute une victoire à l'équipe gagnante
-     */
-    public void addWin(Team winner) {
-        if (winner == Team.RED) {
-            redWins++;
-        } else {
-            blueWins++;
-        }
+    // ── Mutateurs ──────────────────────────────────────────────────────────────
+
+    public void addWin(Team winner, int playersPerTeam) {
+        GameMode m  = GameMode.fromTeamSize(playersPerTeam);
+        ModeStats s = modes.get(m);
+        if (winner == Team.RED) s.redWins++; else s.blueWins++;
         totalGames++;
         saveStats();
     }
 
-    /**
-     * Ajoute un kill à l'équipe spécifiée
-     */
-    public void addKill(Team team) {
-        if (team == Team.RED) {
-            redKills++;
-        } else {
-            blueKills++;
-        }
+    /** Rétro-compat : suppose 1v1. */
+    public void addWin(Team winner) { addWin(winner, 1); }
+
+    public void addKill(Team team, int playersPerTeam) {
+        ModeStats s = modes.get(GameMode.fromTeamSize(playersPerTeam));
+        if (team == Team.RED) s.redKills++; else s.blueKills++;
         saveStats();
     }
+    public void addKill(Team team) { addKill(team, 1); }
 
-    /**
-     * Ajoute un death à l'équipe spécifiée
-     */
-    public void addDeath(Team team) {
-        if (team == Team.RED) {
-            redDeaths++;
-        } else {
-            blueDeaths++;
-        }
+    public void addDeath(Team team, int playersPerTeam) {
+        ModeStats s = modes.get(GameMode.fromTeamSize(playersPerTeam));
+        if (team == Team.RED) s.redDeaths++; else s.blueDeaths++;
         saveStats();
     }
+    public void addDeath(Team team) { addDeath(team, 1); }
 
-    /**
-     * Ajoute une capture au compteur global
-     */
-    public void addCapture() {
-        totalCaptures++;
-        saveStats();
+    public void addCapture() { totalCaptures++; saveStats(); }
+
+    // ── Accesseurs globaux ────────────────────────────────────────────────────
+
+    public int getRedWins()    { return modes.values().stream().mapToInt(s -> s.redWins).sum(); }
+    public int getBlueWins()   { return modes.values().stream().mapToInt(s -> s.blueWins).sum(); }
+    public int getRedKills()   { return modes.values().stream().mapToInt(s -> s.redKills).sum(); }
+    public int getBlueKills()  { return modes.values().stream().mapToInt(s -> s.blueKills).sum(); }
+    public int getRedDeaths()  { return modes.values().stream().mapToInt(s -> s.redDeaths).sum(); }
+    public int getBlueDeaths() { return modes.values().stream().mapToInt(s -> s.blueDeaths).sum(); }
+    public int getTotalGames()    { return totalGames; }
+    public int getTotalCaptures() { return totalCaptures; }
+
+    public double getRedKD()  { int d=getRedDeaths(),k=getRedKills();   return d==0?k:Math.round((double)k/d*100)/100.0; }
+    public double getBlueKD() { int d=getBlueDeaths(),k=getBlueKills(); return d==0?k:Math.round((double)k/d*100)/100.0; }
+
+    // ── Accesseurs par mode ────────────────────────────────────────────────────
+
+    public int getRedWins(GameMode m)    { return modes.get(m).redWins; }
+    public int getBlueWins(GameMode m)   { return modes.get(m).blueWins; }
+    public int getRedKills(GameMode m)   { return modes.get(m).redKills; }
+    public int getBlueKills(GameMode m)  { return modes.get(m).blueKills; }
+    public int getRedDeaths(GameMode m)  { return modes.get(m).redDeaths; }
+    public int getBlueDeaths(GameMode m) { return modes.get(m).blueDeaths; }
+    public int getTotalWins(GameMode m)  { return modes.get(m).redWins + modes.get(m).blueWins; }
+
+    public double getRedKD(GameMode m) {
+        int d=modes.get(m).redDeaths, k=modes.get(m).redKills;
+        return d==0?k:Math.round((double)k/d*100)/100.0;
+    }
+    public double getBlueKD(GameMode m) {
+        int d=modes.get(m).blueDeaths, k=modes.get(m).blueKills;
+        return d==0?k:Math.round((double)k/d*100)/100.0;
     }
 
-    /**
-     * Retourne le nombre de victoires de l'équipe rouge
-     */
-    public int getRedWins() {
-        return redWins;
-    }
+    // ── Reset ──────────────────────────────────────────────────────────────────
 
-    /**
-     * Retourne le nombre de victoires de l'équipe bleue
-     */
-    public int getBlueWins() {
-        return blueWins;
-    }
-
-    /**
-     * Retourne le nombre de kills de l'équipe rouge
-     */
-    public int getRedKills() {
-        return redKills;
-    }
-
-    /**
-     * Retourne le nombre de kills de l'équipe bleue
-     */
-    public int getBlueKills() {
-        return blueKills;
-    }
-
-    /**
-     * Retourne le nombre de deaths de l'équipe rouge
-     */
-    public int getRedDeaths() {
-        return redDeaths;
-    }
-
-    /**
-     * Retourne le nombre de deaths de l'équipe bleue
-     */
-    public int getBlueDeaths() {
-        return blueDeaths;
-    }
-
-    /**
-     * Calcule le ratio K/D de l'équipe rouge
-     */
-    public double getRedKD() {
-        if (redDeaths == 0) {
-            return redKills > 0 ? redKills : 0.0;
-        }
-        return Math.round((double) redKills / redDeaths * 100.0) / 100.0;
-    }
-
-    /**
-     * Calcule le ratio K/D de l'équipe bleue
-     */
-    public double getBlueKD() {
-        if (blueDeaths == 0) {
-            return blueKills > 0 ? blueKills : 0.0;
-        }
-        return Math.round((double) blueKills / blueDeaths * 100.0) / 100.0;
-    }
-
-    /**
-     * Retourne le nombre total de parties jouées
-     */
-    public int getTotalGames() {
-        return totalGames;
-    }
-
-    /**
-     * Retourne le nombre total de captures effectuées
-     */
-    public int getTotalCaptures() {
-        return totalCaptures;
-    }
-
-    /**
-     * Réinitialise toutes les statistiques
-     */
     public void resetStats() {
-        redWins = 0;
-        blueWins = 0;
-        redKills = 0;
-        redDeaths = 0;
-        blueKills = 0;
-        blueDeaths = 0;
-        totalGames = 0;
-        totalCaptures = 0;
+        modes.values().forEach(ModeStats::reset);
+        totalGames = totalCaptures = 0;
         saveStats();
     }
 
-    /**
-     * Retourne toutes les statistiques sous forme de Map
-     */
     public Map<String, Object> getAllStats() {
-        Map<String, Object> stats = new HashMap<>();
-        stats.put("red_wins", redWins);
-        stats.put("blue_wins", blueWins);
-        stats.put("red_kills", redKills);
-        stats.put("red_deaths", redDeaths);
-        stats.put("blue_kills", blueKills);
-        stats.put("blue_deaths", blueDeaths);
-        stats.put("red_kd", getRedKD());
-        stats.put("blue_kd", getBlueKD());
-        stats.put("total_games", totalGames);
-        stats.put("total_captures", totalCaptures);
-        return stats;
+        Map<String, Object> s = new HashMap<>();
+        s.put("red_wins", getRedWins()); s.put("blue_wins", getBlueWins());
+        s.put("red_kills", getRedKills()); s.put("red_deaths", getRedDeaths());
+        s.put("blue_kills", getBlueKills()); s.put("blue_deaths", getBlueDeaths());
+        s.put("red_kd", getRedKD()); s.put("blue_kd", getBlueKD());
+        s.put("total_games", totalGames); s.put("total_captures", totalCaptures);
+        return s;
+    }
+
+    private static class ModeStats {
+        int redWins, blueWins, redKills, redDeaths, blueKills, blueDeaths;
+        void reset() { redWins=blueWins=redKills=redDeaths=blueKills=blueDeaths=0; }
     }
 }

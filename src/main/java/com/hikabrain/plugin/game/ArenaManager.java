@@ -6,6 +6,7 @@ import org.bukkit.configuration.file.YamlConfiguration;
 import java.io.File;
 import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Registre central de toutes les arènes HikaBrain configurées sur le serveur.
@@ -143,6 +144,69 @@ public class ArenaManager {
             }
         }
         return null;
+    }
+
+    /**
+     * Sélectionne la meilleure arène disponible pour une jointure aléatoire (commande
+     * /hb joinrandom). Logique de priorité :
+     *
+     *   1. Parmi les arènes jouables (configurées, pas en partie, pas pleines), on
+     *      privilégie celles qui ont déjà au moins un joueur en attente : ça permet de
+     *      compléter une partie existante (1v1 ou plus) plutôt que d'en ouvrir une vide.
+     *      S'il y a plusieurs arènes avec des joueurs déjà en attente, on choisit celle
+     *      qui en a le plus (la plus proche de démarrer / la plus remplie), et en cas
+     *      d'égalité, on tire au hasard parmi elles.
+     *   2. Si aucune arène n'a de joueur en attente, on tire au hasard parmi toutes les
+     *      arènes disponibles (vides comprises), pour ne jamais renvoyer "aucune arène"
+     *      tant qu'au moins une arène jouable existe.
+     *
+     * Renvoie null si aucune arène n'est actuellement disponible (aucune configurée,
+     * ou toutes pleines/en partie).
+     */
+    public GameManager findBestArenaForRandomJoin() {
+        List<GameManager> joinable = new ArrayList<>();
+        for (GameManager gm : arenas.values()) {
+            if (isJoinable(gm)) {
+                joinable.add(gm);
+            }
+        }
+        if (joinable.isEmpty()) {
+            return null;
+        }
+
+        int maxPlayers = 0;
+        List<GameManager> withPlayers = new ArrayList<>();
+        for (GameManager gm : joinable) {
+            int count = gm.getPlayerCount();
+            if (count > 0) {
+                if (count > maxPlayers) {
+                    maxPlayers = count;
+                    withPlayers.clear();
+                    withPlayers.add(gm);
+                } else if (count == maxPlayers) {
+                    withPlayers.add(gm);
+                }
+            }
+        }
+
+        List<GameManager> candidates = withPlayers.isEmpty() ? joinable : withPlayers;
+        return candidates.get(ThreadLocalRandom.current().nextInt(candidates.size()));
+    }
+
+    /**
+     * Une arène est "joignable" pour la jointure aléatoire si elle est correctement
+     * configurée et si elle n'est pas déjà en train de jouer/de se terminer/pleine.
+     */
+    private boolean isJoinable(GameManager gm) {
+        if (!gm.getArena().isFullyConfigured()) {
+            return false;
+        }
+        GameState state = gm.getState();
+        if (state == GameState.PLAYING || state == GameState.ROUND_RESET || state == GameState.ENDING) {
+            return false;
+        }
+        int max = plugin.getConfig().getInt("max-players", 16);
+        return gm.getPlayerCount() < max;
     }
 
     private String normalize(String name) {

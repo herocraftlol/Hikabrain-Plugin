@@ -3,6 +3,10 @@ package com.hikabrain.plugin;
 import com.hikabrain.plugin.commands.HikaBrainCommand;
 import com.hikabrain.plugin.game.ArenaManager;
 import com.hikabrain.plugin.game.KitManager;
+import com.hikabrain.plugin.gui.ArenaGUI;
+import com.hikabrain.plugin.gui.ArenaGUIListener;
+import com.hikabrain.plugin.hologram.StatsHologramListener;
+import com.hikabrain.plugin.hologram.StatsHologramManager;
 import com.hikabrain.plugin.listeners.ArenaProtectionListener;
 import com.hikabrain.plugin.listeners.BlockPlaceListener;
 import com.hikabrain.plugin.listeners.ForceStartItemListener;
@@ -20,22 +24,26 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 public class HikaBrainPlugin extends JavaPlugin {
 
-    private ArenaManager arenaManager;
-    private ScoreboardManager scoreboardManager;
-    private StatsManager statsManager;
+    private ArenaManager         arenaManager;
+    private ScoreboardManager    scoreboardManager;
+    private StatsManager         statsManager;
+    private ArenaGUI             arenaGUI;
+    private StatsHologramManager hologramManager;
 
     @Override
     public void onEnable() {
         saveDefaultConfig();
 
-        this.arenaManager = new ArenaManager(this);
+        this.arenaManager      = new ArenaManager(this);
         this.arenaManager.loadAll();
         this.scoreboardManager = new ScoreboardManager(this);
-        this.statsManager = new StatsManager(this);
+        this.statsManager      = new StatsManager(this);
+        this.hologramManager   = new StatsHologramManager(this);
         KitManager.init(this);
 
-        // Respawn instantané (sans écran de mort à cliquer) pour une meilleure expérience minijeu.
-        // Appliqué globalement à tous les mondes du serveur.
+        this.arenaGUI = new ArenaGUI(this);
+
+        // Respawn instantané
         for (World world : getServer().getWorlds()) {
             world.setGameRule(GameRule.DO_IMMEDIATE_RESPAWN, true);
         }
@@ -44,6 +52,10 @@ public class HikaBrainPlugin extends JavaPlugin {
         HikaBrainCommand commandExecutor = new HikaBrainCommand(this);
         getCommand("hb").setExecutor(commandExecutor);
         getCommand("hb").setTabCompleter(commandExecutor);
+        getCommand("arenas").setExecutor((sender, command, label, args) -> {
+            commandExecutor.onCommand(sender, command, label, new String[]{"arenas"});
+            return true;
+        });
 
         // Listeners
         getServer().getPluginManager().registerEvents(new PlayerConnectionListener(this), this);
@@ -55,34 +67,23 @@ public class HikaBrainPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new ForceStartItemListener(this), this);
         getServer().getPluginManager().registerEvents(new PlayerItemListener(this), this);
         getServer().getPluginManager().registerEvents(new BlockPlaceListener(this), this);
+        getServer().getPluginManager().registerEvents(new ArenaGUIListener(this, arenaGUI), this);
+        getServer().getPluginManager().registerEvents(new StatsHologramListener(this, hologramManager), this);
 
         getLogger().info("HikaBrain activé ! (" + arenaManager.getNames().size() + " arène(s) chargée(s))");
     }
 
     @Override
     public void onDisable() {
-        if (scoreboardManager != null) {
-            scoreboardManager.stop();
-        }
-        if (statsManager != null) {
-            statsManager.saveStats();
-        }
-        if (arenaManager != null) {
-            arenaManager.stopAll();
-            arenaManager.saveAll();
-        }
+        if (scoreboardManager != null) scoreboardManager.stop();
+        if (statsManager      != null) statsManager.saveStats();
+        if (arenaManager      != null) { arenaManager.stopAll(); arenaManager.saveAll(); }
         getLogger().info("HikaBrain désactivé.");
     }
 
-    public ArenaManager getArenaManager() {
-        return arenaManager;
-    }
-
-    public ScoreboardManager getScoreboardManager() {
-        return scoreboardManager;
-    }
-
-    public StatsManager getStatsManager() {
-        return statsManager;
-    }
+    public ArenaManager         getArenaManager()      { return arenaManager; }
+    public ArenaGUI             getArenaGUI()           { return arenaGUI; }
+    public ScoreboardManager    getScoreboardManager()  { return scoreboardManager; }
+    public StatsManager         getStatsManager()       { return statsManager; }
+    public StatsHologramManager getHologramManager()    { return hologramManager; }
 }
