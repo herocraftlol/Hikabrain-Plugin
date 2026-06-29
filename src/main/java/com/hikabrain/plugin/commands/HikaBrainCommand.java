@@ -82,7 +82,8 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
             case "start" -> handleStart(sender, args);
             case "stop" -> handleStop(sender, args);
             case "info" -> handleInfo(sender, args);
-            case "stats" -> handleStats(sender);
+            case "stats" -> handleStats(sender, args);
+            case "top" -> handleTop(sender, args);
             case "resetstats" -> handleResetStats(sender);
             case "holostats" -> handleHoloStats(sender);
             case "holoremove" -> handleHoloRemove(sender);
@@ -604,17 +605,106 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
 
     // ================= STATISTIQUES =================
 
-    private void handleStats(CommandSender sender) {
-        MessageUtil.send(sender, "&8&m----------&r &bStats HikaBrain &8&m----------");
-        MessageUtil.send(sender, "&f&l▸ &cÉquipe Rouge");
-        MessageUtil.send(sender, "&f  Kills: &c" + plugin.getStatsManager().getRedKills() + " &7/ Deaths: &c" + plugin.getStatsManager().getRedDeaths() + " &7/ K/D: &c" + plugin.getStatsManager().getRedKD());
-        MessageUtil.send(sender, "&f  Victoires: &c" + plugin.getStatsManager().getRedWins());
-        MessageUtil.send(sender, "&f&l▸ &9Équipe Bleu");
-        MessageUtil.send(sender, "&f  Kills: &9" + plugin.getStatsManager().getBlueKills() + " &7/ Deaths: &9" + plugin.getStatsManager().getBlueDeaths() + " &7/ K/D: &9" + plugin.getStatsManager().getBlueKD());
-        MessageUtil.send(sender, "&f  Victoires: &9" + plugin.getStatsManager().getBlueWins());
+    private void handleStats(CommandSender sender, String[] args) {
+        UUID targetUuid;
+        String targetName;
+
+        if (args.length >= 2) {
+            // /hb stats <pseudo>
+            targetName = args[1];
+            org.bukkit.OfflinePlayer offline = org.bukkit.Bukkit.getOfflinePlayer(targetName);
+            if (!offline.hasPlayedBefore() && !offline.isOnline()) {
+                MessageUtil.send(sender, "&cAucune statistique trouvée pour &e" + targetName + "&c.");
+                return;
+            }
+            targetUuid = offline.getUniqueId();
+            targetName = offline.getName() != null ? offline.getName() : targetName;
+        } else {
+            // /hb stats → propres stats
+            if (!(sender instanceof Player player)) {
+                MessageUtil.send(sender, "&cPrécise un pseudo : &e/hb stats <pseudo>");
+                return;
+            }
+            targetUuid = player.getUniqueId();
+            targetName = player.getName();
+        }
+
+        com.hikabrain.plugin.stats.StatsManager.PlayerStats stats =
+                plugin.getStatsManager().getPlayerStats(targetUuid, targetName);
+
+        int losses = stats.gamesPlayed - stats.gamesWon;
+        double winRate = stats.gamesPlayed > 0
+                ? Math.round((double) stats.gamesWon / stats.gamesPlayed * 1000.0) / 10.0
+                : 0.0;
+
+        MessageUtil.send(sender, "&8&m----------&r &bStats de " + targetName + " &8&m----------");
+        MessageUtil.send(sender, "&f▸ Kills: &a" + stats.kills + " &7/ Deaths: &c" + stats.deaths + " &7/ K/D: &e" + stats.getKD());
+        MessageUtil.send(sender, "&f▸ Parties jouées: &7" + stats.gamesPlayed);
+        MessageUtil.send(sender, "&f▸ Parties gagnées: &a" + stats.gamesWon + " &7(défaites: &c" + losses + "&7)");
+        MessageUtil.send(sender, "&f▸ Taux de victoire: &6" + winRate + "%");
+        MessageUtil.send(sender, "&8&m----------&r &7Stats HikaBrain Global &8&m----------");
+        MessageUtil.send(sender, "&fParties jouées: &7" + plugin.getStatsManager().getTotalGames()
+                + "  &fCaptures: &7" + plugin.getStatsManager().getTotalCaptures());
         MessageUtil.send(sender, "&8&m----------&r");
-        MessageUtil.send(sender, "&fParties jouées: &7" + plugin.getStatsManager().getTotalGames());
-        MessageUtil.send(sender, "&fCaptures totales: &7" + plugin.getStatsManager().getTotalCaptures());
+    }
+
+    private void handleTop(CommandSender sender, String[] args) {
+        // /hb top [kd|kills|wins|games]  -- "wins" par défaut
+        String criterion = args.length >= 2 ? args[1].toLowerCase(Locale.ROOT) : "wins";
+
+        Comparator<com.hikabrain.plugin.stats.StatsManager.PlayerStats> comparator;
+        String label;
+        switch (criterion) {
+            case "kd" -> {
+                comparator = Comparator.comparingDouble(com.hikabrain.plugin.stats.StatsManager.PlayerStats::getKD);
+                label = "Meilleur K/D";
+            }
+            case "kills" -> {
+                comparator = Comparator.comparingInt(s -> s.kills);
+                label = "Plus de Kills";
+            }
+            case "games" -> {
+                comparator = Comparator.comparingInt(s -> s.gamesPlayed);
+                label = "Plus de Parties Jouées";
+            }
+            case "wins" -> {
+                comparator = Comparator.comparingInt(s -> s.gamesWon);
+                label = "Plus de Victoires";
+            }
+            default -> {
+                MessageUtil.send(sender, "&cCritère inconnu. Utilise : &e/hb top <kd|kills|wins|games>");
+                return;
+            }
+        }
+
+        List<Map.Entry<UUID, com.hikabrain.plugin.stats.StatsManager.PlayerStats>> top =
+                plugin.getStatsManager().getTopPlayers(10, comparator);
+
+        MessageUtil.send(sender, "&8&m----------&r &6&lClassement: " + label + " &8&m----------");
+
+        if (top.isEmpty()) {
+            MessageUtil.send(sender, "&7Aucune statistique enregistrée pour le moment.");
+        } else {
+            int rank = 1;
+            for (Map.Entry<UUID, com.hikabrain.plugin.stats.StatsManager.PlayerStats> entry : top) {
+                com.hikabrain.plugin.stats.StatsManager.PlayerStats s = entry.getValue();
+                String rankColor = switch (rank) {
+                    case 1 -> "&6";
+                    case 2 -> "&7";
+                    case 3 -> "&c";
+                    default -> "&f";
+                };
+                String value = switch (criterion) {
+                    case "kd"    -> String.valueOf(s.getKD());
+                    case "kills" -> String.valueOf(s.kills);
+                    case "games" -> String.valueOf(s.gamesPlayed);
+                    default      -> String.valueOf(s.gamesWon);
+                };
+                MessageUtil.send(sender, rankColor + "&l#" + rank + " &f" + s.name + " &7- &e" + value);
+                rank++;
+            }
+        }
+
         MessageUtil.send(sender, "&8&m----------&r");
     }
 
@@ -685,7 +775,8 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
         MessageUtil.send(sender, "&e/hb leave &7- Quitter la partie en cours");
         MessageUtil.send(sender, "&e/hb list &7- Lister toutes les arènes");
         MessageUtil.send(sender, "&e/hb info [nom] &7- Voir l'état d'une arène");
-        MessageUtil.send(sender, "&e/hb stats &7- Voir les statistiques");
+        MessageUtil.send(sender, "&e/hb stats [pseudo] &7- Voir tes statistiques (ou celles d'un joueur)");
+        MessageUtil.send(sender, "&e/hb top [kd|kills|wins|games] &7- Voir le classement des meilleurs joueurs");
         if (sender.hasPermission("hikabrain.admin")) {
             MessageUtil.send(sender, "&c/hb create <nom> &7- Créer une nouvelle arène");
             MessageUtil.send(sender, "&c/hb delete <nom> &7- Supprimer une arène");
@@ -712,7 +803,7 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            List<String> options = new ArrayList<>(List.of("join", "joinrandom", "leave", "info", "list", "stats"));
+            List<String> options = new ArrayList<>(List.of("join", "joinrandom", "leave", "info", "list", "stats", "top"));
             if (sender.hasPermission("hikabrain.admin")) {
                 options.addAll(List.of("create", "delete", "setlobby", "setspawn", "delspawn", "setcapture", "setgamezone", "start", "stop"));
                 options.addAll(List.of("setsbserver", "setsbgame", "setsbtitle", "setsblines", "reloadsb", "sbinfo"));
@@ -742,6 +833,16 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
 
         if (args.length == 4 && (sub.equals("setspawn") || sub.equals("delspawn"))) {
             return filterStartingWith(List.of("1", "2", "3", "4"), args[3]);
+        }
+
+        if (args.length == 2 && sub.equals("top")) {
+            return filterStartingWith(List.of("kd", "kills", "wins", "games"), args[1]);
+        }
+
+        if (args.length == 2 && sub.equals("stats")) {
+            List<String> onlineNames = new ArrayList<>();
+            for (Player p : org.bukkit.Bukkit.getOnlinePlayers()) onlineNames.add(p.getName());
+            return filterStartingWith(onlineNames, args[1]);
         }
 
         return Collections.emptyList();

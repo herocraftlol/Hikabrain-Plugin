@@ -674,6 +674,17 @@ public class GameManager {
         // Enregistrer la victoire dans les statistiques
         int teamSize = Math.max(getPlayerCountForTeam(Team.RED), getPlayerCountForTeam(Team.BLUE));
         plugin.getStatsManager().addWin(winner, teamSize);
+
+        // Enregistrer le résultat individuel de chaque joueur
+        for (Map.Entry<UUID, Team> entry : playerTeams.entrySet()) {
+            UUID uuid = entry.getKey();
+            Team team = entry.getValue();
+            Player p  = Bukkit.getPlayer(uuid);
+            String pName = p != null ? p.getName() : uuid.toString();
+            boolean won = (team == winner);
+            plugin.getStatsManager().addPlayerGameResult(uuid, pName, won, teamSize);
+        }
+
         // Rafraîchir l'hologramme si actif
         plugin.getHologramManager().refresh();
 

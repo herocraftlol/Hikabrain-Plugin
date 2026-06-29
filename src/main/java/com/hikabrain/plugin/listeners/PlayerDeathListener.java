@@ -5,11 +5,10 @@ import com.hikabrain.plugin.game.GameManager;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
-import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 
 /**
- * Gère la détection des kills et deaths pour les statistiques.
+ * Gère la détection des kills et deaths pour les statistiques (globales + individuelles).
  */
 public class PlayerDeathListener implements Listener {
 
@@ -19,35 +18,28 @@ public class PlayerDeathListener implements Listener {
         this.plugin = plugin;
     }
 
-    /**
-     * Détecte quand un joueur meurt en partie et enregistre le kill/death.
-     */
     @EventHandler
     public void onDeath(PlayerDeathEvent event) {
         Player victim = event.getEntity();
         GameManager gm = plugin.getArenaManager().findArenaOf(victim);
-        
-        if (gm == null) {
-            return;
-        }
 
-        // Vérifier que la victime est bien dans une équipe
-        if (!gm.isPlaying(victim)) {
-            return;
-        }
+        if (gm == null) return;
+        if (!gm.isPlaying(victim)) return;
 
-        // Trouver le tueur
+        int teamSize = Math.max(gm.getPlayerCountForTeam(com.hikabrain.plugin.game.Team.RED),
+                                gm.getPlayerCountForTeam(com.hikabrain.plugin.game.Team.BLUE));
+
         Player killer = victim.getKiller();
-        
+
         if (killer != null && gm.isPlaying(killer) && !killer.equals(victim)) {
-            // Le kill est comptabilisé pour l'équipe du tueur
-            plugin.getStatsManager().addKill(gm.getTeam(killer));
+            plugin.getStatsManager().addKill(gm.getTeam(killer), teamSize);
+            plugin.getStatsManager().addPlayerKill(killer.getUniqueId(), killer.getName(), teamSize);
             gm.addKill(gm.getTeam(killer));
             gm.addPlayerKill(killer.getUniqueId());
         }
 
-        // Le death est comptabilisé pour l'équipe de la victime
-        plugin.getStatsManager().addDeath(gm.getTeam(victim));
+        plugin.getStatsManager().addDeath(gm.getTeam(victim), teamSize);
+        plugin.getStatsManager().addPlayerDeath(victim.getUniqueId(), victim.getName(), teamSize);
         gm.addDeath(gm.getTeam(victim));
         gm.addPlayerDeath(victim.getUniqueId());
     }
