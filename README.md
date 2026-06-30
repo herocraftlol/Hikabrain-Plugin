@@ -1,6 +1,6 @@
 # HikaBrain Plugin
 
-Plugin Minecraft HikaBrain corrigé (1) avec hologrammes de statistiques, GUI de sélection d'arène et système de capture de zone par équipes pour Paper 1.21.1.
+Plugin Minecraft HikaBrain leaderboard unique avec classement par équipe, hologrammes de statistiques et GUI de sélection d'arène pour Paper 1.21.1.
 
 ## Fonctionnalités
 
@@ -8,7 +8,7 @@ Plugin Minecraft HikaBrain corrigé (1) avec hologrammes de statistiques, GUI de
 - **Capture de zone par équipes** - Système type Screaming Bedwars
 - **Scoreboard en temps réel** - Affichage des scores, kills, deaths et K/D
 - **Système de freeze** - Joueurs immobilisés pendant le compte à rebours
-- **Corrections et améliorations** - Version corrigée avec corrections de bugs
+- **Leaderboard unique** - Classement des joueurs par équipe avec statistiques uniques
 
 ### 📊 Statistiques
 - Statistiques K/D par équipe
