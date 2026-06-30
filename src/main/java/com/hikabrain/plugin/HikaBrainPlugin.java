@@ -75,6 +75,7 @@ public class HikaBrainPlugin extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (hologramManager   != null) hologramManager.despawn();   // stoppe la tâche de refresh
         if (scoreboardManager != null) scoreboardManager.stop();
         if (statsManager      != null) statsManager.saveStats();
         if (arenaManager      != null) { arenaManager.stopAll(); arenaManager.saveAll(); }

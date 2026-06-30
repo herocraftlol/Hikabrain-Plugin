@@ -6,7 +6,7 @@
 
     <groupId>com.hikabrain</groupId>
     <artifactId>HikaBrain</artifactId>
-    <version>1.0.3-leaderboard-unique</version>
+    <version>1.0.2</version>
     <packaging>jar</packaging>
 
     <properties>
