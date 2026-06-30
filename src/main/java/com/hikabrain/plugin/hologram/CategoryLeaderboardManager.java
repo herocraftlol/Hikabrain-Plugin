@@ -18,6 +18,7 @@ import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
+import org.bukkit.entity.LivingEntity;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.scheduler.BukkitTask;
 
@@ -344,9 +345,11 @@ public class CategoryLeaderboardManager {
      * {@link ArmorStand#setSmall(boolean)}.
      */
     private void applyScale(Entity entity, double scale) {
-        AttributeInstance attr = entity.getAttribute(Attribute.SCALE);
-        if (attr != null) {
-            attr.setBaseValue(scale);
+        if (entity instanceof LivingEntity living) {
+            AttributeInstance attr = living.getAttribute(Attribute.GENERIC_SCALE);
+            if (attr != null) {
+                attr.setBaseValue(scale);
+            }
         }
     }
 
