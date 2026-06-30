@@ -68,8 +68,6 @@ public class ArenaGUIListener implements Listener {
      * en déléguant à la logique existante de GameManager.
      */
     private void tryJoin(Player player, GameManager gm) {
-        int maxPlayers = plugin.getConfig().getInt("max-players", 16);
-
         if (!gm.getArena().isFullyConfigured()) {
             MessageUtil.send(player, "&cCette arène n'est pas encore configurée.");
             return;

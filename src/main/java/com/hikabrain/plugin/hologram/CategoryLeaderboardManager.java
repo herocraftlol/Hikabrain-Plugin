@@ -10,6 +10,8 @@ import org.bukkit.Chunk;
 import org.bukkit.Location;
 import org.bukkit.NamespacedKey;
 import org.bukkit.World;
+import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -37,10 +39,10 @@ import java.util.UUID;
  *   - PARTIES   : top 10 par parties jouées
  *
  * Chaque catégorie peut être spawnée/déspawnée séparément, à un endroit
- * différent, via /hb leaderboard <catégorie> [remove].
+ * différent, via /hb leaderboard <catégorie> [remove|size <taille>].
  *
- * Indépendant du StatsHologramManager (hologramme combiné top 3 existant) :
- * les deux systèmes peuvent coexister sans interférer l'un avec l'autre.
+ * La taille (échelle) de chaque hologramme peut être réglée précisément via
+ * /hb leaderboard <catégorie> size <taille> (ex: 1.5 = 1,5x plus grand).
  */
 public class CategoryLeaderboardManager {
 
@@ -73,6 +75,8 @@ public class CategoryLeaderboardManager {
     private static final double LINE_GAP               = 0.27;
     private static final String HOLOGRAM_FILE           = "leaderboards.yml";
     private static final int    TOP_SIZE                = 10;
+    /** Échelle par défaut d'un hologramme (taille normale). */
+    private static final double DEFAULT_SCALE           = 1.0;
     /** Rafraîchissement automatique : toutes les 10 secondes. */
     private static final long   REFRESH_INTERVAL_TICKS  = 20L * 10;
 
@@ -84,6 +88,7 @@ public class CategoryLeaderboardManager {
     // Données par catégorie active
     private final Map<Category, Location>     locations    = new EnumMap<>(Category.class);
     private final Map<Category, List<UUID>>   lineEntities = new EnumMap<>(Category.class);
+    private final Map<Category, Double>       scales       = new EnumMap<>(Category.class);
     private BukkitTask refreshTask = null;
 
     public CategoryLeaderboardManager(HikaBrainPlugin plugin) {
@@ -114,6 +119,7 @@ public class CategoryLeaderboardManager {
             }
             Location loc = new Location(world, s.getDouble("x"), s.getDouble("y"), s.getDouble("z"));
             locations.put(c, loc);
+            scales.put(c, s.getDouble("scale", DEFAULT_SCALE));
             Chunk chunk = world.getChunkAt(loc);
             world.addPluginChunkTicket(chunk.getX(), chunk.getZ(), plugin);
         }
@@ -135,6 +141,7 @@ public class CategoryLeaderboardManager {
             cfg.set(path + ".x", loc.getX());
             cfg.set(path + ".y", loc.getY());
             cfg.set(path + ".z", loc.getZ());
+            cfg.set(path + ".scale", scales.getOrDefault(e.getKey(), DEFAULT_SCALE));
         }
         try {
             cfgFile.getParentFile().mkdirs();
@@ -150,10 +157,23 @@ public class CategoryLeaderboardManager {
     public void spawn(Category category, Location loc) {
         despawnEntities(category);
         locations.put(category, loc.clone());
+        scales.putIfAbsent(category, DEFAULT_SCALE);
         Chunk chunk = loc.getWorld().getChunkAt(loc);
         loc.getWorld().addPluginChunkTicket(chunk.getX(), chunk.getZ(), plugin);
         buildLines(category);
         startRefreshTask();
+        saveConfig();
+    }
+
+    /**
+     * Modifie la taille (échelle) de l'hologramme d'une catégorie déjà spawnée
+     * et reconstruit immédiatement ses lignes avec la nouvelle taille.
+     * @param scale multiplicateur de taille (1.0 = taille normale).
+     */
+    public void setScale(Category category, double scale) {
+        if (!locations.containsKey(category)) return;
+        scales.put(category, scale);
+        refresh(category);
         saveConfig();
     }
 
@@ -165,6 +185,7 @@ public class CategoryLeaderboardManager {
         loc.getWorld().removePluginChunkTicket(chunk.getX(), chunk.getZ(), plugin);
         despawnEntities(category);
         locations.remove(category);
+        scales.remove(category);
         saveConfig();
         if (locations.isEmpty()) stopRefreshTask();
         return true;
@@ -175,6 +196,7 @@ public class CategoryLeaderboardManager {
         stopRefreshTask();
         for (Category c : Category.values()) despawnEntities(c);
         locations.clear();
+        scales.clear();
     }
 
     public boolean isSpawned(Category category) { return locations.containsKey(category); }
@@ -239,12 +261,14 @@ public class CategoryLeaderboardManager {
             }
         }
 
-        double topY = loc.getY() + (lines.size() - 1) * LINE_GAP;
+        double scale = scales.getOrDefault(category, DEFAULT_SCALE);
+        double lineGap = LINE_GAP * scale;
+        double topY = loc.getY() + (lines.size() - 1) * lineGap;
         List<UUID> entities = lineEntities.get(category);
         for (int i = 0; i < lines.size(); i++) {
             Location lineLoc = loc.clone();
-            lineLoc.setY(topY - i * LINE_GAP);
-            ArmorStand as = spawnStand(w, lineLoc, lines.get(i));
+            lineLoc.setY(topY - i * lineGap);
+            ArmorStand as = spawnStand(w, lineLoc, lines.get(i), scale);
             entities.add(as.getUniqueId());
         }
     }
@@ -298,7 +322,7 @@ public class CategoryLeaderboardManager {
 
     // ── Spawn / despawn des armor stands ───────────────────────────────────────
 
-    private ArmorStand spawnStand(World world, Location loc, Component name) {
+    private ArmorStand spawnStand(World world, Location loc, Component name, double scale) {
         ArmorStand as = (ArmorStand) world.spawnEntity(loc, EntityType.ARMOR_STAND);
         as.customName(name);
         as.setCustomNameVisible(true);
@@ -309,7 +333,21 @@ public class CategoryLeaderboardManager {
         as.setCollidable(false);
         as.setMarker(true);
         as.getPersistentDataContainer().set(pdcKey, PersistentDataType.STRING, "leaderboard");
+        applyScale(as, scale);
         return as;
+    }
+
+    /**
+     * Applique une échelle précise à l'entité via l'attribut générique SCALE
+     * (disponible depuis Minecraft 1.20.5+ / Paper 1.20.5+), ce qui permet une
+     * taille continue (ex: 0.5, 1.75, 3.0) au lieu du simple "petit/grand" de
+     * {@link ArmorStand#setSmall(boolean)}.
+     */
+    private void applyScale(Entity entity, double scale) {
+        AttributeInstance attr = entity.getAttribute(Attribute.SCALE);
+        if (attr != null) {
+            attr.setBaseValue(scale);
+        }
     }
 
     private void despawnEntities(Category category) {

@@ -32,9 +32,32 @@ public class Arena {
     private CuboidRegion blueCaptureZone;
     private CuboidRegion gameZone;
 
+    /**
+     * Nombre maximum de joueurs pour CETTE arène. -1 signifie "non défini" : on retombe
+     * alors sur le max-players global du config.yml (voir GameManager#getMaxPlayers).
+     */
+    private int maxPlayers = -1;
+
     public Arena() {
         teamSpawns.put(Team.RED, new ArrayList<>());
         teamSpawns.put(Team.BLUE, new ArrayList<>());
+    }
+
+    /**
+     * Renvoie le nombre maximum de joueurs configuré spécifiquement pour cette arène,
+     * ou -1 si aucune valeur spécifique n'a été définie (on doit alors utiliser le
+     * max-players global).
+     */
+    public int getMaxPlayers() {
+        return maxPlayers;
+    }
+
+    /**
+     * Définit le nombre maximum de joueurs pour cette arène. Une valeur <= 0 réinitialise
+     * la configuration spécifique (retour au max-players global).
+     */
+    public void setMaxPlayers(int maxPlayers) {
+        this.maxPlayers = maxPlayers <= 0 ? -1 : maxPlayers;
     }
 
     /**
@@ -174,6 +197,11 @@ public class Arena {
         saveRegion(config, "arena.captures.red", redCaptureZone);
         saveRegion(config, "arena.captures.blue", blueCaptureZone);
         saveRegion(config, "arena.gamezone", gameZone);
+        if (maxPlayers > 0) {
+            config.set("arena.max-players", maxPlayers);
+        } else {
+            config.set("arena.max-players", null);
+        }
     }
 
     public void loadFromConfig(FileConfiguration config) {
@@ -185,6 +213,7 @@ public class Arena {
         this.redCaptureZone = loadRegion(config, "arena.captures.red");
         this.blueCaptureZone = loadRegion(config, "arena.captures.blue");
         this.gameZone = loadRegion(config, "arena.gamezone");
+        this.maxPlayers = config.isSet("arena.max-players") ? config.getInt("arena.max-players") : -1;
     }
 
     /**

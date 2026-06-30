@@ -8,7 +8,6 @@ import com.hikabrain.plugin.game.GameManager;
 import com.hikabrain.plugin.game.GameState;
 import com.hikabrain.plugin.game.Team;
 import com.hikabrain.plugin.hologram.CategoryLeaderboardManager;
-import com.hikabrain.plugin.hologram.StatsHologramManager;
 import com.hikabrain.plugin.util.MessageUtil;
 import org.bukkit.Location;
 import org.bukkit.command.Command;
@@ -32,6 +31,7 @@ import java.util.*;
  *   /hb delspawn <nom> <red|blue> <index>      - supprime le spawn #index d'une équipe
  *   /hb setcapture <nom> <red|blue> <pos1|pos2> - définit une zone de capture
  *   /hb setgamezone <nom> <pos1|pos2>          - définit + capture la zone de jeu protégée
+ *   /hb setmaxplayers <nom> <nombre>          - définit le max de joueurs de l'arène (0 = global)
  *   /hb join <nom>                            - rejoindre une arène
  *   /hb joinrandom                            - rejoindre une arène au hasard (priorité à celles déjà occupées)
  *   /hb leave                                 - quitter l'arène en cours
@@ -76,6 +76,7 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
             case "delspawn" -> handleDelSpawn(sender, args);
             case "setcapture" -> handleSetCapture(sender, args);
             case "setgamezone" -> handleSetGameZone(sender, args);
+            case "setmaxplayers" -> handleSetMaxPlayers(sender, args);
             case "join" -> handleJoin(sender, args);
             case "joinrandom" -> handleJoinRandom(sender);
             case "arenas" -> handleArenasGui(sender);
@@ -86,8 +87,6 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
             case "stats" -> handleStats(sender, args);
             case "top" -> handleTop(sender, args);
             case "resetstats" -> handleResetStats(sender);
-            case "holostats" -> handleHoloStats(sender);
-            case "holoremove" -> handleHoloRemove(sender);
             case "leaderboard" -> handleLeaderboard(sender, args);
             // Scoreboard commands
             case "setsbserver" -> handleSetSbServer(sender, args);
@@ -347,6 +346,46 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
         }
     }
 
+    /**
+     * Définit le nombre maximum de joueurs pour une arène spécifique. Un nombre <= 0
+     * réinitialise la valeur spécifique (l'arène retombera alors sur le max-players global).
+     */
+    private void handleSetMaxPlayers(CommandSender sender, String[] args) {
+        if (!sender.hasPermission("hikabrain.admin")) {
+            MessageUtil.send(sender, "&cTu n'as pas la permission.");
+            return;
+        }
+        if (args.length < 3) {
+            MessageUtil.send(sender, "&cUsage: /hb setmaxplayers <nom> <nombre>");
+            return;
+        }
+        GameManager gm = resolveArena(sender, args, 1);
+        if (gm == null) return;
+
+        int max;
+        try {
+            max = Integer.parseInt(args[2]);
+        } catch (NumberFormatException e) {
+            MessageUtil.send(sender, "&cLe nombre de joueurs doit être un entier.");
+            return;
+        }
+        if (max < 0) {
+            MessageUtil.send(sender, "&cLe nombre de joueurs ne peut pas être négatif.");
+            return;
+        }
+
+        gm.getArena().setMaxPlayers(max);
+        gm.saveArenaConfig();
+
+        if (max == 0) {
+            MessageUtil.send(sender, "&aLe nombre maximum de joueurs spécifique à l'arène &7" + gm.getName()
+                    + " &aa été réinitialisé (utilisera désormais le max-players global).");
+        } else {
+            MessageUtil.send(sender, "&aLe nombre maximum de joueurs de l'arène &7" + gm.getName()
+                    + " &aa été fixé à &7" + max + "&a.");
+        }
+    }
+
     // ================= JOUEUR =================
 
     private void handleJoin(CommandSender sender, String[] args) {
@@ -452,7 +491,8 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
         Arena arena = gm.getArena();
         MessageUtil.send(sender, "&8&m----------&r &bHikaBrain: " + gm.getName() + " &8&m----------");
         MessageUtil.send(sender, "&7État : &f" + gm.getState());
-        MessageUtil.send(sender, "&7Joueurs en partie : &f" + gm.getPlayerCount());
+        MessageUtil.send(sender, "&7Joueurs en partie : &f" + gm.getPlayerCount() + "&7/&f" + gm.getMaxPlayers()
+                + (arena.getMaxPlayers() > 0 ? " &8(spécifique)" : " &8(global)"));
         MessageUtil.send(sender, "&7Map configurée : " + (arena.isFullyConfigured() ? "&aOui" : "&cNon"));
         MessageUtil.send(sender, "&7Spawns rouges : &c" + arena.getSpawnCount(Team.RED) + " &7/ Spawns bleus : &9" + arena.getSpawnCount(Team.BLUE));
         MessageUtil.send(sender, "&7Zone de jeu (protection) : " + (gm.getArenaSnapshot().isCaptured() ? "&aOui" : "&cNon configurée"));
@@ -710,46 +750,13 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
         MessageUtil.send(sender, "&8&m----------&r");
     }
 
-    private void handleHoloStats(CommandSender sender) {
-        if (!sender.hasPermission("hikabrain.admin")) {
-            MessageUtil.send(sender, "&cTu n'as pas la permission.");
-            return;
-        }
-        if (!(sender instanceof Player player)) {
-            MessageUtil.send(sender, "&cCette commande doit être exécutée par un joueur.");
-            return;
-        }
-        StatsHologramManager hm = plugin.getHologramManager();
-        hm.spawn(player.getLocation());
-        MessageUtil.send(sender, "&aHologramme de stats spawné à ta position !");
-        MessageUtil.send(sender, "&7Clique sur la ligne des modes &e[1v1] [2v2] [3v3] [4v4] &7pour changer.");
-    }
-
-    private void handleHoloRemove(CommandSender sender) {
-        if (!sender.hasPermission("hikabrain.admin")) {
-            MessageUtil.send(sender, "&cTu n'as pas la permission.");
-            return;
-        }
-        StatsHologramManager hm = plugin.getHologramManager();
-        if (!hm.isSpawned()) {
-            MessageUtil.send(sender, "&cAucun hologramme actif.");
-            return;
-        }
-        hm.despawn();
-        MessageUtil.send(sender, "&aHologramme supprimé.");
-    }
-
     private void handleLeaderboard(CommandSender sender, String[] args) {
         if (!sender.hasPermission("hikabrain.admin")) {
             MessageUtil.send(sender, "&cTu n'as pas la permission.");
             return;
         }
-        if (!(sender instanceof Player player)) {
-            MessageUtil.send(sender, "&cCette commande doit être exécutée par un joueur (elle utilise ta position).");
-            return;
-        }
         if (args.length < 2) {
-            MessageUtil.send(sender, "&cUsage: /hb leaderboard <victoires|kills|kd|parties> [remove]");
+            MessageUtil.send(sender, "&cUsage: /hb leaderboard <victoires|kills|kd|parties> [remove|size <taille>]");
             return;
         }
 
@@ -766,6 +773,37 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
             MessageUtil.send(sender, removed
                     ? "&aLeaderboard '" + category.key + "' supprimé."
                     : "&cAucun leaderboard '" + category.key + "' n'est actuellement actif.");
+            return;
+        }
+
+        if (args.length >= 3 && args[2].equalsIgnoreCase("size")) {
+            if (args.length < 4) {
+                MessageUtil.send(sender, "&cUsage: /hb leaderboard <catégorie> size <taille>");
+                MessageUtil.send(sender, "&7La taille est un multiplicateur (ex: 1.0 = normal, 2.0 = deux fois plus grand, 0.5 = deux fois plus petit). Doit être entre 0.1 et 10.");
+                return;
+            }
+            if (!lm.isSpawned(category)) {
+                MessageUtil.send(sender, "&cAucun leaderboard '" + category.key + "' n'est actuellement actif.");
+                return;
+            }
+            double scale;
+            try {
+                scale = Double.parseDouble(args[3]);
+            } catch (NumberFormatException e) {
+                MessageUtil.send(sender, "&cTaille invalide. Utilise un nombre (ex: 1.5).");
+                return;
+            }
+            if (scale < 0.1 || scale > 10.0) {
+                MessageUtil.send(sender, "&cLa taille doit être comprise entre 0.1 et 10.");
+                return;
+            }
+            lm.setScale(category, scale);
+            MessageUtil.send(sender, "&aTaille du leaderboard '" + category.key + "' réglée sur " + scale + ".");
+            return;
+        }
+
+        if (!(sender instanceof Player player)) {
+            MessageUtil.send(sender, "&cCette commande doit être exécutée par un joueur (elle utilise ta position).");
             return;
         }
 
@@ -810,6 +848,7 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
         MessageUtil.send(sender, "&e/hb joinrandom &7- Rejoindre une arène au hasard");
         MessageUtil.send(sender, "&e/hb leave &7- Quitter la partie en cours");
         MessageUtil.send(sender, "&e/hb list &7- Lister toutes les arènes");
+        MessageUtil.send(sender, "&e/hb arenas &7- Ouvrir le menu pour rejoindre une arène");
         MessageUtil.send(sender, "&e/hb info [nom] &7- Voir l'état d'une arène");
         MessageUtil.send(sender, "&e/hb stats [pseudo] &7- Voir tes statistiques (ou celles d'un joueur)");
         MessageUtil.send(sender, "&e/hb top [kd|kills|wins|games] &7- Voir le classement des meilleurs joueurs");
@@ -821,13 +860,13 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
             MessageUtil.send(sender, "&c/hb delspawn <nom> <red|blue> <index> &7- Supprimer un spawn d'équipe");
             MessageUtil.send(sender, "&c/hb setcapture <nom> <red|blue> <pos1|pos2> &7- Définir la zone de capture");
             MessageUtil.send(sender, "&c/hb setgamezone <nom> <pos1|pos2> &7- Définir la zone de jeu (protection + restauration)");
+            MessageUtil.send(sender, "&c/hb setmaxplayers <nom> <nombre> &7- Définir le nombre max de joueurs de l'arène (0 = global)");
             MessageUtil.send(sender, "&c/hb start <nom> &7- Forcer le démarrage");
             MessageUtil.send(sender, "&c/hb stop <nom> &7- Forcer l'arrêt");
             MessageUtil.send(sender, "&c/hb resetstats &7- Réinitialiser les statistiques");
-            MessageUtil.send(sender, "&b/hb holostats &7- Spawner l'hologramme de stats à ta position");
-            MessageUtil.send(sender, "&b/hb holoremove &7- Supprimer l'hologramme de stats");
             MessageUtil.send(sender, "&b/hb leaderboard <victoires|kills|kd|parties> &7- Spawner un leaderboard top 10 à ta position");
             MessageUtil.send(sender, "&b/hb leaderboard <catégorie> remove &7- Supprimer ce leaderboard");
+            MessageUtil.send(sender, "&b/hb leaderboard <catégorie> size <taille> &7- Régler la taille de l'hologramme (ex: 1.5)");
             MessageUtil.send(sender, "&8&m----------&r &dScoreboard &8&m----------");
             MessageUtil.send(sender, "&d/hb setsbserver <nom> &7- Définir le nom du serveur");
             MessageUtil.send(sender, "&d/hb setsbgame <nom> &7- Définir le nom du jeu");
@@ -841,11 +880,11 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            List<String> options = new ArrayList<>(List.of("join", "joinrandom", "leave", "info", "list", "stats", "top"));
+            List<String> options = new ArrayList<>(List.of("join", "joinrandom", "leave", "info", "list", "arenas", "stats", "top"));
             if (sender.hasPermission("hikabrain.admin")) {
-                options.addAll(List.of("create", "delete", "setlobby", "setspawn", "delspawn", "setcapture", "setgamezone", "start", "stop"));
+                options.addAll(List.of("create", "delete", "setlobby", "setspawn", "delspawn", "setcapture", "setgamezone", "setmaxplayers", "start", "stop"));
                 options.addAll(List.of("setsbserver", "setsbgame", "setsbtitle", "setsblines", "reloadsb", "sbinfo"));
-                options.addAll(List.of("resetstats", "holostats", "holoremove", "leaderboard"));
+                options.addAll(List.of("resetstats", "leaderboard"));
             }
             return filterStartingWith(options, args[0]);
         }
@@ -853,7 +892,7 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
         String sub = args[0].toLowerCase(Locale.ROOT);
 
         // Le 2e argument est presque toujours un nom d'arène existant (sauf pour "create").
-        if (args.length == 2 && Set.of("join", "info", "delete", "setlobby", "setspawn", "delspawn", "setcapture", "setgamezone", "start", "stop").contains(sub)) {
+        if (args.length == 2 && Set.of("join", "info", "delete", "setlobby", "setspawn", "delspawn", "setcapture", "setgamezone", "setmaxplayers", "start", "stop").contains(sub)) {
             return filterStartingWith(new ArrayList<>(plugin.getArenaManager().getNames()), args[1]);
         }
 
@@ -882,7 +921,11 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
         }
 
         if (args.length == 3 && sub.equals("leaderboard")) {
-            return filterStartingWith(List.of("remove"), args[2]);
+            return filterStartingWith(List.of("remove", "size"), args[2]);
+        }
+
+        if (args.length == 4 && sub.equals("leaderboard") && args[2].equalsIgnoreCase("size")) {
+            return filterStartingWith(List.of("0.5", "1.0", "1.5", "2.0", "3.0"), args[3]);
         }
 
         if (args.length == 2 && sub.equals("stats")) {
