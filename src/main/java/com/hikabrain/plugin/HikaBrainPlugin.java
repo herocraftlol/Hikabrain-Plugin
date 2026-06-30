@@ -5,6 +5,7 @@ import com.hikabrain.plugin.game.ArenaManager;
 import com.hikabrain.plugin.game.KitManager;
 import com.hikabrain.plugin.gui.ArenaGUI;
 import com.hikabrain.plugin.gui.ArenaGUIListener;
+import com.hikabrain.plugin.hologram.CategoryLeaderboardManager;
 import com.hikabrain.plugin.hologram.StatsHologramListener;
 import com.hikabrain.plugin.hologram.StatsHologramManager;
 import com.hikabrain.plugin.listeners.ArenaProtectionListener;
@@ -29,6 +30,7 @@ public class HikaBrainPlugin extends JavaPlugin {
     private StatsManager         statsManager;
     private ArenaGUI             arenaGUI;
     private StatsHologramManager hologramManager;
+    private CategoryLeaderboardManager leaderboardManager;
 
     @Override
     public void onEnable() {
@@ -39,6 +41,7 @@ public class HikaBrainPlugin extends JavaPlugin {
         this.scoreboardManager = new ScoreboardManager(this);
         this.statsManager      = new StatsManager(this);
         this.hologramManager   = new StatsHologramManager(this);
+        this.leaderboardManager = new CategoryLeaderboardManager(this);
         KitManager.init(this);
 
         this.arenaGUI = new ArenaGUI(this);
@@ -76,6 +79,7 @@ public class HikaBrainPlugin extends JavaPlugin {
     @Override
     public void onDisable() {
         if (hologramManager   != null) hologramManager.despawn();   // stoppe la tâche de refresh
+        if (leaderboardManager != null) leaderboardManager.despawnAll();
         if (scoreboardManager != null) scoreboardManager.stop();
         if (statsManager      != null) statsManager.saveStats();
         if (arenaManager      != null) { arenaManager.stopAll(); arenaManager.saveAll(); }
@@ -87,4 +91,5 @@ public class HikaBrainPlugin extends JavaPlugin {
     public ScoreboardManager    getScoreboardManager()  { return scoreboardManager; }
     public StatsManager         getStatsManager()       { return statsManager; }
     public StatsHologramManager getHologramManager()    { return hologramManager; }
+    public CategoryLeaderboardManager getLeaderboardManager() { return leaderboardManager; }
 }

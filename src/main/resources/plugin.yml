@@ -8,7 +8,7 @@ description: Plugin de minijeu Hikabrain (capture de zone par équipes) inspiré
 commands:
   hb:
     description: Commande principale du plugin Hikabrain
-    usage: /hb <create|delete|list|arenas|setlobby|setspawn|delspawn|setcapture|setgamezone|start|stop|join|joinrandom|leave|info|stats|holostats|holoremove>
+    usage: /hb <create|delete|list|arenas|setlobby|setspawn|delspawn|setcapture|setgamezone|start|stop|join|joinrandom|leave|info|stats|holostats|holoremove|leaderboard>
   arenas:
     description: Ouvre le GUI de sélection d'arène
     usage: /arenas

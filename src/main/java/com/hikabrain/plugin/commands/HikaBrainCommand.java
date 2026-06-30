@@ -7,6 +7,7 @@ import com.hikabrain.plugin.game.CuboidRegion;
 import com.hikabrain.plugin.game.GameManager;
 import com.hikabrain.plugin.game.GameState;
 import com.hikabrain.plugin.game.Team;
+import com.hikabrain.plugin.hologram.CategoryLeaderboardManager;
 import com.hikabrain.plugin.hologram.StatsHologramManager;
 import com.hikabrain.plugin.util.MessageUtil;
 import org.bukkit.Location;
@@ -87,6 +88,7 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
             case "resetstats" -> handleResetStats(sender);
             case "holostats" -> handleHoloStats(sender);
             case "holoremove" -> handleHoloRemove(sender);
+            case "leaderboard" -> handleLeaderboard(sender, args);
             // Scoreboard commands
             case "setsbserver" -> handleSetSbServer(sender, args);
             case "setsbgame" -> handleSetSbGame(sender, args);
@@ -737,6 +739,40 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
         MessageUtil.send(sender, "&aHologramme supprimé.");
     }
 
+    private void handleLeaderboard(CommandSender sender, String[] args) {
+        if (!sender.hasPermission("hikabrain.admin")) {
+            MessageUtil.send(sender, "&cTu n'as pas la permission.");
+            return;
+        }
+        if (!(sender instanceof Player player)) {
+            MessageUtil.send(sender, "&cCette commande doit être exécutée par un joueur (elle utilise ta position).");
+            return;
+        }
+        if (args.length < 2) {
+            MessageUtil.send(sender, "&cUsage: /hb leaderboard <victoires|kills|kd|parties> [remove]");
+            return;
+        }
+
+        CategoryLeaderboardManager.Category category = CategoryLeaderboardManager.Category.fromKey(args[1]);
+        if (category == null) {
+            MessageUtil.send(sender, "&cCatégorie inconnue. Utilise: victoires, kills, kd ou parties.");
+            return;
+        }
+
+        CategoryLeaderboardManager lm = plugin.getLeaderboardManager();
+
+        if (args.length >= 3 && args[2].equalsIgnoreCase("remove")) {
+            boolean removed = lm.despawn(category);
+            MessageUtil.send(sender, removed
+                    ? "&aLeaderboard '" + category.key + "' supprimé."
+                    : "&cAucun leaderboard '" + category.key + "' n'est actuellement actif.");
+            return;
+        }
+
+        lm.spawn(category, player.getLocation());
+        MessageUtil.send(sender, "&aLeaderboard '" + category.key + "' (top 10) spawné à ta position !");
+    }
+
     private void handleResetStats(CommandSender sender) {
         if (!sender.hasPermission("hikabrain.admin")) {
             MessageUtil.send(sender, "&cTu n'as pas la permission.");
@@ -790,6 +826,8 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
             MessageUtil.send(sender, "&c/hb resetstats &7- Réinitialiser les statistiques");
             MessageUtil.send(sender, "&b/hb holostats &7- Spawner l'hologramme de stats à ta position");
             MessageUtil.send(sender, "&b/hb holoremove &7- Supprimer l'hologramme de stats");
+            MessageUtil.send(sender, "&b/hb leaderboard <victoires|kills|kd|parties> &7- Spawner un leaderboard top 10 à ta position");
+            MessageUtil.send(sender, "&b/hb leaderboard <catégorie> remove &7- Supprimer ce leaderboard");
             MessageUtil.send(sender, "&8&m----------&r &dScoreboard &8&m----------");
             MessageUtil.send(sender, "&d/hb setsbserver <nom> &7- Définir le nom du serveur");
             MessageUtil.send(sender, "&d/hb setsbgame <nom> &7- Définir le nom du jeu");
@@ -807,7 +845,7 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
             if (sender.hasPermission("hikabrain.admin")) {
                 options.addAll(List.of("create", "delete", "setlobby", "setspawn", "delspawn", "setcapture", "setgamezone", "start", "stop"));
                 options.addAll(List.of("setsbserver", "setsbgame", "setsbtitle", "setsblines", "reloadsb", "sbinfo"));
-                options.addAll(List.of("resetstats", "holostats", "holoremove"));
+                options.addAll(List.of("resetstats", "holostats", "holoremove", "leaderboard"));
             }
             return filterStartingWith(options, args[0]);
         }
@@ -837,6 +875,14 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
 
         if (args.length == 2 && sub.equals("top")) {
             return filterStartingWith(List.of("kd", "kills", "wins", "games"), args[1]);
+        }
+
+        if (args.length == 2 && sub.equals("leaderboard")) {
+            return filterStartingWith(List.of("victoires", "kills", "kd", "parties"), args[1]);
+        }
+
+        if (args.length == 3 && sub.equals("leaderboard")) {
+            return filterStartingWith(List.of("remove"), args[2]);
         }
 
         if (args.length == 2 && sub.equals("stats")) {
