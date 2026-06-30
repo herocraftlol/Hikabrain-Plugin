@@ -64,7 +64,7 @@ Le fichier `config.yml` permet de configurer :
 ## Auteur
 
 - **Author**: Claude
-- **Version**: 1.0.3-leaderboard-unique
+- **Version**: 1.0.4-leaderboard-fixed
 
 ## Licence
 
