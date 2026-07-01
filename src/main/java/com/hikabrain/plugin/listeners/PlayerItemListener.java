@@ -38,9 +38,9 @@ public class PlayerItemListener implements Listener {
         
         ItemStack item = event.getItemDrop().getItemStack();
         
-        // En lobby : empêcher de lâcher l'item de sélection d'équipe
+        // En lobby : empêcher de lâcher l'item de sélection d'équipe et l'item quitter
         if (gm.getState() == GameState.WAITING) {
-            if (KitManager.isTeamSelectorItem(item) || KitManager.isForceStartItem(item)) {
+            if (KitManager.isTeamSelectorItem(item) || KitManager.isForceStartItem(item) || KitManager.isLeaveItem(item)) {
                 event.setCancelled(true);
             }
         }
@@ -65,9 +65,9 @@ public class PlayerItemListener implements Listener {
         ItemStack item = event.getCurrentItem();
         if (item == null) return;
         
-        // En lobby : empêcher de déplacer l'item de sélection d'équipe
+        // En lobby : empêcher de déplacer l'item de sélection d'équipe et l'item quitter
         if (gm.getState() == GameState.WAITING) {
-            if (KitManager.isTeamSelectorItem(item) || KitManager.isForceStartItem(item)) {
+            if (KitManager.isTeamSelectorItem(item) || KitManager.isForceStartItem(item) || KitManager.isLeaveItem(item)) {
                 event.setCancelled(true);
             }
         }

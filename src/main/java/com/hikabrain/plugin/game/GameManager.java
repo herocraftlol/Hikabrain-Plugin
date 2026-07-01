@@ -302,6 +302,9 @@ public class GameManager {
         if (player.hasPermission("hikabrain.admin")) {
             player.getInventory().setItem(KitManager.FORCESTART_SLOT, KitManager.createForceStartItem());
         }
+
+        // Donner l'item "quitter la partie" en slot 8 (pour tous les joueurs du lobby)
+        player.getInventory().setItem(KitManager.LEAVE_SLOT, KitManager.createLeaveItem());
     }
 
     private void restorePlayer(Player player) {

@@ -28,6 +28,7 @@ public final class KitManager {
     // Slots pour le lobby
     public static final int FORCESTART_SLOT = 0;
     public static final int TEAM_SELECT_SLOT = 2;
+    public static final int LEAVE_SLOT = 8;
     
     // Slots pour le jeu (pas de décalage car le lobby utilise des slots différents)
     private static final int SWORD_SLOT = 0;
@@ -48,12 +49,18 @@ public final class KitManager {
      */
     private static NamespacedKey teamSelectorKey;
 
+    /**
+     * Clé persistante pour identifier l'item "quitter la partie".
+     */
+    private static NamespacedKey leaveKey;
+
     private KitManager() {
     }
 
     public static void init(org.bukkit.plugin.Plugin plugin) {
         forceStartKey = new NamespacedKey(plugin, "force_start_item");
         teamSelectorKey = new NamespacedKey(plugin, "team_selector_item");
+        leaveKey = new NamespacedKey(plugin, "leave_item");
     }
 
     /**
@@ -155,6 +162,33 @@ public final class KitManager {
         } catch (IllegalArgumentException e) {
             return null;
         }
+    }
+
+    /**
+     * Crée l'item "quitter la partie" (barrier block) placé en slot 8 du lobby.
+     * Non droppable et non déplaçable.
+     */
+    public static ItemStack createLeaveItem() {
+        ItemStack item = new ItemStack(Material.BARRIER);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(ChatColor.RED + "" + ChatColor.BOLD + "Quitter la partie");
+            meta.setLore(java.util.List.of(ChatColor.GRAY + "Clique pour faire /hb leave"));
+            meta.getPersistentDataContainer().set(leaveKey, PersistentDataType.BYTE, (byte) 1);
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
+    /**
+     * Détermine si l'ItemStack donné est l'item "quitter la partie".
+     */
+    public static boolean isLeaveItem(ItemStack item) {
+        if (item == null || item.getType() != Material.BARRIER || !item.hasItemMeta()) {
+            return false;
+        }
+        ItemMeta meta = item.getItemMeta();
+        return meta != null && meta.getPersistentDataContainer().has(leaveKey, PersistentDataType.BYTE);
     }
 
     /**

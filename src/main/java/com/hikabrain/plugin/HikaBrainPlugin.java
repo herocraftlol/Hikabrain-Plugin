@@ -9,6 +9,7 @@ import com.hikabrain.plugin.hologram.CategoryLeaderboardManager;
 import com.hikabrain.plugin.listeners.ArenaProtectionListener;
 import com.hikabrain.plugin.listeners.BlockPlaceListener;
 import com.hikabrain.plugin.listeners.ForceStartItemListener;
+import com.hikabrain.plugin.listeners.LeaveItemListener;
 import com.hikabrain.plugin.listeners.PlayerConnectionListener;
 import com.hikabrain.plugin.listeners.PlayerDamageListener;
 import com.hikabrain.plugin.listeners.PlayerDeathListener;
@@ -64,6 +65,7 @@ public class HikaBrainPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new TeamSelectListener(this), this);
         getServer().getPluginManager().registerEvents(new ArenaProtectionListener(this), this);
         getServer().getPluginManager().registerEvents(new ForceStartItemListener(this), this);
+        getServer().getPluginManager().registerEvents(new LeaveItemListener(this), this);
         getServer().getPluginManager().registerEvents(new PlayerItemListener(this), this);
         getServer().getPluginManager().registerEvents(new BlockPlaceListener(this), this);
         getServer().getPluginManager().registerEvents(new ArenaGUIListener(this, arenaGUI), this);
