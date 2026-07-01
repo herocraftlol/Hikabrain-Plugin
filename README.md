@@ -82,7 +82,7 @@ Le fichier `config.yml` permet de configurer :
 ## Auteur
 
 - **Author**: Claude
-- **Version**: 1.0.3
+- **Version**: 1.0.4
 
 ## Licence
 

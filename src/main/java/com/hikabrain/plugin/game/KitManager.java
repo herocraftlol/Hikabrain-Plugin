@@ -28,7 +28,7 @@ public final class KitManager {
     // Slots pour le lobby
     public static final int FORCESTART_SLOT = 0;
     public static final int TEAM_SELECT_SLOT = 2;
-    public static final int LEAVE_SLOT = 8;
+    public static final int LEAVE_SLOT = 4;
     
     // Slots pour le jeu (pas de décalage car le lobby utilise des slots différents)
     private static final int SWORD_SLOT = 0;
