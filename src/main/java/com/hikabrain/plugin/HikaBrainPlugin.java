@@ -6,11 +6,10 @@ import com.hikabrain.plugin.game.KitManager;
 import com.hikabrain.plugin.gui.ArenaGUI;
 import com.hikabrain.plugin.gui.ArenaGUIListener;
 import com.hikabrain.plugin.hologram.CategoryLeaderboardManager;
-import com.hikabrain.plugin.hologram.StatsHologramListener;
-import com.hikabrain.plugin.hologram.StatsHologramManager;
 import com.hikabrain.plugin.listeners.ArenaProtectionListener;
 import com.hikabrain.plugin.listeners.BlockPlaceListener;
 import com.hikabrain.plugin.listeners.ForceStartItemListener;
+import com.hikabrain.plugin.listeners.LeaveItemListener;
 import com.hikabrain.plugin.listeners.PlayerConnectionListener;
 import com.hikabrain.plugin.listeners.PlayerDamageListener;
 import com.hikabrain.plugin.listeners.PlayerDeathListener;
@@ -29,7 +28,6 @@ public class HikaBrainPlugin extends JavaPlugin {
     private ScoreboardManager    scoreboardManager;
     private StatsManager         statsManager;
     private ArenaGUI             arenaGUI;
-    private StatsHologramManager hologramManager;
     private CategoryLeaderboardManager leaderboardManager;
 
     @Override
@@ -40,7 +38,6 @@ public class HikaBrainPlugin extends JavaPlugin {
         this.arenaManager.loadAll();
         this.scoreboardManager = new ScoreboardManager(this);
         this.statsManager      = new StatsManager(this);
-        this.hologramManager   = new StatsHologramManager(this);
         this.leaderboardManager = new CategoryLeaderboardManager(this);
         KitManager.init(this);
 
@@ -68,17 +65,16 @@ public class HikaBrainPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new TeamSelectListener(this), this);
         getServer().getPluginManager().registerEvents(new ArenaProtectionListener(this), this);
         getServer().getPluginManager().registerEvents(new ForceStartItemListener(this), this);
+        getServer().getPluginManager().registerEvents(new LeaveItemListener(this), this);
         getServer().getPluginManager().registerEvents(new PlayerItemListener(this), this);
         getServer().getPluginManager().registerEvents(new BlockPlaceListener(this), this);
         getServer().getPluginManager().registerEvents(new ArenaGUIListener(this, arenaGUI), this);
-        getServer().getPluginManager().registerEvents(new StatsHologramListener(this, hologramManager), this);
 
         getLogger().info("HikaBrain activé ! (" + arenaManager.getNames().size() + " arène(s) chargée(s))");
     }
 
     @Override
     public void onDisable() {
-        if (hologramManager   != null) hologramManager.despawn();   // stoppe la tâche de refresh
         if (leaderboardManager != null) leaderboardManager.despawnAll();
         if (scoreboardManager != null) scoreboardManager.stop();
         if (statsManager      != null) statsManager.saveStats();
@@ -90,6 +86,5 @@ public class HikaBrainPlugin extends JavaPlugin {
     public ArenaGUI             getArenaGUI()           { return arenaGUI; }
     public ScoreboardManager    getScoreboardManager()  { return scoreboardManager; }
     public StatsManager         getStatsManager()       { return statsManager; }
-    public StatsHologramManager getHologramManager()    { return hologramManager; }
     public CategoryLeaderboardManager getLeaderboardManager() { return leaderboardManager; }
 }

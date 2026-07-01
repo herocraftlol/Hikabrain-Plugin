@@ -160,6 +160,18 @@ public class GameManager {
     }
 
     /**
+     * Renvoie le nombre maximum de joueurs effectif pour cette arène : la valeur spécifique
+     * configurée via /hb setmaxplayers si elle existe, sinon le max-players global du config.yml.
+     */
+    public int getMaxPlayers() {
+        int specific = arena.getMaxPlayers();
+        if (specific > 0) {
+            return specific;
+        }
+        return plugin.getConfig().getInt("max-players", 16);
+    }
+
+    /**
      * Fait rejoindre un joueur au lobby d'attente. Renvoie false si la partie n'est pas joignable.
      */
     public boolean addPlayer(Player player) {
@@ -171,7 +183,7 @@ public class GameManager {
             MessageUtil.send(player, "&cUne partie est déjà en cours, réessaie plus tard.");
             return false;
         }
-        int max = plugin.getConfig().getInt("max-players", 16);
+        int max = getMaxPlayers();
         if (playerTeams.size() >= max) {
             MessageUtil.send(player, "&cLe lobby est complet.");
             return false;
@@ -290,6 +302,9 @@ public class GameManager {
         if (player.hasPermission("hikabrain.admin")) {
             player.getInventory().setItem(KitManager.FORCESTART_SLOT, KitManager.createForceStartItem());
         }
+
+        // Donner l'item "quitter la partie" en slot 8 (pour tous les joueurs du lobby)
+        player.getInventory().setItem(KitManager.LEAVE_SLOT, KitManager.createLeaveItem());
     }
 
     private void restorePlayer(Player player) {
@@ -685,8 +700,8 @@ public class GameManager {
             plugin.getStatsManager().addPlayerGameResult(uuid, pName, won, teamSize);
         }
 
-        // Rafraîchir l'hologramme si actif
-        plugin.getHologramManager().refresh();
+        // Rafraîchir les leaderboards si actifs
+        plugin.getLeaderboardManager().refreshAll();
 
         // Mettre tous les joueurs en spectateur et afficher l'écran de victoire
         List<String> redPlayers = new ArrayList<>();

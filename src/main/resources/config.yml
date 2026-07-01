@@ -6,7 +6,7 @@
 min-players: 2
 
 # Nombre de joueurs maximum (au-delà, équilibrage par équipe)
-max-players: 16
+max-players: 16 # Valeur par défaut utilisée par toute arène sans max spécifique (voir /hb setmaxplayers)
 
 # Durée du compte à rebours du lobby dès que le nombre minimum de joueurs est atteint (en secondes)
 lobby-countdown-min-reached: 10
