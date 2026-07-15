@@ -227,7 +227,7 @@ MIT License - Libre d'utilisation et de modification.
 
 ## 👤 Auteur
 
-- **Version**: 1.0.6
+- **Version**: 1.0.7
 - **API**: Paper 1.21.1
 - **Java**: 21
 

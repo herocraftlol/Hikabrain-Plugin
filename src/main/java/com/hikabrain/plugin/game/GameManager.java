@@ -56,6 +56,18 @@ public class GameManager {
     // Joueurs actuellement gelés (après un point marqué)
     private final Set<UUID> frozenPlayers = new HashSet<>();
 
+    // ================= INTÉGRATION TOURNOI =================
+    // Permet au système de tournoi (com.hikabrain.plugin.tournament) de réserver
+    // temporairement cette arène pour un match précis, d'y forcer des joueurs dans
+    // une équipe donnée (sans passer par l'équilibrage automatique), et d'être
+    // notifié du vainqueur une fois la partie terminée.
+
+    /** true si cette arène est actuellement réservée pour un match de tournoi (bloque les jointures publiques). */
+    private boolean reservedForTournament = false;
+
+    /** Callback appelé avec l'équipe gagnante dès qu'un match réservé se termine. */
+    private java.util.function.Consumer<Team> tournamentEndCallback = null;
+
     public GameManager(HikaBrainPlugin plugin, String arenaName) {
         this.plugin = plugin;
         this.arenaName = arenaName;
@@ -160,9 +172,25 @@ public class GameManager {
     }
 
     /**
+     * Renvoie le nombre maximum de joueurs effectif pour cette arène : la valeur spécifique
+     * configurée via /hb setmaxplayers si elle existe, sinon le max-players global du config.yml.
+     */
+    public int getMaxPlayers() {
+        int specific = arena.getMaxPlayers();
+        if (specific > 0) {
+            return specific;
+        }
+        return plugin.getConfig().getInt("max-players", 16);
+    }
+
+    /**
      * Fait rejoindre un joueur au lobby d'attente. Renvoie false si la partie n'est pas joignable.
      */
     public boolean addPlayer(Player player) {
+        if (reservedForTournament) {
+            MessageUtil.send(player, "&cCette arène est réservée pour un match de tournoi, réessaie plus tard.");
+            return false;
+        }
         if (!arena.isFullyConfigured()) {
             MessageUtil.send(player, "&cLa map n'est pas encore configurée. Contacte un admin.");
             return false;
@@ -171,7 +199,7 @@ public class GameManager {
             MessageUtil.send(player, "&cUne partie est déjà en cours, réessaie plus tard.");
             return false;
         }
-        int max = plugin.getConfig().getInt("max-players", 16);
+        int max = getMaxPlayers();
         if (playerTeams.size() >= max) {
             MessageUtil.send(player, "&cLe lobby est complet.");
             return false;
@@ -290,11 +318,57 @@ public class GameManager {
         if (player.hasPermission("hikabrain.admin")) {
             player.getInventory().setItem(KitManager.FORCESTART_SLOT, KitManager.createForceStartItem());
         }
+
+        // Donner l'item "quitter la partie" en slot 8 (pour tous les joueurs du lobby)
+        player.getInventory().setItem(KitManager.LEAVE_SLOT, KitManager.createLeaveItem());
     }
 
     private void restorePlayer(Player player) {
         player.setGameMode(GameMode.SURVIVAL);
         player.getInventory().clear();
+    }
+
+    // ================= INTÉGRATION TOURNOI (API PUBLIQUE) =================
+
+    /** Réserve cette arène : bloque les jointures publiques normales (utilisé pendant un match de tournoi). */
+    public void reserveForTournament() {
+        this.reservedForTournament = true;
+    }
+
+    /** Libère la réservation : l'arène redevient joignable normalement. */
+    public void releaseTournamentReservation() {
+        this.reservedForTournament = false;
+        this.tournamentEndCallback = null;
+    }
+
+    public boolean isReservedForTournament() {
+        return reservedForTournament;
+    }
+
+    /**
+     * Enregistre un callback appelé (avec l'équipe gagnante) dès que la partie en cours
+     * se termine. Utilisé par le TournamentManager pour savoir qui a gagné un match.
+     */
+    public void setTournamentEndCallback(java.util.function.Consumer<Team> callback) {
+        this.tournamentEndCallback = callback;
+    }
+
+    /**
+     * Ajoute un joueur directement dans l'équipe donnée, sans passer par l'équilibrage
+     * automatique ni les vérifications habituelles de jointure publique (lobby plein, partie
+     * en cours...). Réservé au système de tournoi : à utiliser uniquement sur une arène
+     * préalablement réservée via {@link #reserveForTournament()}.
+     */
+    public boolean addPlayerToTeam(Player player, Team team) {
+        if (!arena.isFullyConfigured()) {
+            return false;
+        }
+        playerTeams.put(player.getUniqueId(), team);
+        preLobbyLocations.put(player.getUniqueId(), player.getLocation().clone());
+        player.teleport(arena.getLobbySpawn());
+        preparePlayerForLobby(player);
+        plugin.getScoreboardManager().showScoreboard(player, this);
+        return true;
     }
 
     // ================= LOBBY / COUNTDOWN =================
@@ -664,6 +738,14 @@ public class GameManager {
         if (state != GameState.PLAYING && state != GameState.ROUND_RESET) return;
         state = GameState.ENDING;
 
+        // Notifier le système de tournoi si ce match était un match de tournoi réservé.
+        // On retire le callback immédiatement pour éviter un double appel.
+        if (tournamentEndCallback != null) {
+            java.util.function.Consumer<Team> callback = tournamentEndCallback;
+            tournamentEndCallback = null;
+            callback.accept(winner);
+        }
+
         if (roundResetTask != null) {
             roundResetTask.cancel();
             roundResetTask = null;
@@ -685,8 +767,8 @@ public class GameManager {
             plugin.getStatsManager().addPlayerGameResult(uuid, pName, won, teamSize);
         }
 
-        // Rafraîchir l'hologramme si actif
-        plugin.getHologramManager().refresh();
+        // Rafraîchir les leaderboards si actifs
+        plugin.getLeaderboardManager().refreshAll();
 
         // Mettre tous les joueurs en spectateur et afficher l'écran de victoire
         List<String> redPlayers = new ArrayList<>();

@@ -57,13 +57,12 @@ public class ArenaGUI {
         Inventory inv = Bukkit.createInventory(null, GUI_SIZE, GUI_TITLE);
 
         Collection<GameManager> allArenas = plugin.getArenaManager().getAll();
-        int maxPlayers = plugin.getConfig().getInt("max-players", 16);
 
         int slot = 0;
         for (GameManager gm : allArenas) {
             if (slot >= RANDOM_ROW_START) break; // Max 45 arènes
 
-            ItemStack item = buildArenaItem(gm, maxPlayers);
+            ItemStack item = buildArenaItem(gm, gm.getMaxPlayers());
             inv.setItem(slot, item);
             slot++;
         }
@@ -75,7 +74,7 @@ public class ArenaGUI {
         }
 
         // Ligne 6 entière : bouton arène aléatoire
-        ItemStack randomBtn = buildRandomButton(allArenas, maxPlayers);
+        ItemStack randomBtn = buildRandomButton(allArenas);
         for (int i = RANDOM_ROW_START; i < GUI_SIZE; i++) {
             inv.setItem(i, randomBtn);
         }
@@ -154,14 +153,14 @@ public class ArenaGUI {
     /**
      * Bouton de la dernière ligne : rejoindre une arène aléatoire (priorité aux arènes avec joueurs).
      */
-    private ItemStack buildRandomButton(Collection<GameManager> allArenas, int maxPlayers) {
+    private ItemStack buildRandomButton(Collection<GameManager> allArenas) {
         long joinableCount = allArenas.stream()
                 .filter(gm -> gm.getArena().isFullyConfigured()
                         && gm.getState() != GameState.PLAYING
                         && gm.getState() != GameState.ROUND_RESET
                         && gm.getState() != GameState.ENDING
                         && gm.getState() != GameState.NOT_CONFIGURED
-                        && gm.getPlayerCount() < maxPlayers)
+                        && gm.getPlayerCount() < gm.getMaxPlayers())
                 .count();
 
         ItemStack item = new ItemStack(Material.NETHER_STAR);

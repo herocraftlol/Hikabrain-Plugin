@@ -6,7 +6,7 @@
 min-players: 2
 
 # Nombre de joueurs maximum (au-delà, équilibrage par équipe)
-max-players: 16
+max-players: 16 # Valeur par défaut utilisée par toute arène sans max spécifique (voir /hb setmaxplayers)
 
 # Durée du compte à rebours du lobby dès que le nombre minimum de joueurs est atteint (en secondes)
 lobby-countdown-min-reached: 10
@@ -77,3 +77,30 @@ messages:
   point-scored: "&6+%points% point(s) pour l'équipe %team% &7(%score%/%win%)"
   game-end: "&a&lL'équipe %team% a gagné la partie !"
   not-enough-players: "&cPas assez de joueurs pour démarrer."
+
+# ===========================================
+#         Configuration Tournois
+# ===========================================
+tournament:
+  # Durée par défaut (secondes) d'une manche/course aux points avant décision au score/survivants
+  default-time-limit-seconds: 600
+
+  # Délai de grâce (secondes) avant qu'un joueur totalement déconnecté ne fasse perdre son équipe par forfait
+  disconnect-grace-seconds: 60
+
+  # Règles affichées automatiquement aux joueurs au lancement de chaque match
+  default-rules:
+    - "Pas de triche, pas de X-Ray, pas de clients modifiés"
+    - "Pas de macros ni d'auto-clicker"
+    - "Une déconnexion volontaire pendant un match peut être sanctionnée par un forfait"
+    - "Respecte l'arbitre et les autres joueurs"
+
+  # Commandes exécutées depuis la console à la fin d'un tournoi (placeholder : %player%)
+  rewards:
+    champion:
+      - "eco give %player% 1000"
+      - "give %player% diamond 5"
+    runner-up:
+      - "eco give %player% 500"
+    third-place:
+      - "eco give %player% 250"

@@ -205,8 +205,7 @@ public class ArenaManager {
         if (state == GameState.PLAYING || state == GameState.ROUND_RESET || state == GameState.ENDING) {
             return false;
         }
-        int max = plugin.getConfig().getInt("max-players", 16);
-        return gm.getPlayerCount() < max;
+        return gm.getPlayerCount() < gm.getMaxPlayers();
     }
 
     private String normalize(String name) {

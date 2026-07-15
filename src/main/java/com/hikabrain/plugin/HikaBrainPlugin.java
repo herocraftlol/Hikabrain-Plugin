@@ -6,11 +6,10 @@ import com.hikabrain.plugin.game.KitManager;
 import com.hikabrain.plugin.gui.ArenaGUI;
 import com.hikabrain.plugin.gui.ArenaGUIListener;
 import com.hikabrain.plugin.hologram.CategoryLeaderboardManager;
-import com.hikabrain.plugin.hologram.StatsHologramListener;
-import com.hikabrain.plugin.hologram.StatsHologramManager;
 import com.hikabrain.plugin.listeners.ArenaProtectionListener;
 import com.hikabrain.plugin.listeners.BlockPlaceListener;
 import com.hikabrain.plugin.listeners.ForceStartItemListener;
+import com.hikabrain.plugin.listeners.LeaveItemListener;
 import com.hikabrain.plugin.listeners.PlayerConnectionListener;
 import com.hikabrain.plugin.listeners.PlayerDamageListener;
 import com.hikabrain.plugin.listeners.PlayerDeathListener;
@@ -19,6 +18,14 @@ import com.hikabrain.plugin.listeners.PlayerMoveListener;
 import com.hikabrain.plugin.listeners.TeamSelectListener;
 import com.hikabrain.plugin.scoreboard.ScoreboardManager;
 import com.hikabrain.plugin.stats.StatsManager;
+import com.hikabrain.plugin.tournament.DuelArenaManager;
+import com.hikabrain.plugin.tournament.TournamentCommand;
+import com.hikabrain.plugin.tournament.TournamentListener;
+import com.hikabrain.plugin.tournament.TournamentManager;
+import com.hikabrain.plugin.tournament.gui.TournamentGUI;
+import com.hikabrain.plugin.tournament.gui.TournamentGUIListener;
+import com.hikabrain.plugin.tournament.history.TournamentHistoryManager;
+import com.hikabrain.plugin.tournament.hologram.TournamentHologramManager;
 import org.bukkit.GameRule;
 import org.bukkit.World;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -29,8 +36,13 @@ public class HikaBrainPlugin extends JavaPlugin {
     private ScoreboardManager    scoreboardManager;
     private StatsManager         statsManager;
     private ArenaGUI             arenaGUI;
-    private StatsHologramManager hologramManager;
     private CategoryLeaderboardManager leaderboardManager;
+
+    private DuelArenaManager          duelArenaManager;
+    private TournamentHistoryManager  tournamentHistoryManager;
+    private TournamentHologramManager tournamentHologramManager;
+    private TournamentManager         tournamentManager;
+    private TournamentGUI             tournamentGUI;
 
     @Override
     public void onEnable() {
@@ -40,11 +52,18 @@ public class HikaBrainPlugin extends JavaPlugin {
         this.arenaManager.loadAll();
         this.scoreboardManager = new ScoreboardManager(this);
         this.statsManager      = new StatsManager(this);
-        this.hologramManager   = new StatsHologramManager(this);
         this.leaderboardManager = new CategoryLeaderboardManager(this);
         KitManager.init(this);
 
         this.arenaGUI = new ArenaGUI(this);
+
+        // Système de tournoi
+        this.duelArenaManager = new DuelArenaManager(this);
+        this.duelArenaManager.loadAll();
+        this.tournamentHistoryManager = new TournamentHistoryManager(this);
+        this.tournamentHologramManager = new TournamentHologramManager(this);
+        this.tournamentManager = new TournamentManager(this, duelArenaManager, tournamentHistoryManager, tournamentHologramManager);
+        this.tournamentGUI = new TournamentGUI(this);
 
         // Respawn instantané
         for (World world : getServer().getWorlds()) {
@@ -60,6 +79,10 @@ public class HikaBrainPlugin extends JavaPlugin {
             return true;
         });
 
+        TournamentCommand tournamentCommand = new TournamentCommand(this);
+        getCommand("tournament").setExecutor(tournamentCommand);
+        getCommand("tournament").setTabCompleter(tournamentCommand);
+
         // Listeners
         getServer().getPluginManager().registerEvents(new PlayerConnectionListener(this), this);
         getServer().getPluginManager().registerEvents(new PlayerDamageListener(this), this);
@@ -68,17 +91,21 @@ public class HikaBrainPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new TeamSelectListener(this), this);
         getServer().getPluginManager().registerEvents(new ArenaProtectionListener(this), this);
         getServer().getPluginManager().registerEvents(new ForceStartItemListener(this), this);
+        getServer().getPluginManager().registerEvents(new LeaveItemListener(this), this);
         getServer().getPluginManager().registerEvents(new PlayerItemListener(this), this);
         getServer().getPluginManager().registerEvents(new BlockPlaceListener(this), this);
         getServer().getPluginManager().registerEvents(new ArenaGUIListener(this, arenaGUI), this);
-        getServer().getPluginManager().registerEvents(new StatsHologramListener(this, hologramManager), this);
+        getServer().getPluginManager().registerEvents(new TournamentListener(this), this);
+        getServer().getPluginManager().registerEvents(new TournamentGUIListener(this, tournamentGUI), this);
 
         getLogger().info("HikaBrain activé ! (" + arenaManager.getNames().size() + " arène(s) chargée(s))");
     }
 
     @Override
     public void onDisable() {
-        if (hologramManager   != null) hologramManager.despawn();   // stoppe la tâche de refresh
+        if (tournamentManager   != null) tournamentManager.shutdown();
+        if (tournamentHologramManager != null) tournamentHologramManager.shutdown();
+        if (duelArenaManager    != null) duelArenaManager.saveAll();
         if (leaderboardManager != null) leaderboardManager.despawnAll();
         if (scoreboardManager != null) scoreboardManager.stop();
         if (statsManager      != null) statsManager.saveStats();
@@ -90,6 +117,11 @@ public class HikaBrainPlugin extends JavaPlugin {
     public ArenaGUI             getArenaGUI()           { return arenaGUI; }
     public ScoreboardManager    getScoreboardManager()  { return scoreboardManager; }
     public StatsManager         getStatsManager()       { return statsManager; }
-    public StatsHologramManager getHologramManager()    { return hologramManager; }
     public CategoryLeaderboardManager getLeaderboardManager() { return leaderboardManager; }
+
+    public DuelArenaManager          getDuelArenaManager()          { return duelArenaManager; }
+    public TournamentHistoryManager  getTournamentHistoryManager()  { return tournamentHistoryManager; }
+    public TournamentHologramManager getTournamentHologramManager() { return tournamentHologramManager; }
+    public TournamentManager         getTournamentManager()         { return tournamentManager; }
+    public TournamentGUI             getTournamentGUI()             { return tournamentGUI; }
 }
