@@ -81,6 +81,9 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
             case "joinrandom" -> handleJoinRandom(sender);
             case "arenas" -> handleArenasGui(sender);
             case "leave" -> handleLeave(sender);
+            case "spectate" -> handleSpectate(sender, args);
+            case "unspectate" -> handleUnspectate(sender);
+            case "setspectatorspawn" -> handleSetSpectatorSpawn(sender, args);
             case "start" -> handleStart(sender, args);
             case "stop" -> handleStop(sender, args);
             case "info" -> handleInfo(sender, args);
@@ -179,6 +182,27 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
         gm.saveArenaConfig();
 
         MessageUtil.send(sender, "&aLe point de lobby de '" + args[1] + "' a été défini à ta position.");
+    }
+
+    /**
+     * Définit le point de téléportation dédié aux spectateurs de cette arène (à la position
+     * actuelle de l'admin). Facultatif : sans ce point, on retombe automatiquement sur le
+     * centre de la zone de jeu (gameZone), sinon sur le lobby.
+     */
+    private void handleSetSpectatorSpawn(CommandSender sender, String[] args) {
+        if (!checkAdminAndPlayer(sender)) return;
+        if (args.length < 2) {
+            MessageUtil.send(sender, "&cUsage: /hb setspectatorspawn <nom>");
+            return;
+        }
+        GameManager gm = resolveArena(sender, args, 1);
+        if (gm == null) return;
+        Player player = (Player) sender;
+
+        gm.getArena().setSpectatorSpawn(player.getLocation());
+        gm.saveArenaConfig();
+
+        MessageUtil.send(sender, "&aLe point de spawn spectateur de '" + args[1] + "' a été défini à ta position.");
     }
 
     private void handleSetSpawn(CommandSender sender, String[] args) {
@@ -410,6 +434,12 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
             return;
         }
 
+        GameManager currentSpectate = am.findSpectatorArenaOf(player);
+        if (currentSpectate != null) {
+            MessageUtil.send(sender, "&cTu es en mode spectateur (" + currentSpectate.getName() + "). Fais /hb unspectate d'abord.");
+            return;
+        }
+
         gm.addPlayer(player);
     }
 
@@ -430,6 +460,12 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
         GameManager current = am.findArenaOf(player);
         if (current != null) {
             MessageUtil.send(sender, "&cTu es déjà dans une partie (" + current.getName() + "). Fais /hb leave d'abord.");
+            return;
+        }
+
+        GameManager currentSpectate = am.findSpectatorArenaOf(player);
+        if (currentSpectate != null) {
+            MessageUtil.send(sender, "&cTu es en mode spectateur (" + currentSpectate.getName() + "). Fais /hb unspectate d'abord.");
             return;
         }
 
@@ -461,6 +497,61 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
             return;
         }
         gm.removePlayer(player);
+    }
+
+    /**
+     * Rejoint le mode spectateur sur une arène donnée, pour regarder une partie en cours
+     * (ou en attente) sans y participer. Le joueur reste confiné à la zone de l'arène
+     * (voir PlayerMoveListener) et peut repartir à tout moment avec /hb unspectate.
+     */
+    private void handleSpectate(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player player)) {
+            MessageUtil.send(sender, "&cCette commande doit être exécutée par un joueur.");
+            return;
+        }
+        if (args.length < 2) {
+            MessageUtil.send(sender, "&cUsage: /hb spectate <nom>");
+            return;
+        }
+
+        ArenaManager am = plugin.getArenaManager();
+        GameManager gm = am.get(args[1]);
+        if (gm == null) {
+            MessageUtil.send(sender, "&cAucune arène nommée '" + args[1] + "' n'existe.");
+            return;
+        }
+
+        GameManager currentGame = am.findArenaOf(player);
+        if (currentGame != null) {
+            MessageUtil.send(sender, "&cTu es déjà dans une partie (" + currentGame.getName() + "). Fais /hb leave d'abord.");
+            return;
+        }
+
+        GameManager currentSpectate = am.findSpectatorArenaOf(player);
+        if (currentSpectate != null) {
+            if (currentSpectate.getName().equals(gm.getName())) {
+                MessageUtil.send(sender, "&cTu regardes déjà cette arène en spectateur.");
+                return;
+            }
+            // On quitte le spectate actuel avant de rejoindre le nouveau, pour rester cohérent
+            // avec un seul mode spectateur actif à la fois.
+            currentSpectate.removeSpectator(player);
+        }
+
+        gm.addSpectator(player);
+    }
+
+    private void handleUnspectate(CommandSender sender) {
+        if (!(sender instanceof Player player)) {
+            MessageUtil.send(sender, "&cCette commande doit être exécutée par un joueur.");
+            return;
+        }
+        GameManager gm = plugin.getArenaManager().findSpectatorArenaOf(player);
+        if (gm == null) {
+            MessageUtil.send(sender, "&cTu n'es pas en mode spectateur en ce moment.");
+            return;
+        }
+        gm.removeSpectator(player);
     }
 
     private void handleInfo(CommandSender sender, String[] args) {
@@ -847,6 +938,8 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
         MessageUtil.send(sender, "&e/hb join <nom> &7- Rejoindre une arène");
         MessageUtil.send(sender, "&e/hb joinrandom &7- Rejoindre une arène au hasard");
         MessageUtil.send(sender, "&e/hb leave &7- Quitter la partie en cours");
+        MessageUtil.send(sender, "&e/hb spectate <nom> &7- Regarder une partie en cours en spectateur");
+        MessageUtil.send(sender, "&e/hb unspectate &7- Quitter le mode spectateur");
         MessageUtil.send(sender, "&e/hb list &7- Lister toutes les arènes");
         MessageUtil.send(sender, "&e/hb arenas &7- Ouvrir le menu pour rejoindre une arène");
         MessageUtil.send(sender, "&e/hb info [nom] &7- Voir l'état d'une arène");
@@ -856,6 +949,7 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
             MessageUtil.send(sender, "&c/hb create <nom> &7- Créer une nouvelle arène");
             MessageUtil.send(sender, "&c/hb delete <nom> &7- Supprimer une arène");
             MessageUtil.send(sender, "&c/hb setlobby <nom> &7- Définir le point de lobby");
+            MessageUtil.send(sender, "&c/hb setspectatorspawn <nom> &7- Définir le point de spawn des spectateurs");
             MessageUtil.send(sender, "&c/hb setspawn <nom> <red|blue> <index> &7- Définir/remplacer un spawn d'équipe");
             MessageUtil.send(sender, "&c/hb delspawn <nom> <red|blue> <index> &7- Supprimer un spawn d'équipe");
             MessageUtil.send(sender, "&c/hb setcapture <nom> <red|blue> <pos1|pos2> &7- Définir la zone de capture");
@@ -880,9 +974,9 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            List<String> options = new ArrayList<>(List.of("join", "joinrandom", "leave", "info", "list", "arenas", "stats", "top"));
+            List<String> options = new ArrayList<>(List.of("join", "joinrandom", "leave", "spectate", "unspectate", "info", "list", "arenas", "stats", "top"));
             if (sender.hasPermission("hikabrain.admin")) {
-                options.addAll(List.of("create", "delete", "setlobby", "setspawn", "delspawn", "setcapture", "setgamezone", "setmaxplayers", "start", "stop"));
+                options.addAll(List.of("create", "delete", "setlobby", "setspectatorspawn", "setspawn", "delspawn", "setcapture", "setgamezone", "setmaxplayers", "start", "stop"));
                 options.addAll(List.of("setsbserver", "setsbgame", "setsbtitle", "setsblines", "reloadsb", "sbinfo"));
                 options.addAll(List.of("resetstats", "leaderboard"));
             }
@@ -892,7 +986,7 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
         String sub = args[0].toLowerCase(Locale.ROOT);
 
         // Le 2e argument est presque toujours un nom d'arène existant (sauf pour "create").
-        if (args.length == 2 && Set.of("join", "info", "delete", "setlobby", "setspawn", "delspawn", "setcapture", "setgamezone", "setmaxplayers", "start", "stop").contains(sub)) {
+        if (args.length == 2 && Set.of("join", "info", "delete", "setlobby", "setspectatorspawn", "setspawn", "delspawn", "setcapture", "setgamezone", "setmaxplayers", "start", "stop", "spectate").contains(sub)) {
             return filterStartingWith(new ArrayList<>(plugin.getArenaManager().getNames()), args[1]);
         }
 

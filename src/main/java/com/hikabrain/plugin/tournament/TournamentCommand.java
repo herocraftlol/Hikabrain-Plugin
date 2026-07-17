@@ -56,6 +56,7 @@ public class TournamentCommand implements CommandExecutor, TabCompleter {
             case "top": return handleTop(sender, args);
             case "history": return handleHistory(sender);
             case "gui": return handleGui(sender);
+            case "rooms": return handleRooms(sender, args);
             case "arena": return handleArena(sender, args);
             case "sethologram": return handleSetHologram(sender);
             case "removehologram": return handleRemoveHologram(sender);
@@ -351,6 +352,26 @@ public class TournamentCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
+    private boolean handleRooms(CommandSender sender, String[] args) {
+        if (!requirePlayer(sender)) return true;
+        if (args.length < 2) {
+            MessageUtil.send(sender, "&cUsage: /tournament rooms <nom>");
+            return true;
+        }
+        Player player = (Player) sender;
+        Tournament tournament = plugin.getTournamentManager().get(args[1]);
+        if (tournament == null) {
+            MessageUtil.send(sender, "&cTournoi introuvable.");
+            return true;
+        }
+        if (!plugin.getTournamentRoomsGUI().canOpen(tournament)) {
+            MessageUtil.send(sender, "&cCe menu n'est disponible que pendant que le tournoi est en cours.");
+            return true;
+        }
+        plugin.getTournamentRoomsGUI().open(player, tournament);
+        return true;
+    }
+
     private boolean handleSetHologram(CommandSender sender) {
         if (!requirePlayerAdmin(sender)) return true;
         Player player = (Player) sender;
@@ -506,6 +527,7 @@ public class TournamentCommand implements CommandExecutor, TabCompleter {
         MessageUtil.send(sender, "&f/tournament top [wins|kills] &7- Classements");
         MessageUtil.send(sender, "&f/tournament history &7- Historique des tournois");
         MessageUtil.send(sender, "&f/tournament gui &7- Ouvrir le menu des tournois");
+        MessageUtil.send(sender, "&f/tournament rooms <nom> &7- Salles du tournoi en cours (rejoindre/spectate)");
         if (sender.hasPermission("hikabrain.admin")) {
             MessageUtil.send(sender, "&e--- Administration ---");
             MessageUtil.send(sender, "&f/tournament create <nom> <format> <places> [bo] [points] [temps] [arene] &7- Créer");
@@ -519,7 +541,7 @@ public class TournamentCommand implements CommandExecutor, TabCompleter {
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
             List<String> subs = new ArrayList<>(Arrays.asList("join", "leave", "list", "info", "bracket", "matches",
-                    "spectate", "unspectate", "top", "history", "gui", "help"));
+                    "spectate", "unspectate", "top", "history", "gui", "rooms", "help"));
             if (sender.hasPermission("hikabrain.admin")) {
                 subs.addAll(Arrays.asList("create", "start", "forcestart", "cancel", "delete", "arena", "sethologram", "removehologram"));
             }
@@ -529,7 +551,7 @@ public class TournamentCommand implements CommandExecutor, TabCompleter {
         if (args.length == 2) {
             switch (sub) {
                 case "join": case "leave": case "info": case "bracket": case "matches":
-                case "spectate": case "start": case "forcestart": case "cancel": case "delete":
+                case "spectate": case "start": case "forcestart": case "cancel": case "delete": case "rooms":
                     return filter(plugin.getTournamentManager().getAll().stream().map(Tournament::getName).collect(Collectors.toList()), args[1]);
                 case "create":
                     return Collections.emptyList();

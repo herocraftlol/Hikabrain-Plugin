@@ -24,6 +24,13 @@ public class Arena {
 
     private Location lobbySpawn;
 
+    /**
+     * Point de téléportation optionnel pour les spectateurs. S'il n'est pas configuré,
+     * on retombe sur le centre de la zone de jeu (gameZone) si elle existe, sinon sur
+     * le lobby (voir GameManager#getSpectatorTeleportLocation).
+     */
+    private Location spectatorSpawn;
+
     // Liste de spawns par équipe. L'index 0 correspond au spawn "1" vu de l'admin
     // (les commandes utilisent un index 1-based, converti en 0-based ici).
     private final Map<Team, List<Location>> teamSpawns = new EnumMap<>(Team.class);
@@ -92,6 +99,14 @@ public class Arena {
 
     public void setLobbySpawn(Location lobbySpawn) {
         this.lobbySpawn = lobbySpawn;
+    }
+
+    public Location getSpectatorSpawn() {
+        return spectatorSpawn;
+    }
+
+    public void setSpectatorSpawn(Location spectatorSpawn) {
+        this.spectatorSpawn = spectatorSpawn;
     }
 
     /**
@@ -190,6 +205,7 @@ public class Arena {
 
     public void saveToConfig(FileConfiguration config) {
         saveLocation(config, "arena.lobby", lobbySpawn);
+        saveLocation(config, "arena.spectator", spectatorSpawn);
         config.set("arena.spawns.red", null);
         config.set("arena.spawns.blue", null);
         saveSpawnList(config, "arena.spawns.red", teamSpawns.get(Team.RED));
@@ -206,6 +222,7 @@ public class Arena {
 
     public void loadFromConfig(FileConfiguration config) {
         this.lobbySpawn = loadLocation(config, "arena.lobby");
+        this.spectatorSpawn = loadLocation(config, "arena.spectator");
         teamSpawns.get(Team.RED).clear();
         teamSpawns.get(Team.RED).addAll(loadSpawnList(config, "arena.spawns.red"));
         teamSpawns.get(Team.BLUE).clear();

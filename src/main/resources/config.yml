@@ -29,6 +29,11 @@ restore-pre-lobby-location: true
 # Délai (secondes) avant de relancer un nouveau lobby après la fin d'une partie
 restart-delay: 5
 
+# Distance maximale (blocs) autorisée entre un spectateur et son point de téléportation
+# spectateur, UNIQUEMENT utilisée en secours si l'arène n'a pas de zone de jeu (gamezone)
+# configurée. Si une gamezone existe, les spectateurs sont confinés à cette zone à la place.
+spectator-max-distance: 60
+
 # ===========================================
 #         Configuration Scoreboard
 # ===========================================
@@ -82,8 +87,13 @@ messages:
 #         Configuration Tournois
 # ===========================================
 tournament:
-  # Durée par défaut (secondes) d'une manche/course aux points avant décision au score/survivants
+  # Durée par défaut (secondes) d'une manche/course aux points avant décision au score/ratio
   default-time-limit-seconds: 600
+
+  # Délai de préparation (secondes) entre l'annonce d'une phase (poules, huitièmes, quarts,
+  # demies, finale...) et la téléportation automatique des joueurs dans leurs arènes.
+  # Un décompte est annoncé (10s, 5s, 4s, 3s, 2s, 1s). Mettre 0 pour téléporter instantanément.
+  round-prep-seconds: 15
 
   # Délai de grâce (secondes) avant qu'un joueur totalement déconnecté ne fasse perdre son équipe par forfait
   disconnect-grace-seconds: 60

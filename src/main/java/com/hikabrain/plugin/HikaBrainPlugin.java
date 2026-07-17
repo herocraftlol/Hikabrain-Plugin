@@ -24,6 +24,8 @@ import com.hikabrain.plugin.tournament.TournamentListener;
 import com.hikabrain.plugin.tournament.TournamentManager;
 import com.hikabrain.plugin.tournament.gui.TournamentGUI;
 import com.hikabrain.plugin.tournament.gui.TournamentGUIListener;
+import com.hikabrain.plugin.tournament.gui.TournamentRoomsGUI;
+import com.hikabrain.plugin.tournament.gui.TournamentRoomsGUIListener;
 import com.hikabrain.plugin.tournament.history.TournamentHistoryManager;
 import com.hikabrain.plugin.tournament.hologram.TournamentHologramManager;
 import org.bukkit.GameRule;
@@ -43,6 +45,7 @@ public class HikaBrainPlugin extends JavaPlugin {
     private TournamentHologramManager tournamentHologramManager;
     private TournamentManager         tournamentManager;
     private TournamentGUI             tournamentGUI;
+    private TournamentRoomsGUI        tournamentRoomsGUI;
 
     @Override
     public void onEnable() {
@@ -64,6 +67,7 @@ public class HikaBrainPlugin extends JavaPlugin {
         this.tournamentHologramManager = new TournamentHologramManager(this);
         this.tournamentManager = new TournamentManager(this, duelArenaManager, tournamentHistoryManager, tournamentHologramManager);
         this.tournamentGUI = new TournamentGUI(this);
+        this.tournamentRoomsGUI = new TournamentRoomsGUI(this);
 
         // Respawn instantané
         for (World world : getServer().getWorlds()) {
@@ -97,6 +101,7 @@ public class HikaBrainPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new ArenaGUIListener(this, arenaGUI), this);
         getServer().getPluginManager().registerEvents(new TournamentListener(this), this);
         getServer().getPluginManager().registerEvents(new TournamentGUIListener(this, tournamentGUI), this);
+        getServer().getPluginManager().registerEvents(new TournamentRoomsGUIListener(this), this);
 
         getLogger().info("HikaBrain activé ! (" + arenaManager.getNames().size() + " arène(s) chargée(s))");
     }
@@ -124,4 +129,5 @@ public class HikaBrainPlugin extends JavaPlugin {
     public TournamentHologramManager getTournamentHologramManager() { return tournamentHologramManager; }
     public TournamentManager         getTournamentManager()         { return tournamentManager; }
     public TournamentGUI             getTournamentGUI()             { return tournamentGUI; }
+    public TournamentRoomsGUI        getTournamentRoomsGUI()        { return tournamentRoomsGUI; }
 }

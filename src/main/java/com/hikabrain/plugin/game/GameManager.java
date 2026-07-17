@@ -56,6 +56,14 @@ public class GameManager {
     // Joueurs actuellement gelés (après un point marqué)
     private final Set<UUID> frozenPlayers = new HashSet<>();
 
+    // ================= SPECTATEURS =================
+
+    /** Joueurs actuellement en mode spectateur sur cette arène. */
+    private final Set<UUID> spectators = new HashSet<>();
+
+    /** Positions des spectateurs avant qu'ils ne rejoignent le mode spectateur (pour restauration). */
+    private final Map<UUID, Location> preSpectateLocations = new HashMap<>();
+
     // ================= INTÉGRATION TOURNOI =================
     // Permet au système de tournoi (com.hikabrain.plugin.tournament) de réserver
     // temporairement cette arène pour un match précis, d'y forcer des joueurs dans
@@ -262,6 +270,142 @@ public class GameManager {
         // Si une partie est en cours et qu'une équipe se vide totalement, on arrête.
         if (state == GameState.PLAYING || state == GameState.ROUND_RESET) {
             checkForfeit();
+        }
+    }
+
+    // ================= GESTION DES SPECTATEURS =================
+
+    public boolean isSpectating(Player player) {
+        return spectators.contains(player.getUniqueId());
+    }
+
+    public int getSpectatorCount() {
+        return spectators.size();
+    }
+
+    /**
+     * Renvoie une copie non modifiable des UUID actuellement en spectateur sur cette arène.
+     */
+    public Set<UUID> getSpectatorUuids() {
+        return Collections.unmodifiableSet(new HashSet<>(spectators));
+    }
+
+    /**
+     * Calcule le point de téléportation utilisé pour les spectateurs :
+     * 1. Le point dédié configuré via /hb setspectatorspawn, s'il existe.
+     * 2. Sinon le centre de la zone de jeu (gameZone), s'il existe.
+     * 3. Sinon le lobby de l'arène.
+     * Peut renvoyer null si rien de tout ça n'est configuré.
+     */
+    public Location getSpectatorTeleportLocation() {
+        if (arena.getSpectatorSpawn() != null) {
+            return arena.getSpectatorSpawn().clone();
+        }
+        if (arena.getGameZone() != null) {
+            return arena.getGameZone().getCenter();
+        }
+        if (arena.getLobbySpawn() != null) {
+            return arena.getLobbySpawn().clone();
+        }
+        return null;
+    }
+
+    /**
+     * Détermine si une localisation est considérée comme "dans les limites" pour un
+     * spectateur de cette arène :
+     * - S'il y a une gameZone configurée, le spectateur doit y rester.
+     * - Sinon, on retombe sur une limite de distance (config "spectator-max-distance")
+     *   autour du point de téléportation spectateur, pour toujours garantir un minimum
+     *   de confinement même si l'admin n'a pas défini de zone de jeu précise.
+     * - Si on n'a même pas de point de référence, on ne peut rien vérifier : on autorise.
+     */
+    public boolean isWithinSpectatorBounds(Location loc) {
+        CuboidRegion zone = arena.getGameZone();
+        if (zone != null) {
+            return zone.contains(loc);
+        }
+        Location center = getSpectatorTeleportLocation();
+        if (center == null || center.getWorld() == null || loc.getWorld() == null
+                || !center.getWorld().equals(loc.getWorld())) {
+            return true;
+        }
+        double maxDistance = plugin.getConfig().getDouble("spectator-max-distance", 60);
+        return center.distanceSquared(loc) <= (maxDistance * maxDistance);
+    }
+
+    /**
+     * Fait rejoindre un joueur en mode spectateur sur cette arène. Renvoie false si
+     * ce n'est pas possible (arène non configurée, joueur déjà engagé ailleurs...).
+     */
+    public boolean addSpectator(Player player) {
+        if (!arena.isFullyConfigured()) {
+            MessageUtil.send(player, "&cCette arène n'est pas encore configurée.");
+            return false;
+        }
+        if (isPlaying(player)) {
+            MessageUtil.send(player, "&cTu ne peux pas regarder cette partie en spectateur, tu y joues déjà.");
+            return false;
+        }
+        if (isSpectating(player)) {
+            MessageUtil.send(player, "&cTu regardes déjà cette partie en spectateur.");
+            return false;
+        }
+
+        Location teleportTo = getSpectatorTeleportLocation();
+        if (teleportTo == null) {
+            MessageUtil.send(player, "&cImpossible de spectate cette arène : aucun point de téléportation configuré.");
+            return false;
+        }
+
+        preSpectateLocations.put(player.getUniqueId(), player.getLocation().clone());
+        spectators.add(player.getUniqueId());
+
+        player.teleport(teleportTo);
+        player.setGameMode(GameMode.SPECTATOR);
+        player.getInventory().clear();
+        player.getInventory().setItem(KitManager.SPECTATOR_LEAVE_SLOT, KitManager.createSpectatorLeaveItem());
+
+        MessageUtil.send(player, "&7Tu observes désormais la partie sur l'arène &f" + arenaName
+                + "&7. Utilise &f/hb unspectate &7(ou l'item dans ton inventaire) pour repartir.");
+        return true;
+    }
+
+    /**
+     * Fait sortir un joueur du mode spectateur de cette arène et le renvoie à sa
+     * position d'avant, ou au lobby de l'arène si indisponible.
+     */
+    public void removeSpectator(Player player) {
+        UUID uuid = player.getUniqueId();
+        if (!spectators.remove(uuid)) {
+            return;
+        }
+
+        player.setGameMode(GameMode.SURVIVAL);
+        player.getInventory().clear();
+
+        Location back = preSpectateLocations.remove(uuid);
+        if (back != null) {
+            player.teleport(back);
+        } else if (arena.getLobbySpawn() != null) {
+            player.teleport(arena.getLobbySpawn());
+        }
+
+        MessageUtil.send(player, "&7Tu as quitté le mode spectateur.");
+    }
+
+    /**
+     * Fait sortir tous les spectateurs de cette arène (utilisé quand l'arène est arrêtée
+     * de force ou supprimée par un admin).
+     */
+    private void removeAllSpectators() {
+        for (UUID uuid : new ArrayList<>(spectators)) {
+            Player player = Bukkit.getPlayer(uuid);
+            if (player != null) {
+                removeSpectator(player);
+            } else {
+                spectators.remove(uuid);
+                preSpectateLocations.remove(uuid);
+            }
         }
     }
 
@@ -914,6 +1058,7 @@ public class GameManager {
         }
         unfreezeAllPlayers();
         resetToLobby();
+        removeAllSpectators();
     }
 
     // ================= SONS & EFFETS =================

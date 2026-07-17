@@ -55,6 +55,12 @@ public class TournamentManager {
     private final Map<String, Tournament> hikaBrainMatchTournament = new HashMap<>();
     private final Map<String, BracketMatch> hikaBrainMatchByArena = new HashMap<>();
 
+    // Tournois actuellement en "compte à rebours de préparation" entre deux phases :
+    // pendant ce délai, les matchs du tour sont déjà connus (PENDING) mais ne sont pas
+    // encore lancés/téléportés, pour laisser le temps aux joueurs de se préparer.
+    private final Set<String> tournamentsInPrepCountdown = new HashSet<>();
+    private final Map<String, BukkitTask> prepCountdownTasks = new HashMap<>();
+
     private BukkitTask retryTask;
 
     public TournamentManager(HikaBrainPlugin plugin, DuelArenaManager duelArenaManager,
@@ -179,6 +185,7 @@ public class TournamentManager {
     }
 
     private void cleanupTournament(Tournament tournament) {
+        cancelPrepCountdown(tournament.getName());
         for (MatchRuntime rt : new ArrayList<>(activeRuntimes)) {
             if (rt.getTournament() == tournament) {
                 terminateRuntime(rt);
@@ -248,7 +255,58 @@ public class TournamentManager {
             checkRoundComplete(tournament);
             return;
         }
-        tryLaunchPendingMatches(tournament);
+        startRoundPrepCountdown(tournament);
+    }
+
+    /**
+     * Lance le compte à rebours de préparation avant le début effectif d'une phase
+     * (aussi bien le premier tour au "start" que chaque tour suivant). Les joueurs
+     * concernés ne sont téléportés dans leurs arènes qu'une fois ce délai écoulé.
+     * Durée configurable via "tournament.round-prep-seconds" (0 = téléportation immédiate).
+     */
+    private void startRoundPrepCountdown(Tournament tournament) {
+        int prepSeconds = plugin.getConfig().getInt("tournament.round-prep-seconds", 15);
+        if (prepSeconds <= 0) {
+            tryLaunchPendingMatches(tournament);
+            return;
+        }
+
+        String name = tournament.getName();
+        cancelPrepCountdown(name);
+        tournamentsInPrepCountdown.add(name);
+
+        List<BracketMatch> round = tournament.getCurrentRound();
+        String roundName = round != null
+                ? BracketUtil.roundName(round.size(), round.size() == 1)
+                : "Tour";
+        broadcastToTournament(tournament, "&e⏳ &f" + roundName
+                + " &e- Préparez-vous, téléportation dans &f" + prepSeconds + "s&e !");
+        broadcastToTournament(tournament, "&7Astuce : &f/tournament rooms " + name
+                + " &7pour retrouver ta salle ou observer un match.");
+
+        int[] remaining = {prepSeconds};
+        BukkitTask task = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+            remaining[0]--;
+            int left = remaining[0];
+            if (left <= 0) {
+                tournamentsInPrepCountdown.remove(name);
+                BukkitTask self = prepCountdownTasks.remove(name);
+                if (self != null) self.cancel();
+                broadcastToTournament(tournament, "&a&lC'est parti !");
+                tryLaunchPendingMatches(tournament);
+                return;
+            }
+            if (left <= 5 || left == 10) {
+                broadcastToTournament(tournament, "&eTéléportation dans &f" + left + "&e...");
+            }
+        }, 20L, 20L);
+        prepCountdownTasks.put(name, task);
+    }
+
+    private void cancelPrepCountdown(String tournamentName) {
+        tournamentsInPrepCountdown.remove(tournamentName);
+        BukkitTask task = prepCountdownTasks.remove(tournamentName);
+        if (task != null) task.cancel();
     }
 
     private void retryPendingMatches() {
@@ -260,6 +318,7 @@ public class TournamentManager {
     }
 
     private void tryLaunchPendingMatches(Tournament tournament) {
+        if (tournamentsInPrepCountdown.contains(tournament.getName())) return;
         List<BracketMatch> round = tournament.getCurrentRound();
         if (round == null) return;
         for (BracketMatch match : round) {
@@ -485,37 +544,56 @@ public class TournamentManager {
         BracketMatch match = rt.getMatch();
         if (match.getStatus() != MatchStatus.ONGOING) return;
 
+        // Temps écoulé sans qu'un camp n'ait atteint la condition de victoire : décision au
+        // nombre de points marqués, et en cas d'égalité au meilleur ratio points/morts.
+        int bestSlot = decideWinnerByScoreThenRatio(rt, match);
+
         if (rt.getMode() == MatchRuntime.Mode.POINTS_RACE) {
-            int best = -1, bestSlot = -1;
-            for (int i = 0; i < match.getSlots().size(); i++) {
-                if (match.getSlots().get(i) == null) continue;
-                int score = rt.getSlotScore(i);
-                if (score > best) {
-                    best = score;
-                    bestSlot = i;
-                }
-            }
-            broadcastMatch(match, "&eTemps écoulé ! Décision au score.");
+            broadcastMatch(match, "&eTemps écoulé ! Décision au score" + (bestSlot >= 0 ? tieBreakSuffix(rt, match) : "") + ".");
             if (bestSlot >= 0) onMatchWon(rt, bestSlot);
             return;
         }
 
-        // ELIMINATION_ROUNDS : temps écoulé pendant une manche -> décision au nombre de survivants,
-        // puis au nombre de kills marqués pendant cette manche.
+        // ELIMINATION_ROUNDS : temps écoulé pendant une manche.
+        broadcastMatch(match, "&eTemps écoulé ! Décision au score" + tieBreakSuffix(rt, match) + ".");
+        if (bestSlot >= 0) onRoundWon(rt, bestSlot);
+    }
+
+    /**
+     * Détermine le slot vainqueur d'un match/manche interrompu par le temps limite :
+     * critère principal = le plus de points marqués, critère de départage en cas d'égalité
+     * = le meilleur ratio points/morts. Renvoie -1 s'il n'y a aucun slot présent.
+     */
+    private int decideWinnerByScoreThenRatio(MatchRuntime rt, BracketMatch match) {
         int bestSlot = -1;
-        int bestAlive = -1;
-        int bestKillsThisRound = -1;
+        int bestScore = -1;
+        double bestRatio = -1;
         for (int i = 0; i < match.getSlots().size(); i++) {
             if (match.getSlots().get(i) == null) continue;
-            int aliveCount = rt.getAlive(i).size();
-            if (aliveCount > bestAlive) {
-                bestAlive = aliveCount;
+            int score = rt.getSlotScore(i);
+            double ratio = rt.getSlotRatio(i);
+            if (score > bestScore || (score == bestScore && ratio > bestRatio)) {
+                bestScore = score;
+                bestRatio = ratio;
                 bestSlot = i;
-                bestKillsThisRound = -1;
             }
         }
-        broadcastMatch(match, "&eTemps écoulé ! La manche est décidée au nombre de survivants.");
-        if (bestSlot >= 0) onRoundWon(rt, bestSlot);
+        return bestSlot;
+    }
+
+    /** Petit suffixe informatif indiquant si le départage s'est fait au ratio (égalité de points). */
+    private String tieBreakSuffix(MatchRuntime rt, BracketMatch match) {
+        int tiedCount = 0;
+        int bestScore = -1;
+        for (int i = 0; i < match.getSlots().size(); i++) {
+            if (match.getSlots().get(i) == null) continue;
+            bestScore = Math.max(bestScore, rt.getSlotScore(i));
+        }
+        for (int i = 0; i < match.getSlots().size(); i++) {
+            if (match.getSlots().get(i) == null) continue;
+            if (rt.getSlotScore(i) == bestScore) tiedCount++;
+        }
+        return tiedCount > 1 ? " &7(départage au ratio K/D)" : "";
     }
 
     // ================= ÉVÉNEMENTS DE JEU (appelés par TournamentListener) =================
@@ -533,6 +611,8 @@ public class TournamentManager {
 
         int victimSlot = rt.slotIndexOf(victim.getUniqueId());
         if (victimSlot < 0) return;
+
+        rt.addSlotDeath(victimSlot);
 
         if (killer != null) {
             int killerSlot = rt.slotIndexOf(killer.getUniqueId());
@@ -865,6 +945,54 @@ public class TournamentManager {
             tournament.getSpectators().remove(player.getUniqueId());
         }
         player.setGameMode(GameMode.SURVIVAL);
+    }
+
+    /** Téléporte un joueur en spectateur sur UN match précis (utilisé par le GUI des salles). */
+    public boolean spectateMatch(Tournament tournament, BracketMatch match, Player player) {
+        if (tournament == null || match == null) return false;
+        if (match.getStatus() != MatchStatus.ONGOING) return false;
+
+        Location target = null;
+        if (tournament.getFormat().isHikaBrainEngine()) {
+            GameManager gm = plugin.getArenaManager().get(match.getArenaName());
+            if (gm != null) target = gm.getArena().getLobbySpawn();
+        } else {
+            DuelArena arena = duelArenaManager.get(match.getArenaName());
+            if (arena != null) {
+                target = arena.getSpectatorSpawn() != null ? arena.getSpectatorSpawn() : arena.getWaitingSpawn();
+            }
+        }
+        if (target == null) return false;
+
+        tournament.getSpectators().add(player.getUniqueId());
+        player.setGameMode(GameMode.SPECTATOR);
+        player.teleport(target);
+        MessageUtil.send(player, "&7Tu observes maintenant &f" + match.getDisplayVersus() + "&7.");
+        return true;
+    }
+
+    /**
+     * Retéléporte un joueur inscrit vers son match de tournoi (duel) en cours, sans attendre
+     * une reconnexion. Utilisé par le GUI des salles ("Rejoindre mon match").
+     */
+    public boolean rejoinMyDuelMatch(Player player) {
+        MatchRuntime rt = runtimeByPlayer.get(player.getUniqueId());
+        if (rt == null) return false;
+        BracketMatch match = rt.getMatch();
+        if (match.getStatus() != MatchStatus.ONGOING) return false;
+        int slotIndex = rt.slotIndexOf(player.getUniqueId());
+        if (slotIndex < 0) return false;
+
+        Location spawn = rt.getArena().getSpawn(slotIndex, 0);
+        if (spawn == null) return false;
+        player.setGameMode(GameMode.SURVIVAL);
+        player.teleport(spawn);
+        if (!rt.getAlive(slotIndex).contains(player.getUniqueId())) {
+            giveDuelKit(player);
+            rt.getAlive(slotIndex).add(player.getUniqueId());
+        }
+        MessageUtil.send(player, "&aTu as rejoint ton match !");
+        return true;
     }
 
     // ================= AFFICHAGE =================

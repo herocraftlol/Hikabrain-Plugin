@@ -147,6 +147,19 @@ public class ArenaManager {
     }
 
     /**
+     * Trouve l'arène (s'il y en a une) sur laquelle le joueur donné est actuellement
+     * en train de spectate.
+     */
+    public GameManager findSpectatorArenaOf(org.bukkit.entity.Player player) {
+        for (GameManager gm : arenas.values()) {
+            if (gm.isSpectating(player)) {
+                return gm;
+            }
+        }
+        return null;
+    }
+
+    /**
      * Sélectionne la meilleure arène disponible pour une jointure aléatoire (commande
      * /hb joinrandom). Logique de priorité :
      *

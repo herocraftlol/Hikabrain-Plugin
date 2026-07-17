@@ -130,6 +130,9 @@ public class ArenaGUI {
         lore.add("");
         lore.add(ChatColor.GRAY + "Joueurs : " + statusColor + current + ChatColor.DARK_GRAY + "/" + ChatColor.GRAY + maxPlayers);
         lore.add(ChatColor.GRAY + "Statut  : " + statusLine);
+        if (state == GameState.PLAYING || state == GameState.ROUND_RESET) {
+            lore.add(ChatColor.GRAY + "Spectateurs : " + ChatColor.AQUA + gm.getSpectatorCount());
+        }
         lore.add("");
 
         boolean joinable = gm.getArena().isFullyConfigured()
@@ -139,8 +142,13 @@ public class ArenaGUI {
                 && state != GameState.NOT_CONFIGURED
                 && current < maxPlayers;
 
+        boolean spectatable = gm.getArena().isFullyConfigured()
+                && (state == GameState.PLAYING || state == GameState.ROUND_RESET);
+
         if (joinable) {
             lore.add(ChatColor.YELLOW + "▶ Cliquez pour rejoindre !");
+        } else if (spectatable) {
+            lore.add(ChatColor.AQUA + "\uD83D\uDC41 Cliquez pour regarder en spectateur !");
         } else {
             lore.add(ChatColor.RED + "✖ Indisponible");
         }

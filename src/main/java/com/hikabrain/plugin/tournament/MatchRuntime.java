@@ -38,6 +38,9 @@ public class MatchRuntime {
     /** Points/kills cumulés sur l'ensemble du MATCH (toutes manches confondues), par index de slot. */
     private final Map<Integer, Integer> slotScore = new HashMap<>();
 
+    /** Morts cumulées sur l'ensemble du MATCH, par index de slot (utilisé pour le ratio en cas d'égalité). */
+    private final Map<Integer, Integer> slotDeaths = new HashMap<>();
+
     private BukkitTask timeLimitTask;
     private BukkitTask actionBarTask;
     private final Map<UUID, BukkitTask> disconnectGraceTasks = new HashMap<>();
@@ -81,6 +84,28 @@ public class MatchRuntime {
 
     public void addSlotScore(int slotIndex, int amount) {
         slotScore.put(slotIndex, getSlotScore(slotIndex) + amount);
+    }
+
+    public int getSlotDeaths(int slotIndex) {
+        return slotDeaths.getOrDefault(slotIndex, 0);
+    }
+
+    public void addSlotDeath(int slotIndex) {
+        slotDeaths.put(slotIndex, getSlotDeaths(slotIndex) + 1);
+    }
+
+    /**
+     * Ratio points/morts pour ce slot, utilisé comme critère de départage quand le temps
+     * est écoulé et que les scores sont à égalité. Un slot sans mort avec au moins un point
+     * est considéré comme ayant le meilleur ratio possible (division par zéro évitée).
+     */
+    public double getSlotRatio(int slotIndex) {
+        int score = getSlotScore(slotIndex);
+        int deaths = getSlotDeaths(slotIndex);
+        if (deaths <= 0) {
+            return score > 0 ? Double.MAX_VALUE : 0.0;
+        }
+        return (double) score / deaths;
     }
 
     public BukkitTask getTimeLimitTask() {

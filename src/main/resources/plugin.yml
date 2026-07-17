@@ -8,14 +8,14 @@ description: Plugin de minijeu Hikabrain (capture de zone par équipes) inspiré
 commands:
   hb:
     description: Commande principale du plugin Hikabrain
-    usage: /hb <create|delete|list|arenas|setlobby|setspawn|delspawn|setcapture|setgamezone|start|stop|join|joinrandom|leave|info|stats|leaderboard>
+    usage: /hb <create|delete|list|arenas|setlobby|setspectatorspawn|setspawn|delspawn|setcapture|setgamezone|start|stop|join|joinrandom|leave|spectate|unspectate|info|stats|leaderboard>
   arenas:
     description: Ouvre le GUI de sélection d'arène
     usage: /arenas
     aliases: [arena]
   tournament:
     description: Commande du système de tournoi automatisé
-    usage: /tournament <create|join|leave|start|forcestart|cancel|delete|list|info|bracket|matches|spectate|unspectate|top|history|gui|arena|sethologram|removehologram>
+    usage: /tournament <create|join|leave|start|forcestart|cancel|delete|list|info|bracket|matches|spectate|unspectate|top|history|gui|rooms|arena|sethologram|removehologram>
     aliases: [tournoi]
 
 permissions:
