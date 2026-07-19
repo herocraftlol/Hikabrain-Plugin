@@ -4,7 +4,6 @@ import com.hikabrain.plugin.HikaBrainPlugin;
 import com.hikabrain.plugin.game.GameManager;
 import com.hikabrain.plugin.game.GameState;
 import com.hikabrain.plugin.game.KitManager;
-import com.hikabrain.plugin.game.Team;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -59,8 +58,9 @@ public class PlayerDamageListener implements Listener {
             return;
         }
 
-        Team team = gameManager.getTeam(player);
-        Location spawn = gameManager.getArena().getSpawn(team);
+        // Utilise le spawn fixe attribué au joueur pour toute la partie (voir
+        // GameManager#getAssignedSpawn), pour qu'il respawn toujours au même endroit.
+        Location spawn = gameManager.getAssignedSpawn(player);
         if (spawn != null) {
             event.setRespawnLocation(spawn);
         }
