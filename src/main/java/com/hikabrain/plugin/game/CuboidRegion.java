@@ -55,4 +55,20 @@ public class CuboidRegion {
                 && blockY >= minY && blockY <= maxY
                 && blockZ >= minZ && blockZ <= maxZ;
     }
+
+    /**
+     * Renvoie le centre de la zone (utilisé notamment comme point de téléportation
+     * de repli pour les spectateurs qui tentent de sortir de la zone de jeu).
+     * Le Y utilisé est le plus haut des deux coins (+1), pour éviter de renvoyer
+     * quelqu'un à l'intérieur d'un bloc.
+     */
+    public Location getCenter() {
+        double x = (corner1.getX() + corner2.getX()) / 2.0;
+        double z = (corner1.getZ() + corner2.getZ()) / 2.0;
+        double y = Math.max(corner1.getY(), corner2.getY()) + 1;
+        Location center = new Location(corner1.getWorld(), x, y, z);
+        center.setYaw(corner1.getYaw());
+        center.setPitch(corner1.getPitch());
+        return center;
+    }
 }

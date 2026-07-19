@@ -32,15 +32,24 @@ public class PlayerItemListener implements Listener {
     @EventHandler(priority = EventPriority.HIGH)
     public void onDropItem(PlayerDropItemEvent event) {
         Player player = event.getPlayer();
+
+        // Spectateur : ne jamais laisser lâcher l'item "quitter le mode spectateur"
+        if (plugin.getArenaManager().findSpectatorArenaOf(player) != null) {
+            if (KitManager.isSpectatorLeaveItem(event.getItemDrop().getItemStack())) {
+                event.setCancelled(true);
+            }
+            return;
+        }
+
         GameManager gm = plugin.getArenaManager().findArenaOf(player);
         
         if (gm == null) return;
         
         ItemStack item = event.getItemDrop().getItemStack();
         
-        // En lobby : empêcher de lâcher l'item de sélection d'équipe
+        // En lobby : empêcher de lâcher l'item de sélection d'équipe et l'item quitter
         if (gm.getState() == GameState.WAITING) {
-            if (KitManager.isTeamSelectorItem(item) || KitManager.isForceStartItem(item)) {
+            if (KitManager.isTeamSelectorItem(item) || KitManager.isForceStartItem(item) || KitManager.isLeaveItem(item)) {
                 event.setCancelled(true);
             }
         }
@@ -58,6 +67,16 @@ public class PlayerItemListener implements Listener {
     public void onInventoryClick(InventoryClickEvent event) {
         if (!(event.getWhoClicked() instanceof Player)) return;
         Player player = (Player) event.getWhoClicked();
+
+        // Spectateur : ne jamais laisser déplacer l'item "quitter le mode spectateur"
+        if (plugin.getArenaManager().findSpectatorArenaOf(player) != null) {
+            ItemStack clicked = event.getCurrentItem();
+            if (clicked != null && KitManager.isSpectatorLeaveItem(clicked)) {
+                event.setCancelled(true);
+            }
+            return;
+        }
+
         GameManager gm = plugin.getArenaManager().findArenaOf(player);
         
         if (gm == null) return;
@@ -65,9 +84,9 @@ public class PlayerItemListener implements Listener {
         ItemStack item = event.getCurrentItem();
         if (item == null) return;
         
-        // En lobby : empêcher de déplacer l'item de sélection d'équipe
+        // En lobby : empêcher de déplacer l'item de sélection d'équipe et l'item quitter
         if (gm.getState() == GameState.WAITING) {
-            if (KitManager.isTeamSelectorItem(item) || KitManager.isForceStartItem(item)) {
+            if (KitManager.isTeamSelectorItem(item) || KitManager.isForceStartItem(item) || KitManager.isLeaveItem(item)) {
                 event.setCancelled(true);
             }
         }
