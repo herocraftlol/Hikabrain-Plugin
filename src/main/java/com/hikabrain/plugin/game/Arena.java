@@ -24,6 +24,13 @@ public class Arena {
 
     private Location lobbySpawn;
 
+    /**
+     * Point de téléportation optionnel pour les spectateurs. S'il n'est pas configuré,
+     * on retombe sur le centre de la zone de jeu (gameZone) si elle existe, sinon sur
+     * le lobby (voir GameManager#getSpectatorTeleportLocation).
+     */
+    private Location spectatorSpawn;
+
     // Liste de spawns par équipe. L'index 0 correspond au spawn "1" vu de l'admin
     // (les commandes utilisent un index 1-based, converti en 0-based ici).
     private final Map<Team, List<Location>> teamSpawns = new EnumMap<>(Team.class);
@@ -32,9 +39,56 @@ public class Arena {
     private CuboidRegion blueCaptureZone;
     private CuboidRegion gameZone;
 
+    /**
+     * Nombre maximum de joueurs pour CETTE arène. -1 signifie "non défini" : on retombe
+     * alors sur le max-players global du config.yml (voir GameManager#getMaxPlayers).
+     */
+    private int maxPlayers = -1;
+
+    /**
+     * Nombre minimum de joueurs pour CETTE arène avant que le compte à rebours du lobby
+     * ne puisse se lancer. -1 signifie "non défini" : on retombe alors sur le min-players
+     * global du config.yml (voir GameManager#getMinPlayers).
+     */
+    private int minPlayers = -1;
+
     public Arena() {
         teamSpawns.put(Team.RED, new ArrayList<>());
         teamSpawns.put(Team.BLUE, new ArrayList<>());
+    }
+
+    /**
+     * Renvoie le nombre maximum de joueurs configuré spécifiquement pour cette arène,
+     * ou -1 si aucune valeur spécifique n'a été définie (on doit alors utiliser le
+     * max-players global).
+     */
+    public int getMaxPlayers() {
+        return maxPlayers;
+    }
+
+    /**
+     * Définit le nombre maximum de joueurs pour cette arène. Une valeur <= 0 réinitialise
+     * la configuration spécifique (retour au max-players global).
+     */
+    public void setMaxPlayers(int maxPlayers) {
+        this.maxPlayers = maxPlayers <= 0 ? -1 : maxPlayers;
+    }
+
+    /**
+     * Renvoie le nombre minimum de joueurs configuré spécifiquement pour cette arène,
+     * ou -1 si aucune valeur spécifique n'a été définie (on doit alors utiliser le
+     * min-players global).
+     */
+    public int getMinPlayers() {
+        return minPlayers;
+    }
+
+    /**
+     * Définit le nombre minimum de joueurs pour cette arène. Une valeur <= 0 réinitialise
+     * la configuration spécifique (retour au min-players global).
+     */
+    public void setMinPlayers(int minPlayers) {
+        this.minPlayers = minPlayers <= 0 ? -1 : minPlayers;
     }
 
     /**
@@ -69,6 +123,14 @@ public class Arena {
 
     public void setLobbySpawn(Location lobbySpawn) {
         this.lobbySpawn = lobbySpawn;
+    }
+
+    public Location getSpectatorSpawn() {
+        return spectatorSpawn;
+    }
+
+    public void setSpectatorSpawn(Location spectatorSpawn) {
+        this.spectatorSpawn = spectatorSpawn;
     }
 
     /**
@@ -167,6 +229,7 @@ public class Arena {
 
     public void saveToConfig(FileConfiguration config) {
         saveLocation(config, "arena.lobby", lobbySpawn);
+        saveLocation(config, "arena.spectator", spectatorSpawn);
         config.set("arena.spawns.red", null);
         config.set("arena.spawns.blue", null);
         saveSpawnList(config, "arena.spawns.red", teamSpawns.get(Team.RED));
@@ -174,10 +237,21 @@ public class Arena {
         saveRegion(config, "arena.captures.red", redCaptureZone);
         saveRegion(config, "arena.captures.blue", blueCaptureZone);
         saveRegion(config, "arena.gamezone", gameZone);
+        if (maxPlayers > 0) {
+            config.set("arena.max-players", maxPlayers);
+        } else {
+            config.set("arena.max-players", null);
+        }
+        if (minPlayers > 0) {
+            config.set("arena.min-players", minPlayers);
+        } else {
+            config.set("arena.min-players", null);
+        }
     }
 
     public void loadFromConfig(FileConfiguration config) {
         this.lobbySpawn = loadLocation(config, "arena.lobby");
+        this.spectatorSpawn = loadLocation(config, "arena.spectator");
         teamSpawns.get(Team.RED).clear();
         teamSpawns.get(Team.RED).addAll(loadSpawnList(config, "arena.spawns.red"));
         teamSpawns.get(Team.BLUE).clear();
@@ -185,6 +259,8 @@ public class Arena {
         this.redCaptureZone = loadRegion(config, "arena.captures.red");
         this.blueCaptureZone = loadRegion(config, "arena.captures.blue");
         this.gameZone = loadRegion(config, "arena.gamezone");
+        this.maxPlayers = config.isSet("arena.max-players") ? config.getInt("arena.max-players") : -1;
+        this.minPlayers = config.isSet("arena.min-players") ? config.getInt("arena.min-players") : -1;
     }
 
     /**

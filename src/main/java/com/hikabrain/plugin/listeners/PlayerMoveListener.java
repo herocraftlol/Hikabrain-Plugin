@@ -16,6 +16,10 @@ import org.bukkit.util.Vector;
  * - Immobilisation propre quand le joueur est gelé (après un point marqué)
  *   Le joueur peut toujours regarder autour de lui (yaw/pitch conservés).
  * - Mort automatique si le joueur sort de la zone de jeu
+ * - Confinement des spectateurs à l'intérieur de la zone de l'arène qu'ils observent
+ *   (retéléportation au point central/spectateur dès qu'ils tentent d'en sortir, ce qui
+ *   empêche de facto de "traverser les murs" en mode spectateur puisque le noclip du
+ *   spectateur est immédiatement annulé par la retéléportation).
  */
 public class PlayerMoveListener implements Listener {
 
@@ -28,9 +32,48 @@ public class PlayerMoveListener implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onMove(PlayerMoveEvent event) {
         Player player = event.getPlayer();
+
+        // Confinement des spectateurs, indépendamment du fait qu'ils "jouent" ou non.
+        GameManager spectating = plugin.getArenaManager().findSpectatorArenaOf(player);
+        if (spectating != null) {
+            if (!isSameBlock(event.getFrom(), event.getTo()) && !spectating.isWithinSpectatorBounds(event.getTo())) {
+                Location center = spectating.getSpectatorTeleportLocation();
+                if (center != null) {
+                    Location fixed = center.clone();
+                    fixed.setYaw(event.getTo().getYaw());
+                    fixed.setPitch(event.getTo().getPitch());
+                    event.setTo(fixed);
+                    // En mode spectateur (noclip), un simple setTo() peut ne pas suffire si le
+                    // déplacement d'un seul tick est déjà très grand (vol rapide) : on force
+                    // aussi une téléportation directe pour être certain de ramener le joueur.
+                    player.teleport(fixed);
+                }
+            }
+            return;
+        }
+
         GameManager gm = plugin.getArenaManager().findArenaOf(player);
 
         if (gm == null) {
+            return;
+        }
+
+        // Fin de partie (écran de victoire) : les joueurs sont passés en spectateur mais
+        // n'ont pas encore été téléportés au lobby (léger délai configurable). Sans ça, ils
+        // pourraient s'envoler hors de l'arène en mode spectateur avant ce transfert. On les
+        // confine donc exactement comme un spectateur classique (mêmes limites), en les
+        // ramenant au centre de l'arène s'ils tentent d'en sortir.
+        if (gm.getState() == GameState.ENDING) {
+            if (!isSameBlock(event.getFrom(), event.getTo()) && !gm.isWithinSpectatorBounds(event.getTo())) {
+                Location center = gm.getSpectatorTeleportLocation();
+                if (center != null) {
+                    Location fixed = center.clone();
+                    fixed.setYaw(event.getTo().getYaw());
+                    fixed.setPitch(event.getTo().getPitch());
+                    event.setTo(fixed);
+                    player.teleport(fixed);
+                }
+            }
             return;
         }
 

@@ -5,7 +5,7 @@
 ![Paper](https://img.shields.io/badge/Paper-API-red?style=for-the-badge&logo=paper)
 ![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)
 
-> **Plugin de combat tactique par équipes avec capture de zones, hologrammes 3D, leaderboards dynamiques et interfaces graphiques immersives !**
+> **Plugin de combat tactique par équipes avec capture de zones, hologrammes 3D, leaderboards dynamiques, interfaces graphiques immersives et système de tournois automatisé !**
 
 ---
 
@@ -18,6 +18,7 @@
 - 🎨 Interfaces graphiques modernes
 - 📊 Scoreboards dynamiques
 - 💾 Persistance des données en YAML
+- 🎯 **Système de tournois automatisé** avec bracket, GUI et 5 formats (1v1, 2v2, FFA, Faction vs Faction, HikaBrain)
 
 ---
 
@@ -227,7 +228,7 @@ MIT License - Libre d'utilisation et de modification.
 
 ## 👤 Auteur
 
-- **Version**: 1.0.5-output
+- **Version**: 1.0.6
 - **API**: Paper 1.21.1
 - **Java**: 21
 

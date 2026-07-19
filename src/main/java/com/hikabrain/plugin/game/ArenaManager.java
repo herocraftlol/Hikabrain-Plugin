@@ -147,6 +147,19 @@ public class ArenaManager {
     }
 
     /**
+     * Trouve l'arène (s'il y en a une) sur laquelle le joueur donné est actuellement
+     * en train de spectate.
+     */
+    public GameManager findSpectatorArenaOf(org.bukkit.entity.Player player) {
+        for (GameManager gm : arenas.values()) {
+            if (gm.isSpectating(player)) {
+                return gm;
+            }
+        }
+        return null;
+    }
+
+    /**
      * Sélectionne la meilleure arène disponible pour une jointure aléatoire (commande
      * /hb joinrandom). Logique de priorité :
      *
@@ -205,8 +218,7 @@ public class ArenaManager {
         if (state == GameState.PLAYING || state == GameState.ROUND_RESET || state == GameState.ENDING) {
             return false;
         }
-        int max = plugin.getConfig().getInt("max-players", 16);
-        return gm.getPlayerCount() < max;
+        return gm.getPlayerCount() < gm.getMaxPlayers();
     }
 
     private String normalize(String name) {
