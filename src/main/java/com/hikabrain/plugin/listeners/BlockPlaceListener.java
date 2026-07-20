@@ -30,8 +30,9 @@ public class BlockPlaceListener implements Listener {
         
         if (gm == null) return;
         
-        // Vérifier uniquement pendant la partie (PLAYING ou ROUND_RESET)
-        if (gm.getState() != GameState.PLAYING && gm.getState() != GameState.ROUND_RESET) {
+        // Vérifier uniquement pendant la partie (STARTING, PLAYING ou ROUND_RESET)
+        if (gm.getState() != GameState.PLAYING && gm.getState() != GameState.ROUND_RESET
+                && gm.getState() != GameState.STARTING) {
             return;
         }
         

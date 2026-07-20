@@ -28,6 +28,8 @@ public final class KitManager {
     // Slots pour le lobby
     public static final int FORCESTART_SLOT = 0;
     public static final int TEAM_SELECT_SLOT = 2;
+    public static final int LEAVE_SLOT = 4;
+    public static final int SPECTATOR_LEAVE_SLOT = 8;
     
     // Slots pour le jeu (pas de décalage car le lobby utilise des slots différents)
     private static final int SWORD_SLOT = 0;
@@ -48,12 +50,24 @@ public final class KitManager {
      */
     private static NamespacedKey teamSelectorKey;
 
+    /**
+     * Clé persistante pour identifier l'item "quitter la partie".
+     */
+    private static NamespacedKey leaveKey;
+
+    /**
+     * Clé persistante pour identifier l'item "quitter le mode spectateur".
+     */
+    private static NamespacedKey spectatorLeaveKey;
+
     private KitManager() {
     }
 
     public static void init(org.bukkit.plugin.Plugin plugin) {
         forceStartKey = new NamespacedKey(plugin, "force_start_item");
         teamSelectorKey = new NamespacedKey(plugin, "team_selector_item");
+        leaveKey = new NamespacedKey(plugin, "leave_item");
+        spectatorLeaveKey = new NamespacedKey(plugin, "spectator_leave_item");
     }
 
     /**
@@ -84,7 +98,7 @@ public final class KitManager {
             String teamName = team.getColoredName();
             meta.setDisplayName(teamName + ChatColor.WHITE + " - Sélection d'équipe");
             meta.setLore(java.util.List.of(
-                ChatColor.GRAY + "Clique pour rejoindre cette équipe",
+                ChatColor.GRAY + "Clique pour choisir ton équipe",
                 ChatColor.GRAY + "Équipe actuelle: " + teamName
             ));
             meta.getPersistentDataContainer().set(teamSelectorKey, PersistentDataType.STRING, team.name());
@@ -107,7 +121,7 @@ public final class KitManager {
         String teamName = team.getColoredName();
         meta.setDisplayName(teamName + ChatColor.WHITE + " - Sélection d'équipe");
         meta.setLore(java.util.List.of(
-            ChatColor.GRAY + "Clique pour rejoindre cette équipe",
+            ChatColor.GRAY + "Clique pour choisir ton équipe",
             ChatColor.GRAY + "Équipe actuelle: " + teamName
         ));
         meta.getPersistentDataContainer().set(teamSelectorKey, PersistentDataType.STRING, team.name());
@@ -155,6 +169,60 @@ public final class KitManager {
         } catch (IllegalArgumentException e) {
             return null;
         }
+    }
+
+    /**
+     * Crée l'item "quitter la partie" (barrier block) placé en slot 8 du lobby.
+     * Non droppable et non déplaçable.
+     */
+    public static ItemStack createLeaveItem() {
+        ItemStack item = new ItemStack(Material.BARRIER);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(ChatColor.RED + "" + ChatColor.BOLD + "Quitter la partie");
+            meta.setLore(java.util.List.of(ChatColor.GRAY + "Clique pour faire /hb leave"));
+            meta.getPersistentDataContainer().set(leaveKey, PersistentDataType.BYTE, (byte) 1);
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
+    /**
+     * Détermine si l'ItemStack donné est l'item "quitter la partie".
+     */
+    public static boolean isLeaveItem(ItemStack item) {
+        if (item == null || item.getType() != Material.BARRIER || !item.hasItemMeta()) {
+            return false;
+        }
+        ItemMeta meta = item.getItemMeta();
+        return meta != null && meta.getPersistentDataContainer().has(leaveKey, PersistentDataType.BYTE);
+    }
+
+    /**
+     * Crée l'item "quitter le mode spectateur" (boussole) donné aux spectateurs.
+     * Non droppable et non déplaçable (voir PlayerItemListener).
+     */
+    public static ItemStack createSpectatorLeaveItem() {
+        ItemStack item = new ItemStack(Material.COMPASS);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(ChatColor.YELLOW + "" + ChatColor.BOLD + "Quitter le mode spectateur");
+            meta.setLore(java.util.List.of(ChatColor.GRAY + "Clique pour faire /hb unspectate"));
+            meta.getPersistentDataContainer().set(spectatorLeaveKey, PersistentDataType.BYTE, (byte) 1);
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
+    /**
+     * Détermine si l'ItemStack donné est l'item "quitter le mode spectateur".
+     */
+    public static boolean isSpectatorLeaveItem(ItemStack item) {
+        if (item == null || item.getType() != Material.COMPASS || !item.hasItemMeta()) {
+            return false;
+        }
+        ItemMeta meta = item.getItemMeta();
+        return meta != null && meta.getPersistentDataContainer().has(spectatorLeaveKey, PersistentDataType.BYTE);
     }
 
     /**

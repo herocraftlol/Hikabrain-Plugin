@@ -4,11 +4,11 @@ import com.hikabrain.plugin.HikaBrainPlugin;
 import com.hikabrain.plugin.game.GameManager;
 import com.hikabrain.plugin.game.GameState;
 import com.hikabrain.plugin.game.KitManager;
-import com.hikabrain.plugin.game.Team;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
 
@@ -17,6 +17,10 @@ import org.bukkit.event.player.PlayerRespawnEvent;
  * lave, vide, noyade...) ne doit pas sortir le joueur de la partie : on le fait
  * respawn directement au spawn de son équipe, comme sur les serveurs type Hypixel.
  * On lui redonne aussi une pomme dorée fraîche à chaque mort.
+ *
+ * Les dégâts de chute sont par ailleurs entièrement désactivés pour tout joueur engagé
+ * sur une arène HikaBrain (en lobby, en partie ou en spectateur) : ce mode ne doit
+ * jamais infliger de dégâts de chute, quelle que soit la hauteur.
  */
 public class PlayerDamageListener implements Listener {
 
@@ -27,7 +31,27 @@ public class PlayerDamageListener implements Listener {
     }
 
     private boolean isActiveGameState(GameState state) {
-        return state == GameState.PLAYING || state == GameState.ROUND_RESET;
+        return state == GameState.PLAYING || state == GameState.ROUND_RESET || state == GameState.STARTING;
+    }
+
+    /**
+     * Annule tous les dégâts de chute pour un joueur engagé (lobby, partie ou spectateur)
+     * sur une arène HikaBrain. On ne veut aucun dégât de chute dans ce mode.
+     */
+    @EventHandler
+    public void onFallDamage(EntityDamageEvent event) {
+        if (event.getCause() != EntityDamageEvent.DamageCause.FALL) {
+            return;
+        }
+        if (!(event.getEntity() instanceof Player player)) {
+            return;
+        }
+
+        boolean inArena = plugin.getArenaManager().findArenaOf(player) != null
+                || plugin.getArenaManager().findSpectatorArenaOf(player) != null;
+        if (inArena) {
+            event.setCancelled(true);
+        }
     }
 
     @EventHandler
@@ -59,8 +83,9 @@ public class PlayerDamageListener implements Listener {
             return;
         }
 
-        Team team = gameManager.getTeam(player);
-        Location spawn = gameManager.getArena().getSpawn(team);
+        // Utilise le spawn fixe attribué au joueur pour toute la partie (voir
+        // GameManager#getAssignedSpawn), pour qu'il respawn toujours au même endroit.
+        Location spawn = gameManager.getAssignedSpawn(player);
         if (spawn != null) {
             event.setRespawnLocation(spawn);
         }

@@ -34,7 +34,7 @@ public class ArenaProtectionListener implements Listener {
         // pour rester correct même dans des cas limites (spectateur, tiers proche de la zone).
         for (GameManager gameManager : plugin.getArenaManager().getAll()) {
             GameState state = gameManager.getState();
-            if (state != GameState.PLAYING && state != GameState.ROUND_RESET) {
+            if (state != GameState.PLAYING && state != GameState.ROUND_RESET && state != GameState.STARTING) {
                 continue;
             }
 
