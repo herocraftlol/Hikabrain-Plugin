@@ -11,7 +11,8 @@ import org.bukkit.scheduler.BukkitTask;
 import java.util.*;
 
 /**
- * Gère le scoreboard affiché aux joueurs pendant la partie HikaBrain.
+ * Gère le scoreboard affiché aux joueurs pendant la partie HikaBrain, ainsi qu'aux
+ * spectateurs qui observent une partie en cours.
  * Utilise un scoreboard SHARED par arène (pas par joueur) pour le TAB.
  * Affiche : score des équipes, temps écoulé, nom du serveur et du jeu.
  */
@@ -19,8 +20,12 @@ public class ScoreboardManager {
 
     private final HikaBrainPlugin plugin;
     
-    // Scoreboard PAR JOUEUR (pour afficher leur K/D personnel)
+    // Scoreboard PAR JOUEUR (pour afficher leur K/D personnel, ou le statut spectateur)
     private final Map<UUID, Scoreboard> playerScoreboards = new HashMap<>();
+
+    // Mémorise, pour chaque joueur affiché, s'il s'agit d'un spectateur (sidebar sans K/D
+    // personnel) ou d'un joueur en partie (sidebar avec K/D personnel).
+    private final Map<UUID, Boolean> spectatorFlags = new HashMap<>();
     
     private BukkitTask updateTask;
 
@@ -63,37 +68,52 @@ public class ScoreboardManager {
             }
         }
         playerScoreboards.clear();
+        spectatorFlags.clear();
     }
 
     /**
-     * Crée et affiche le scoreboard pour un joueur
+     * Crée et affiche le scoreboard pour un joueur en partie (avec son K/D personnel).
      */
     public void showScoreboard(Player player, GameManager gm) {
-        Scoreboard board = createPlayerScoreboard(player, gm);
+        Scoreboard board = createPlayerScoreboard(player, gm, false);
         playerScoreboards.put(player.getUniqueId(), board);
+        spectatorFlags.put(player.getUniqueId(), false);
         player.setScoreboard(board);
     }
 
     /**
-     * Supprime le scoreboard d'un joueur
+     * Crée et affiche le scoreboard pour un spectateur : mêmes lignes de score que les
+     * joueurs qu'il observe (score des deux équipes, effectifs), sans K/D personnel
+     * puisqu'il ne joue pas.
+     */
+    public void showSpectatorScoreboard(Player player, GameManager gm) {
+        Scoreboard board = createPlayerScoreboard(player, gm, true);
+        playerScoreboards.put(player.getUniqueId(), board);
+        spectatorFlags.put(player.getUniqueId(), true);
+        player.setScoreboard(board);
+    }
+
+    /**
+     * Supprime le scoreboard d'un joueur (qu'il soit joueur ou spectateur)
      */
     public void removeScoreboard(Player player) {
         playerScoreboards.remove(player.getUniqueId());
+        spectatorFlags.remove(player.getUniqueId());
         player.setScoreboard(Bukkit.getScoreboardManager().getMainScoreboard());
     }
 
     /**
-     * Crée un scoreboard pour un joueur spécifique
+     * Crée un scoreboard pour un joueur ou un spectateur spécifique
      */
-    private Scoreboard createPlayerScoreboard(Player player, GameManager gm) {
+    private Scoreboard createPlayerScoreboard(Player player, GameManager gm, boolean isSpectator) {
         Scoreboard board = Bukkit.getScoreboardManager().getNewScoreboard();
         
         // Créer l'objectif pour le sidebar
         Objective objective = board.registerNewObjective("hikabrain", Criteria.DUMMY, parseColor(title));
         objective.setDisplaySlot(DisplaySlot.SIDEBAR);
         
-        // Ajouter les lignes du sidebar avec le K/D du joueur
-        addPlayerSidebarLines(board, objective, player, gm);
+        // Ajouter les lignes du sidebar (score des équipes + K/D du joueur, ou statut spectateur)
+        addPlayerSidebarLines(board, objective, player, gm, isSpectator);
         
         return board;
     }
@@ -124,11 +144,13 @@ public class ScoreboardManager {
     }
 
     /**
-     * Ajoute les lignes du sidebar pour un joueur spécifique.
-     * Affiche : le score des deux équipes, le nombre de joueurs par équipe,
-     * et le K/D personnel du joueur.
+     * Ajoute les lignes du sidebar.
+     * Affiche toujours : le score des deux équipes et le nombre de joueurs par équipe.
+     * Pour un joueur en partie, ajoute en plus son K/D personnel.
+     * Pour un spectateur, remplace cette ligne par un simple rappel qu'il observe la partie
+     * (il voit exactement le même score que les joueurs qu'il regarde).
      */
-    private void addPlayerSidebarLines(Scoreboard board, Objective objective, Player player, GameManager gm) {
+    private void addPlayerSidebarLines(Scoreboard board, Objective objective, Player player, GameManager gm, boolean isSpectator) {
         com.hikabrain.plugin.game.Team RED = com.hikabrain.plugin.game.Team.RED;
         com.hikabrain.plugin.game.Team BLUE = com.hikabrain.plugin.game.Team.BLUE;
 
@@ -137,20 +159,26 @@ public class ScoreboardManager {
         int redPlayers = gm.getPlayerCountForTeam(RED);
         int bluePlayers = gm.getPlayerCountForTeam(BLUE);
 
-        // K/D personnel du joueur (kills / deaths, ou kills si aucune mort -> ratio standard)
-        int kills = gm.getPlayerKills(player.getUniqueId());
-        int deaths = gm.getPlayerDeaths(player.getUniqueId());
-        double kd = deaths > 0 ? (double) kills / deaths : kills;
-        String kdStr = String.format("%.1f", kd);
+        String lastLine;
+        if (isSpectator) {
+            lastLine = "&e\uD83D\uDC41 Mode spectateur";
+        } else {
+            // K/D personnel du joueur (kills / deaths, ou kills si aucune mort -> ratio standard)
+            int kills = gm.getPlayerKills(player.getUniqueId());
+            int deaths = gm.getPlayerDeaths(player.getUniqueId());
+            double kd = deaths > 0 ? (double) kills / deaths : kills;
+            String kdStr = String.format("%.1f", kd);
+            lastLine = "&fTon K/D: &a" + kills + "&7/&c" + deaths + " &8(&a" + kdStr + "&8)";
+        }
 
-        // Lignes du sidebar : scores des deux équipes + effectifs + K/D du joueur
+        // Lignes du sidebar : scores des deux équipes + effectifs + dernière ligne (K/D ou spectateur)
         String[] lines = {
             "&6&lHikaBrain",
             "&7" + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500,
             "&c\u2764 Rouge: &c" + redScore + "&7/&f5 &7(&c" + redPlayers + " joueur" + (redPlayers == 1 ? "" : "s") + "&7)",
             "&9\u2764 Bleu: &9" + blueScore + "&7/&f5 &7(&9" + bluePlayers + " joueur" + (bluePlayers == 1 ? "" : "s") + "&7)",
             "&7" + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500 + (char) 0x2500,
-            "&fTon K/D: &a" + kills + "&7/&c" + deaths + " &8(&a" + kdStr + "&8)"
+            lastLine
         };
 
         // Une entrée invisible distincte par ligne : le prefix de l'équipe scoreboard porte
@@ -176,15 +204,26 @@ public class ScoreboardManager {
     }
 
     /**
-     * Met à jour tous les scoreboards des joueurs
+     * Met à jour tous les scoreboards (joueurs en partie ET spectateurs).
      */
     private void updateAllPlayerScoreboards() {
-        // Supprimer les joueurs qui ne jouent plus
+        // Supprimer les entrées qui ne correspondent plus à un joueur en partie ni à un spectateur
         playerScoreboards.keySet().removeIf(uuid -> {
             Player player = Bukkit.getPlayer(uuid);
-            if (player == null) return true;
+            if (player == null) {
+                spectatorFlags.remove(uuid);
+                return true;
+            }
             GameManager gm = plugin.getArenaManager().findArenaOf(player);
-            return gm == null || !gm.isPlaying(player);
+            if (gm != null && gm.isPlaying(player)) {
+                return false;
+            }
+            GameManager specGm = plugin.getArenaManager().findSpectatorArenaOf(player);
+            if (specGm != null && specGm.isSpectating(player)) {
+                return false;
+            }
+            spectatorFlags.remove(uuid);
+            return true;
         });
         
         // Mettre à jour chaque scoreboard
@@ -193,18 +232,23 @@ public class ScoreboardManager {
             if (player == null) continue;
             
             GameManager gm = plugin.getArenaManager().findArenaOf(player);
-            if (gm == null || !gm.isPlaying(player)) continue;
+            boolean isSpectator = false;
+            if (gm == null || !gm.isPlaying(player)) {
+                gm = plugin.getArenaManager().findSpectatorArenaOf(player);
+                isSpectator = true;
+            }
+            if (gm == null) continue;
             
             Scoreboard board = playerScoreboards.get(uuid);
-            updatePlayerSidebar(board, player, gm);
+            updatePlayerSidebar(board, player, gm, isSpectator);
             player.setScoreboard(board);
         }
     }
 
     /**
-     * Met à jour le sidebar pour un joueur
+     * Met à jour le sidebar pour un joueur ou un spectateur
      */
-    private void updatePlayerSidebar(Scoreboard board, Player player, GameManager gm) {
+    private void updatePlayerSidebar(Scoreboard board, Player player, GameManager gm, boolean isSpectator) {
         // Récupérer ou créer l'objectif
         Objective objective = board.getObjective("hikabrain");
         if (objective == null) {
@@ -224,7 +268,7 @@ public class ScoreboardManager {
         }
         
         // Recréer les lignes
-        addPlayerSidebarLines(board, objective, player, gm);
+        addPlayerSidebarLines(board, objective, player, gm, isSpectator);
     }
 
     public void onGameStart(GameManager gm) {
