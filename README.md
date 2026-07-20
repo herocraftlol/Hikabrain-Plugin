@@ -1,6 +1,6 @@
 # HikaBrain Plugin
 
-Plugin Minecraft HikaBrain - Système de capture de zone par équipes avec leaderboards par catégorie et items de jeu pour Paper 1.21.1.
+Plugin Minecraft HikaBrain - Système de capture de zone par équipes avec leaderboards par catégorie, système d'arènes, chat de mort et items de jeu pour Paper 1.21.1.
 
 ## Fonctionnalités
 
@@ -10,6 +10,9 @@ Plugin Minecraft HikaBrain - Système de capture de zone par équipes avec leade
 - **Système de lobby** - Compte à rebours configurable avec freeze des joueurs
 - **Classements par catégorie** - Leaderboards K/D, Victoires, Kills totaux avec hologrammes 3D
 - **Items de jeu** - Bouton forcer le démarrage et bouton quitter la partie
+- **Système d'arènes** - Création et gestion de multiples arènes de jeu
+- **Chat de mort** - Messages de mort personnalisables avec statistiques
+- **Chat en jeu** - Communication d'équipe et messages de mort visibles
 
 ### 📊 Statistiques
 - Statistiques K/D par équipe
