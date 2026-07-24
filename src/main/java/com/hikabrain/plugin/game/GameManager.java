@@ -152,6 +152,11 @@ public class GameManager {
      */
     public void loadArenaConfig() {
         arena.loadFromConfig(arenaConfig);
+        // Ré-évalue l'état de l'arène maintenant que sa configuration est chargée :
+        // sans ça, "state" restait bloqué sur sa valeur initiale NOT_CONFIGURED après
+        // un redémarrage, ce qui faisait afficher la vitre grise dans le GUI au lieu
+        // de la vitre verte, même pour une arène entièrement configurée.
+        state = arena.isFullyConfigured() ? GameState.WAITING : GameState.NOT_CONFIGURED;
     }
 
     public GameState getState() {

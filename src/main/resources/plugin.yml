@@ -1,9 +1,9 @@
 name: HikaBrain
-version: 1.0.11
+version: 1.0.12
 main: com.hikabrain.plugin.HikaBrainPlugin
 api-version: 1.21
 author: Claude
-description: Plugin Minecraft HikaBrain - Système de capture de zone par équipes avec leaderboards, tournois et chat d'arène pour Paper 1.21.1
+description: Plugin de minijeu Hikabrain (capture de zone par équipes) inspiré de l'automatisation type ScreamingBedwars
 
 commands:
   hb:
