@@ -2,6 +2,7 @@ package com.hikabrain.plugin.gui;
 
 import com.hikabrain.plugin.HikaBrainPlugin;
 import com.hikabrain.plugin.game.GameManager;
+import com.hikabrain.plugin.game.GameState;
 import com.hikabrain.plugin.util.MessageUtil;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -10,7 +11,8 @@ import org.bukkit.event.inventory.InventoryClickEvent;
 
 /**
  * Écoute les clics dans le GUI d'arènes et effectue les actions correspondantes :
- * - Clic sur une arène → /hb join <nom>
+ * - Clic sur une arène disponible → /hb join <nom>
+ * - Clic sur une arène en cours de partie → /hb spectate <nom>
  * - Clic sur le bouton aléatoire → /hb joinrandom
  */
 public class ArenaGUIListener implements Listener {
@@ -60,6 +62,15 @@ public class ArenaGUIListener implements Listener {
         }
 
         player.closeInventory();
+
+        // Si une partie est en cours sur cette arène, un clic propose de la regarder
+        // en spectateur plutôt que de la rejoindre (indisponible pour jouer).
+        if (gm.getState() == GameState.PLAYING || gm.getState() == GameState.ROUND_RESET
+                || gm.getState() == GameState.STARTING) {
+            trySpectate(player, gm);
+            return;
+        }
+
         tryJoin(player, gm);
     }
 
@@ -68,8 +79,6 @@ public class ArenaGUIListener implements Listener {
      * en déléguant à la logique existante de GameManager.
      */
     private void tryJoin(Player player, GameManager gm) {
-        int maxPlayers = plugin.getConfig().getInt("max-players", 16);
-
         if (!gm.getArena().isFullyConfigured()) {
             MessageUtil.send(player, "&cCette arène n'est pas encore configurée.");
             return;
@@ -86,7 +95,35 @@ public class ArenaGUIListener implements Listener {
             return;
         }
 
+        GameManager currentSpectate = plugin.getArenaManager().findSpectatorArenaOf(player);
+        if (currentSpectate != null) {
+            MessageUtil.send(player, "&cTu es en mode spectateur (&7" + currentSpectate.getName() + "&c). Fais &7/hb unspectate &cd'abord.");
+            return;
+        }
+
         // Déléguer au GameManager
         gm.addPlayer(player);
+    }
+
+    /**
+     * Tente de faire passer le joueur en mode spectateur sur l'arène donnée.
+     */
+    private void trySpectate(Player player, GameManager gm) {
+        GameManager current = plugin.getArenaManager().findArenaOf(player);
+        if (current != null) {
+            MessageUtil.send(player, "&cTu es déjà dans une partie (&7" + current.getName() + "&c). Fais &7/hb leave &cd'abord.");
+            return;
+        }
+
+        GameManager currentSpectate = plugin.getArenaManager().findSpectatorArenaOf(player);
+        if (currentSpectate != null) {
+            if (currentSpectate.getName().equals(gm.getName())) {
+                MessageUtil.send(player, "&cTu regardes déjà cette arène en spectateur.");
+                return;
+            }
+            currentSpectate.removeSpectator(player);
+        }
+
+        gm.addSpectator(player);
     }
 }

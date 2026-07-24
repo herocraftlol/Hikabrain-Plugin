@@ -6,7 +6,7 @@
 
     <groupId>com.hikabrain</groupId>
     <artifactId>HikaBrain</artifactId>
-    <version>1.0.5-output</version>
+    <version>1.0.11</version>
     <packaging>jar</packaging>
 
     <properties>

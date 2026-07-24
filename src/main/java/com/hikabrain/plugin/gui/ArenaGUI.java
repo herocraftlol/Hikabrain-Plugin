@@ -57,13 +57,12 @@ public class ArenaGUI {
         Inventory inv = Bukkit.createInventory(null, GUI_SIZE, GUI_TITLE);
 
         Collection<GameManager> allArenas = plugin.getArenaManager().getAll();
-        int maxPlayers = plugin.getConfig().getInt("max-players", 16);
 
         int slot = 0;
         for (GameManager gm : allArenas) {
             if (slot >= RANDOM_ROW_START) break; // Max 45 arènes
 
-            ItemStack item = buildArenaItem(gm, maxPlayers);
+            ItemStack item = buildArenaItem(gm, gm.getMaxPlayers());
             inv.setItem(slot, item);
             slot++;
         }
@@ -75,7 +74,7 @@ public class ArenaGUI {
         }
 
         // Ligne 6 entière : bouton arène aléatoire
-        ItemStack randomBtn = buildRandomButton(allArenas, maxPlayers);
+        ItemStack randomBtn = buildRandomButton(allArenas);
         for (int i = RANDOM_ROW_START; i < GUI_SIZE; i++) {
             inv.setItem(i, randomBtn);
         }
@@ -104,7 +103,7 @@ public class ArenaGUI {
             displayName = ChatColor.GRAY + "" + ChatColor.BOLD + "✖ " + capitalize(name);
             statusLine = ChatColor.GRAY + "Non configurée";
             statusColor = ChatColor.GRAY;
-        } else if (state == GameState.PLAYING || state == GameState.ROUND_RESET) {
+        } else if (state == GameState.PLAYING || state == GameState.ROUND_RESET || state == GameState.STARTING) {
             mat = Material.RED_STAINED_GLASS_PANE;
             displayName = ChatColor.RED + "" + ChatColor.BOLD + "⚔ " + capitalize(name);
             statusLine = ChatColor.RED + "Partie en cours";
@@ -131,17 +130,26 @@ public class ArenaGUI {
         lore.add("");
         lore.add(ChatColor.GRAY + "Joueurs : " + statusColor + current + ChatColor.DARK_GRAY + "/" + ChatColor.GRAY + maxPlayers);
         lore.add(ChatColor.GRAY + "Statut  : " + statusLine);
+        if (state == GameState.PLAYING || state == GameState.ROUND_RESET || state == GameState.STARTING) {
+            lore.add(ChatColor.GRAY + "Spectateurs : " + ChatColor.AQUA + gm.getSpectatorCount());
+        }
         lore.add("");
 
         boolean joinable = gm.getArena().isFullyConfigured()
                 && state != GameState.PLAYING
                 && state != GameState.ROUND_RESET
+                && state != GameState.STARTING
                 && state != GameState.ENDING
                 && state != GameState.NOT_CONFIGURED
                 && current < maxPlayers;
 
+        boolean spectatable = gm.getArena().isFullyConfigured()
+                && (state == GameState.PLAYING || state == GameState.ROUND_RESET || state == GameState.STARTING);
+
         if (joinable) {
             lore.add(ChatColor.YELLOW + "▶ Cliquez pour rejoindre !");
+        } else if (spectatable) {
+            lore.add(ChatColor.AQUA + "\uD83D\uDC41 Cliquez pour regarder en spectateur !");
         } else {
             lore.add(ChatColor.RED + "✖ Indisponible");
         }
@@ -154,14 +162,15 @@ public class ArenaGUI {
     /**
      * Bouton de la dernière ligne : rejoindre une arène aléatoire (priorité aux arènes avec joueurs).
      */
-    private ItemStack buildRandomButton(Collection<GameManager> allArenas, int maxPlayers) {
+    private ItemStack buildRandomButton(Collection<GameManager> allArenas) {
         long joinableCount = allArenas.stream()
                 .filter(gm -> gm.getArena().isFullyConfigured()
                         && gm.getState() != GameState.PLAYING
                         && gm.getState() != GameState.ROUND_RESET
+                        && gm.getState() != GameState.STARTING
                         && gm.getState() != GameState.ENDING
                         && gm.getState() != GameState.NOT_CONFIGURED
-                        && gm.getPlayerCount() < maxPlayers)
+                        && gm.getPlayerCount() < gm.getMaxPlayers())
                 .count();
 
         ItemStack item = new ItemStack(Material.NETHER_STAR);

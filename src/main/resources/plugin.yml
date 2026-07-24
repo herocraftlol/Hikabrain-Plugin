@@ -1,23 +1,30 @@
 name: HikaBrain
-version: 1.0.0
+version: 1.0.11
 main: com.hikabrain.plugin.HikaBrainPlugin
 api-version: 1.21
 author: Claude
-description: Plugin de minijeu Hikabrain (capture de zone par équipes) inspiré de l'automatisation type ScreamingBedwars
+description: Plugin Minecraft HikaBrain - Système de capture de zone par équipes avec leaderboards, tournois et chat d'arène pour Paper 1.21.1
 
 commands:
   hb:
     description: Commande principale du plugin Hikabrain
-    usage: /hb <create|delete|list|arenas|setlobby|setspawn|delspawn|setcapture|setgamezone|start|stop|join|joinrandom|leave|info|stats|holostats|holoremove|leaderboard>
+    usage: /hb <create|delete|list|arenas|setlobby|setspectatorspawn|setspawn|delspawn|setcapture|setgamezone|start|stop|join|joinrandom|leave|spectate|unspectate|info|stats|leaderboard>
   arenas:
     description: Ouvre le GUI de sélection d'arène
     usage: /arenas
     aliases: [arena]
+  tournament:
+    description: Commande du système de tournoi automatisé
+    usage: /tournament <create|join|leave|start|forcestart|cancel|delete|list|info|bracket|matches|spectate|unspectate|top|history|gui|rooms|arena|sethologram|removehologram>
+    aliases: [tournoi]
 
 permissions:
   hikabrain.admin:
-    description: Permission pour administrer le jeu Hikabrain (hologramme, reset, setup arènes…)
+    description: Permission pour administrer le jeu Hikabrain (hologramme, reset, setup arènes…) et le système de tournoi
     default: op
   hikabrain.play:
     description: Permission pour jouer au Hikabrain
+    default: true
+  hikabrain.tournament.join:
+    description: Permission pour s'inscrire à un tournoi
     default: true
