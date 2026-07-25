@@ -1,31 +1,44 @@
-# HikaBrain Plugin
+# 🎮 HikaBrain Plugin
 
-Plugin Minecraft HikaBrain - Système de capture de zone par équipes avec leaderboards par catégorie et items de jeu pour Paper 1.21.1.
+> Un plugin Minecraft complet pour Paper 1.21.1 - Système de capture de zone par équipes avec tournoi automatisé, chat d'arène et leaderboards holographiques.
 
-## Fonctionnalités
+**HikaBrain** est un minije u palpitant où deux équipes (Rouge vs Bleu) s'affrontent pour contrôler une zone centrale. Inspiré par le style Screaming Bedwars, ce plugin offre une expérience compétitive avec des statistiques détaillées, des classements holographiques et un système de tournoi intégré.
 
-### 🎮 Gameplay
-- **Capture de zone par équipes** - Système de combat rouge vs bleu inspiré de Screaming Bedwars
-- **Scoreboard en temps réel** - Affichage des scores, kills, deaths, K/D et victoires par équipe
-- **Système de lobby** - Compte à rebours configurable avec freeze des joueurs
-- **Classements par catégorie** - Leaderboards K/D, Victoires, Kills totaux avec hologrammes 3D
-- **Items de jeu** - Bouton forcer le démarrage et bouton quitter la partie
+---
 
-### 📊 Statistiques
-- Statistiques K/D par équipe
-- Persistance des statistiques dans un fichier YAML
-- **Hologrammes de leaderboard** - Affichage 3D des classements dans le monde
+## ✨ Fonctionnalités Principales
 
-### 🎨 Interface
-- **GUI de sélection d'arène** - Interface graphique pour parcourir et sélectionner les arènes
-- Sélection d'équipe (rouge/bleu) via GUI
-- Inventaire personnalisé par état du jeu
+### 🎯 Gameplay
+- **Système de Capture de Zone** - Combat stratégique pour le contrôle du territoire
+- **Deux Équipes** - Rouge vs Bleu avec spawns distincts
+- **Scoreboard en Temps Réel** - Scores, kills, deaths, K/D et victoires
+- **Compte à Rebours Configurable** - Lobby avec freeze des joueurs
+- **Items de Jeu** - Bouton forcer le démarrage 🔵 et quitter la partie 🔴
+
+### 🏆 Système de Tournoi
+- **Tournois Automatisés** - Créez et gérez des tournois compétitifs
+- **Matchs en Arène** - Duels entre équipes avec bracket visuel
+- **Hologrammes de Tournoi** - Affichage 3D des brackets et classements
+- **Historique des Matchs** - Sauvegarde complète des résultats
+
+### 📊 Statistiques & Classements
+- **Statistiques K/D** - Par équipe et par joueur
+- **Leaderboards par Catégorie** - K/D, Victoires, Kills totaux
+- **Hologrammes 3D** - Classements visibles dans le monde Minecraft
+- **Persistance YAML** - Données sauvegardées automatiquement
+
+### 🎨 Interface Graphique
+- **GUI de Sélection d'Arène** - Interface intuitive pour choisir son arène
+- **Sélection d'Équipe** - Choix Rouge/Bleu via GUI
+- **Inventaire Dynamique** - Items adaptés à chaque état du jeu
 
 ### ⚔️ Système de Kit
-- Kits configurables pour les joueurs
-- Attribution automatique en fonction des paramètres
+- **Kits Configurables** - Équipement personnalisé par équipe
+- **Attribution Automatique** - Distribution selon les paramètres
 
-## Commandes
+---
+
+## 📋 Fonctionnalités Détaillées
 
 | Commande | Description |
 |----------|-------------|
@@ -79,11 +92,50 @@ Le fichier `config.yml` permet de configurer :
 - Apparence complète du scoreboard (titre, lignes, couleurs)
 - Messages personnalisés avec préfixe
 
-## Auteur
+## 🆕 Dernière Mise à Jour (v1.0.13)
 
-- **Author**: Claude
-- **Version**: 1.0.12
+### Nouveautés
+- **Chat d'Arène** - Le chat est désormais limité aux joueurs présents dans la même arène
+- Améliorations du système de scoreboard
+- Corrections de bugs et optimisations
 
-## Licence
+## 📖 Installation
+
+1. Téléchargez le JAR depuis la [dernière release](https://github.com/herocraftlol/Hikabrain-Plugin/releases/latest)
+2. Placez le fichier `HikaBrain.jar` dans le dossier `plugins` de votre serveur Paper 1.21.1
+3. Redémarrez le serveur
+4. Configurez les arènes avec `/hb create <nom>`
+
+## ⚙️ Configuration
+
+Le fichier `config.yml` permet de personnaliser :
+- Nombre de joueurs minimum/maximum par arène
+- Durée des comptes à rebours (lobby et round)
+- Points nécessaires pour gagner
+- Apparence complète du scoreboard (titre, lignes, couleurs)
+- Messages personnalisés avec préfixe
+
+## 🛠️ Compilation
+
+- **Java** : 21
+- **API** : Paper 1.21.1
+- **Build** : Maven
+
+```bash
+# Cloner le dépôt
+git clone https://github.com/herocraftlol/Hikabrain-Plugin.git
+
+# Compiler
+mvn clean package
+
+# Le JAR sera dans target/HikaBrain.jar
+```
+
+## 📝 Auteur
+
+- **Développeur**: herocraftlol
+- **Version**: 1.0.13
+
+## 📄 Licence
 
 MIT License
