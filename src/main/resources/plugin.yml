@@ -1,30 +1,23 @@
-name: HikaBrain
-version: 1.0.13
-main: com.hikabrain.plugin.HikaBrainPlugin
-api-version: 1.21
+name: Spide
+version: '1.0.1'
+main: fr.spide.Spide
+api-version: '1.21'
 author: herocraftlol
-description: Plugin de minijeu Hikabrain - Système de capture de zone par équipes avec tournoi automatisé, chat d'arène et leaderboards holographiques
+description: >
+  Jeu PvP par équipes où les flèches ne blessent pas mais détruisent des blocs.
+  Le but est de faire tomber les joueurs adverses en cassant les blocs de leur base.
 
 commands:
-  hb:
-    description: Commande principale du plugin Hikabrain
-    usage: /hb <create|delete|list|arenas|setlobby|setspectatorspawn|setspawn|delspawn|setcapture|setgamezone|start|stop|join|joinrandom|leave|spectate|unspectate|info|stats|leaderboard>
-  arenas:
-    description: Ouvre le GUI de sélection d'arène
-    usage: /arenas
-    aliases: [arena]
-  tournament:
-    description: Commande du système de tournoi automatisé
-    usage: /tournament <create|join|leave|start|forcestart|cancel|delete|list|info|bracket|matches|spectate|unspectate|top|history|gui|rooms|arena|sethologram|removehologram>
-    aliases: [tournoi]
+  sp:
+    description: Commande principale du plugin Spide
+    usage: /sp <gui|create|teamlist|hub|<map> ...>
+    permission: spide.admin
+    permission-message: "§cVous n'avez pas la permission d'utiliser cette commande."
 
 permissions:
-  hikabrain.admin:
-    description: Permission pour administrer le jeu Hikabrain (hologramme, reset, setup arènes…) et le système de tournoi
+  spide.admin:
+    description: Permet de configurer les maps Spide
     default: op
-  hikabrain.play:
-    description: Permission pour jouer au Hikabrain
-    default: true
-  hikabrain.tournament.join:
-    description: Permission pour s'inscrire à un tournoi
+  spide.play:
+    description: Permet de jouer à Spide
     default: true
