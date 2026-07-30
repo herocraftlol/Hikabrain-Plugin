@@ -790,8 +790,8 @@ public class GameManager {
 
     /**
      * Lance une tâche périodique qui vérifie, pour chaque joueur en partie, qu'il a bien
-     * 64 grès lisse en offhand, et complète si besoin (le joueur peut poser/casser le bloc
-     * normalement, il est juste toujours réapprovisionné à 64).
+     * 64 grès lisse en offhand et dans le slot 4 de la hotbar, et complète si besoin (le
+     * joueur peut poser/casser les blocs normalement, ils sont juste toujours réapprovisionnés à 64).
      */
     private void startOffhandReplenishTask() {
         if (offhandReplenishTask != null) {

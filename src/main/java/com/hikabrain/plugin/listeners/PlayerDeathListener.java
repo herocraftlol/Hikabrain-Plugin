@@ -2,6 +2,7 @@ package com.hikabrain.plugin.listeners;
 
 import com.hikabrain.plugin.HikaBrainPlugin;
 import com.hikabrain.plugin.game.GameManager;
+import com.hikabrain.plugin.game.KitManager;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.ChatColor;
@@ -30,6 +31,10 @@ public class PlayerDeathListener implements Listener {
 
         if (gm == null) return;
         if (!gm.isPlaying(victim)) return;
+
+        // L'épée, la pioche, la pomme dorée et les blocs du kit ne doivent jamais
+        // se retrouver au sol, même en mourant (ils sont regivés au round reset).
+        event.getDrops().removeIf(KitManager::isProtectedKitItem);
 
         restrictDeathMessageToArena(event, gm);
 

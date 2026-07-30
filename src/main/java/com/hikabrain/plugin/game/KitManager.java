@@ -16,7 +16,8 @@ import org.bukkit.persistence.PersistentDataType;
  * - Slot 0 : épée en fer, incassable
  * - Slot 1 : pioche en fer, incassable
  * - Slot 2 : pomme dorée (regivée à chaque mort / point marqué)
- * - Slot 8 : blocs (grès lisse) en offhand
+ * - Slot 3 (4ème case en partant de la gauche) : blocs (grès lisse), en plus de l'offhand
+ * - Offhand : blocs (grès lisse)
  * Pendant le lobby :
  * - Slot 0 : diamant admin (pour forcer le démarrage)
  * - Slot 2 : sel d'équipe (terracotta coloré pour changer d'équipe)
@@ -35,6 +36,7 @@ public final class KitManager {
     private static final int SWORD_SLOT = 0;
     private static final int PICKAXE_SLOT = 1;
     private static final int GAPPLE_SLOT = 2;
+    private static final int BLOCK_HOTBAR_SLOT = 3;
 
     public static final Material OFFHAND_BLOCK_MATERIAL = Material.SMOOTH_SANDSTONE;
     public static final int OFFHAND_BLOCK_AMOUNT = 64;
@@ -226,6 +228,20 @@ public final class KitManager {
     }
 
     /**
+     * Détermine si l'ItemStack donné fait partie des items du kit qui ne doivent
+     * jamais pouvoir être déplacés dans un autre slot, ni droppés, ni perdus au
+     * décès : épée en fer, pioche en fer, pomme dorée, blocs (grès lisse).
+     */
+    public static boolean isProtectedKitItem(ItemStack item) {
+        if (item == null) return false;
+        Material mat = item.getType();
+        return mat == Material.IRON_SWORD
+            || mat == Material.IRON_PICKAXE
+            || mat == Material.GOLDEN_APPLE
+            || mat == OFFHAND_BLOCK_MATERIAL;
+    }
+
+    /**
      * Équipe entièrement un joueur avec le kit de départ complet (armure + outils + pomme + grès).
      * Utilisé au début de partie et à chaque round reset.
      */
@@ -236,6 +252,7 @@ public final class KitManager {
         inv.setItem(SWORD_SLOT, makeUnbreakable(new ItemStack(Material.IRON_SWORD)));
         inv.setItem(PICKAXE_SLOT, makeUnbreakable(new ItemStack(Material.IRON_PICKAXE)));
         inv.setItem(GAPPLE_SLOT, new ItemStack(Material.GOLDEN_APPLE, 1));
+        inv.setItem(BLOCK_HOTBAR_SLOT, new ItemStack(OFFHAND_BLOCK_MATERIAL, OFFHAND_BLOCK_AMOUNT));
 
         inv.setItemInOffHand(new ItemStack(OFFHAND_BLOCK_MATERIAL, OFFHAND_BLOCK_AMOUNT));
 
@@ -251,16 +268,27 @@ public final class KitManager {
     }
 
     /**
-     * Vérifie que le joueur a bien 64 grès lisse en offhand, et complète si besoin.
-     * Le joueur peut poser/casser ce bloc normalement ; on le réapprovisionne juste à 64.
+     * Vérifie que le joueur a bien 64 grès lisse en offhand et dans le slot 4 de la hotbar,
+     * et complète si besoin. Le joueur peut poser/casser ce bloc normalement ; on le
+     * réapprovisionne juste à 64 à chaque passage.
      */
     public static void replenishOffhandBlocks(org.bukkit.entity.Player player) {
-        ItemStack offhand = player.getInventory().getItemInOffHand();
+        PlayerInventory inv = player.getInventory();
+
+        ItemStack offhand = inv.getItemInOffHand();
         if (offhand.getType() != OFFHAND_BLOCK_MATERIAL) {
-            player.getInventory().setItemInOffHand(new ItemStack(OFFHAND_BLOCK_MATERIAL, OFFHAND_BLOCK_AMOUNT));
+            inv.setItemInOffHand(new ItemStack(OFFHAND_BLOCK_MATERIAL, OFFHAND_BLOCK_AMOUNT));
         } else if (offhand.getAmount() < OFFHAND_BLOCK_AMOUNT) {
             offhand.setAmount(OFFHAND_BLOCK_AMOUNT);
-            player.getInventory().setItemInOffHand(offhand);
+            inv.setItemInOffHand(offhand);
+        }
+
+        ItemStack hotbarBlock = inv.getItem(BLOCK_HOTBAR_SLOT);
+        if (hotbarBlock == null || hotbarBlock.getType() != OFFHAND_BLOCK_MATERIAL) {
+            inv.setItem(BLOCK_HOTBAR_SLOT, new ItemStack(OFFHAND_BLOCK_MATERIAL, OFFHAND_BLOCK_AMOUNT));
+        } else if (hotbarBlock.getAmount() < OFFHAND_BLOCK_AMOUNT) {
+            hotbarBlock.setAmount(OFFHAND_BLOCK_AMOUNT);
+            inv.setItem(BLOCK_HOTBAR_SLOT, hotbarBlock);
         }
     }
 
