@@ -92,9 +92,26 @@ Le fichier `config.yml` permet de configurer :
 - Apparence complète du scoreboard (titre, lignes, couleurs)
 - Messages personnalisés avec préfixe
 
-## 🆕 Dernière Mise à Jour (v1.0.16)
+## 🆕 Dernière Mise à Jour (v1.0.17)
 
-### 🌟 Nouveau Système de Points et Niveaux !
+### 🎨 Personnalisation Avancée du GUI des Arènes
+
+Cette mise à jour ajoute un contrôle total sur le placement des arènes dans le menu de sélection `/arenas` :
+
+#### Nouvelle Commande `/hb guislot`
+- **Placez vos arènes où vous le souhaitez** — Utilisez `/hb guislot <emplacement 1-45> <arène>` pour assigner une arène à un emplacement précis du GUI
+- **Réservation d'emplacements** — Les emplacements 46 à 54 (dernière ligne) restent réservés au bouton "arène aléatoire"
+- **Assignation persistente** — Les placements sont sauvegardés automatiquement et persistent au redémarrage du serveur
+- **Flexibilité totale** — Retirez une assignation avec `/hb guislot <emplacement> clear` et l'emplacement sera automatiquement rempli par le système
+
+#### Amélioration Technique : Affichage des Têtes de Joueur
+- Correction du rendu des têtes de joueur pour l'effet cosmétique "Nuage de particules"
+- Utilisation d'ArmorStands pour un affichage fidèle des skins Minecraft
+- Nettoyage automatique des entités en cas d'arrêt brutal de partie
+
+---
+
+### 🌟 Système de Points et Niveaux (v1.0.16)
 
 C'est une grande mise à jour qui ajoute un **système de progression complet** pour récompenser votre investissement dans le jeu :
 
@@ -167,7 +184,7 @@ mvn clean package
 ## 📝 Auteur
 
 - **Développeur**: herocraftlol
-- **Version**: 1.0.16
+- **Version**: 1.0.17
 
 ## 📄 Licence
 

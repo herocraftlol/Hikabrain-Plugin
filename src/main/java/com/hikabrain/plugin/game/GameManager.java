@@ -63,6 +63,14 @@ public class GameManager {
     // Joueurs actuellement gelés (après un point marqué)
     private final Set<UUID> frozenPlayers = new HashSet<>();
 
+    /**
+     * Entités décoratives temporaires (armor stands invisibles portant une tête de joueur
+     * pour l'avantage cosmétique {@link Perk#PARTICLE_HEAD}). Suivies ici pour garantir
+     * qu'elles sont bien supprimées même si la partie s'arrête brutalement en plein effet
+     * (forceStop, tout le monde quitte...), et non seulement quand leur minuteur se termine.
+     */
+    private final Set<org.bukkit.entity.ArmorStand> cosmeticArmorStands = new HashSet<>();
+
     // ================= SPECTATEURS =================
 
     /** Joueurs actuellement en mode spectateur sur cette arène. */
@@ -1391,6 +1399,10 @@ public class GameManager {
         }
         // S'assurer que personne n'est encore gelé
         unfreezeAllPlayers();
+        // Filet de sécurité : si une partie s'arrête pendant un effet cosmétique en cours
+        // (nuage de particules "tête", étincelles de victoire...), on force la suppression
+        // des entités décoratives restantes plutôt que de compter uniquement sur leur minuteur.
+        clearCosmeticArmorStands();
         clearColoredNames(playerTeams.keySet());
         for (UUID uuid : new ArrayList<>(playerTeams.keySet())) {
             Player player = Bukkit.getPlayer(uuid);
@@ -1532,8 +1544,16 @@ public class GameManager {
     }
 
     /**
-     * Fait tourbillonner un petit nuage de particules "tête du joueur" au-dessus de lui
+     * Fait flotter et tourner un petit nuage de mini-têtes du joueur au-dessus de lui
      * pendant quelques secondes. Purement cosmétique.
+     *
+     * Note technique : on utilise volontairement des ArmorStand invisibles portant une
+     * tête de joueur en "casque", plutôt que la particule Particle.ITEM avec un
+     * ItemStack de tête. Cette dernière ne charge pas la texture réelle du skin (le
+     * client affiche une texture par défaut, qui peut ressembler à un bloc de terre) et
+     * ne garantit pas non plus un arrêt propre. Un ArmorStand affiche systématiquement
+     * la vraie tête du joueur, et est un minuteur strict (voir #clearCosmeticArmorStands
+     * pour le filet de sécurité en cas d'arrêt brutal de la partie).
      */
     private void playParticleHeadEffect(Player player) {
         ItemStack skull = new ItemStack(org.bukkit.Material.PLAYER_HEAD);
@@ -1542,26 +1562,65 @@ public class GameManager {
             skull.setItemMeta(meta);
         }
 
+        Location spawnLoc = player.getLocation().add(0, 2.3, 0);
+        int orbCount = 3;
+        List<org.bukkit.entity.ArmorStand> stands = new ArrayList<>(orbCount);
+        for (int i = 0; i < orbCount; i++) {
+            org.bukkit.entity.ArmorStand stand = spawnLoc.getWorld().spawn(spawnLoc, org.bukkit.entity.ArmorStand.class, as -> {
+                as.setVisible(false);
+                as.setGravity(false);
+                as.setSmall(true);
+                as.setMarker(true);
+                as.setInvulnerable(true);
+                as.setBasePlate(false);
+                as.setCustomNameVisible(false);
+                as.setPersistent(false);
+                as.getEquipment().setHelmet(skull.clone());
+            });
+            stands.add(stand);
+            cosmeticArmorStands.add(stand);
+        }
+
         int durationTicks = 60; // 3 secondes
         BukkitTask[] taskHolder = new BukkitTask[1];
         int[] tick = {0};
         taskHolder[0] = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
-            if (tick[0] >= durationTicks || !player.isOnline()) {
+            boolean shouldStop = tick[0] >= durationTicks || !player.isOnline();
+            if (shouldStop) {
+                for (org.bukkit.entity.ArmorStand stand : stands) {
+                    if (stand != null && !stand.isDead()) stand.remove();
+                    cosmeticArmorStands.remove(stand);
+                }
                 if (taskHolder[0] != null) taskHolder[0].cancel();
                 return;
             }
             double angle = tick[0] * 0.35;
             Location center = player.getLocation().add(0, 2.3, 0);
-            for (int i = 0; i < 2; i++) {
-                double a = angle + i * Math.PI;
+            for (int i = 0; i < stands.size(); i++) {
+                org.bukkit.entity.ArmorStand stand = stands.get(i);
+                if (stand == null || stand.isDead()) continue;
+                double a = angle + i * (2 * Math.PI / stands.size());
                 double dx = Math.cos(a) * 0.6;
                 double dz = Math.sin(a) * 0.6;
                 double dy = Math.sin(angle * 2) * 0.15;
-                Location particleLoc = center.clone().add(dx, dy, dz);
-                center.getWorld().spawnParticle(Particle.ITEM, particleLoc, 1, 0, 0, 0, 0, skull);
+                stand.teleport(center.clone().add(dx, dy, dz));
             }
             tick[0]++;
         }, 0L, 2L);
+    }
+
+    /**
+     * Filet de sécurité : force la suppression de toute entité décorative cosmétique
+     * encore en vie (voir {@link #playParticleHeadEffect}), utilisé quand une partie
+     * s'arrête (normalement ou brutalement) avant la fin naturelle d'un effet.
+     */
+    private void clearCosmeticArmorStands() {
+        for (org.bukkit.entity.ArmorStand stand : cosmeticArmorStands) {
+            if (stand != null && !stand.isDead()) {
+                stand.remove();
+            }
+        }
+        cosmeticArmorStands.clear();
     }
 
     /**
