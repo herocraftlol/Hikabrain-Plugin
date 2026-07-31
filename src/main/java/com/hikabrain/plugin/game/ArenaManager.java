@@ -1,6 +1,7 @@
 package com.hikabrain.plugin.game;
 
 import com.hikabrain.plugin.HikaBrainPlugin;
+import org.bukkit.Location;
 import org.bukkit.configuration.file.YamlConfiguration;
 
 import java.io.File;
@@ -95,6 +96,60 @@ public class ArenaManager {
 
     public GameManager get(String name) {
         return arenas.get(normalize(name));
+    }
+
+    /**
+     * Résultat de la copie d'une arène (voir {@link #copy}).
+     */
+    public enum CopyResult {
+        SUCCESS,
+        SOURCE_NOT_FOUND,
+        TARGET_ALREADY_EXISTS,
+        SOURCE_HAS_NO_LOBBY,
+        INVALID_NAME
+    }
+
+    /**
+     * Copie intégralement une arène existante (lobby, spectateur, spawns des deux
+     * équipes, zones de capture, zone de jeu protégée + son snapshot de blocs, min/max
+     * joueurs) vers une nouvelle arène portant un nouveau nom, afin de faciliter le
+     * déploiement rapide de plusieurs arènes déjà configurées.
+     *
+     * Les coordonnées ne sont PAS copiées telles quelles : elles sont toutes translatées
+     * (même décalage pour tous les points) par rapport à {@code newAnchor}, généralement
+     * la position du joueur qui exécute la commande, debout à l'endroit où il a reconstruit
+     * la nouvelle map — un peu comme un "coller" WorldEdit, mais pour la configuration
+     * HikaBrain (spawns, zones de capture, zone de jeu...). Le monde de destination est
+     * celui de {@code newAnchor}, ce qui permet aussi de déployer dans un autre monde.
+     *
+     * Ne copie évidemment pas l'état d'une partie en cours (scores, joueurs...), juste
+     * la configuration statique de la map. La nouvelle arène est immédiatement persistée
+     * sur disque et ajoutée au registre, exactement comme {@link #create(String)}.
+     */
+    public CopyResult copy(String sourceName, String newName, Location newAnchor) {
+        if (newName == null || newName.isBlank()) {
+            return CopyResult.INVALID_NAME;
+        }
+
+        String srcNorm = normalize(sourceName);
+        String dstNorm = normalize(newName);
+
+        GameManager source = arenas.get(srcNorm);
+        if (source == null) {
+            return CopyResult.SOURCE_NOT_FOUND;
+        }
+        if (arenas.containsKey(dstNorm)) {
+            return CopyResult.TARGET_ALREADY_EXISTS;
+        }
+        if (source.getArena().getLobbySpawn() == null) {
+            return CopyResult.SOURCE_HAS_NO_LOBBY;
+        }
+
+        GameManager target = new GameManager(plugin, dstNorm);
+        source.copyConfigurationTo(target, newAnchor);
+        arenas.put(dstNorm, target);
+        saveRegistry();
+        return CopyResult.SUCCESS;
     }
 
     public boolean exists(String name) {

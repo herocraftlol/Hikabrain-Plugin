@@ -42,6 +42,27 @@ restart-delay: 5
 spectator-max-distance: 60
 
 # ===========================================
+#         Configuration Points & Niveaux
+# ===========================================
+levels:
+  # Points gagnés par coup porté à un adversaire (le plus simple à obtenir)
+  points-per-hit: 1
+
+  # Points gagnés par kill
+  points-per-kill: 5
+
+  # Points gagnés par but marqué
+  points-per-goal: 8
+
+  # Points gagnés si l'équipe du joueur gagne la partie (le plus dur à obtenir)
+  points-per-win: 15
+
+  # Base du barème de progression des niveaux : le nombre de points cumulés nécessaires
+  # pour ATTEINDRE le niveau N est "base-points * N * (N+1) / 2" (paliers progressifs :
+  # l'écart entre deux niveaux consécutifs grandit à chaque niveau, donc de plus en plus dur).
+  base-points: 100
+
+# ===========================================
 #         Configuration Scoreboard
 # ===========================================
 scoreboard:

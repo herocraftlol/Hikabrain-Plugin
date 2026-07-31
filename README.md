@@ -92,19 +92,43 @@ Le fichier `config.yml` permet de configurer :
 - Apparence complète du scoreboard (titre, lignes, couleurs)
 - Messages personnalisés avec préfixe
 
-## 🆕 Dernière Mise à Jour (v1.0.15)
+## 🆕 Dernière Mise à Jour (v1.0.16)
 
-### 🔒 Améliorations du Système de Kit
-- **Protection Renforcée des Items** - Les items du kit (épée en fer, pioche, pomme dorée et blocs) sont désormais parfaitement protégés contre :
-  - Le déplacement via clic droit, touche numérique ou échange offhand
-  - Le drop accidentel
-  - La perte au décès (les items sont automatiquement restitués au round suivant)
-- **Double Emplacement pour les Blocs** - Les blocs de construction (grès lisse) sont désormais disponibles dans l'offhand ET dans le slot 4 de la hotbar pour une meilleure expérience de jeu
-- **Gestion du Drag-and-Drop** - Empêche désormais efficacement le glisser-déposer des items du kit vers d'autres emplacements
+### 🌟 Nouveau Système de Points et Niveaux !
 
-### 🐛 Corrections de Bugs
-- Correction d'un problème où les items du kit pouvaient être déplacés ou perdus dans certaines conditions
-- Amélioration de la cohérence de la protection des items à travers tous les types d'interactions
+C'est une grande mise à jour qui ajoute un **système de progression complet** pour récompenser votre investissement dans le jeu :
+
+#### Système de Points
+- **1 point** par coup porté à un adversaire
+- **5 points** par kill
+- **8 points** par but marqué (capture de zone)
+- **15 points** pour une victoire d'équipe
+
+#### Progression par Niveaux
+- Les niveaux sont calculés avec des paliers progressifs (chaque niveau demande plus de points que le précédent)
+- Plus vous jouez, plus vous montez en niveau !
+
+#### Avantages Cosmétiques (100% Équitables)
+Tous les perks sont **purement cosmétiques** — ils ne donnent aucun avantage en jeu pour préserver l'équité :
+
+| Niveau requis | Perk | Description |
+|--------------|------|-------------|
+| 3 | 🌟 Nuage de particules | Un nuage de particules affichant votre tête flotte au-dessus de vous en début de partie |
+| 6 | ✨ Étincelles de victoire | Des étincelles dorées tourbillonnent autour de vous quand votre équipe gagne |
+| 10 | 💎 Étoile de prestige | Une petite étoile colorée apparaît à côté de votre niveau affiché en jeu |
+
+#### Nouvelles Commandes
+- `/hb top` — Affiche le classement des 10 meilleurs joueurs par niveau
+- `/hb points` — Affiche vos points et votre niveau actuel avec progression
+- `/hb perk` — Gérez vos perks équipés (équiper/déséquiper)
+
+### 📊 Améliorations du Scoreboard
+- Scoreboard amélioré avec affichage en temps réel des scores et statistiques
+
+### ⚙️ Configuration
+Le fichier `config.yml` permet désormais de configurer :
+- Les points attribués par action (coup, kill, but, victoire)
+- Le palier de base pour les niveaux
 
 ---
 
@@ -143,7 +167,7 @@ mvn clean package
 ## 📝 Auteur
 
 - **Développeur**: herocraftlol
-- **Version**: 1.0.15
+- **Version**: 1.0.16
 
 ## 📄 Licence
 

@@ -2,6 +2,8 @@ package com.hikabrain.plugin.game;
 
 import com.hikabrain.plugin.HikaBrainPlugin;
 import com.hikabrain.plugin.gui.TeamSelectGUI;
+import com.hikabrain.plugin.levels.LevelManager;
+import com.hikabrain.plugin.levels.Perk;
 import com.hikabrain.plugin.util.MessageUtil;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -9,10 +11,14 @@ import org.bukkit.FireworkEffect;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Color;
+import org.bukkit.Particle;
 import org.bukkit.Sound;
+import org.bukkit.World;
 import org.bukkit.entity.Firework;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.FireworkMeta;
+import org.bukkit.inventory.meta.SkullMeta;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
 
@@ -157,6 +163,95 @@ public class GameManager {
         // un redémarrage, ce qui faisait afficher la vitre grise dans le GUI au lieu
         // de la vitre verte, même pour une arène entièrement configurée.
         state = arena.isFullyConfigured() ? GameState.WAITING : GameState.NOT_CONFIGURED;
+    }
+
+    /**
+     * Copie l'intégralité de la configuration STATIQUE de cette arène (lobby, spectateur,
+     * spawns des deux équipes, zones de capture, zone de jeu protégée + son snapshot de
+     * blocs, min/max joueurs) vers une autre arène — typiquement une arène fraîchement
+     * créée et encore vide — afin de faciliter le déploiement rapide de plusieurs arènes
+     * déjà configurées (voir {@link ArenaManager#copy}).
+     *
+     * IMPORTANT : les coordonnées ne sont pas copiées telles quelles. Elles sont toutes
+     * translatées (spawns, zones de capture, zone de jeu, spectateur...) par le même
+     * décalage, calculé entre le lobby de CETTE arène (l'ancien point de référence) et
+     * {@code newAnchor} (le nouveau point de référence, typiquement la position du joueur
+     * qui exécute la commande, debout à l'endroit où il a reconstruit la nouvelle map).
+     * Le monde de destination est celui de {@code newAnchor}, ce qui permet aussi de
+     * déployer la copie dans un monde différent.
+     *
+     * La zone de jeu (si définie) est ensuite RE-capturée à son nouvel emplacement (et non
+     * simplement copiée telle quelle) : on suppose que la structure a déjà été reconstruite
+     * à l'identique au nouvel endroit avant d'exécuter cette copie.
+     *
+     * Précondition : le lobby de cette arène doit être défini (c'est le point de référence
+     * utilisé pour calculer le décalage) — à vérifier par l'appelant (voir ArenaManager#copy).
+     *
+     * Ne copie PAS l'état d'une partie en cours (scores, joueurs, etc.) : uniquement la
+     * configuration de la map elle-même. L'arène cible est ensuite sauvegardée sur disque
+     * immédiatement, pour qu'elle survive à un redémarrage du serveur.
+     */
+    public void copyConfigurationTo(GameManager target, Location newAnchor) {
+        Location oldAnchor = this.arena.getLobbySpawn();
+        if (oldAnchor == null || newAnchor == null) {
+            return;
+        }
+
+        double dx = newAnchor.getX() - oldAnchor.getX();
+        double dy = newAnchor.getY() - oldAnchor.getY();
+        double dz = newAnchor.getZ() - oldAnchor.getZ();
+        World newWorld = newAnchor.getWorld();
+
+        Arena src = this.arena;
+        Arena dst = target.arena;
+
+        dst.setLobbySpawn(translateLocation(src.getLobbySpawn(), dx, dy, dz, newWorld));
+        dst.setSpectatorSpawn(translateLocation(src.getSpectatorSpawn(), dx, dy, dz, newWorld));
+
+        for (Team team : Team.values()) {
+            List<Location> spawns = src.getSpawns(team);
+            for (int i = 0; i < spawns.size(); i++) {
+                dst.setSpawn(team, i + 1, translateLocation(spawns.get(i), dx, dy, dz, newWorld));
+            }
+        }
+
+        dst.setCaptureZone(Team.RED, translateRegion(src.getCaptureZone(Team.RED), dx, dy, dz, newWorld));
+        dst.setCaptureZone(Team.BLUE, translateRegion(src.getCaptureZone(Team.BLUE), dx, dy, dz, newWorld));
+        dst.setGameZone(translateRegion(src.getGameZone(), dx, dy, dz, newWorld));
+
+        dst.setMaxPlayers(src.getMaxPlayers());
+        dst.setMinPlayers(src.getMinPlayers());
+
+        target.saveArenaConfig();
+
+        // Zone de jeu : on RE-capture les blocs à leur nouvel emplacement (la structure y a
+        // déjà été reconstruite à l'identique), plutôt que de réutiliser l'ancien snapshot.
+        if (dst.getGameZone() != null) {
+            target.captureGameZone();
+        }
+
+        target.state = dst.isFullyConfigured() ? GameState.WAITING : GameState.NOT_CONFIGURED;
+    }
+
+    /**
+     * Translate une localisation du décalage donné, en la replaçant dans le nouveau monde.
+     * Conserve le yaw/pitch d'origine. Renvoie null si la localisation d'origine est null
+     * (permet de translater proprement des points optionnels non définis).
+     */
+    private Location translateLocation(Location loc, double dx, double dy, double dz, World newWorld) {
+        if (loc == null) return null;
+        return new Location(newWorld, loc.getX() + dx, loc.getY() + dy, loc.getZ() + dz, loc.getYaw(), loc.getPitch());
+    }
+
+    /**
+     * Translate les deux coins d'une zone cuboïde du même décalage. Renvoie null si la
+     * zone d'origine est null (zone optionnelle non définie).
+     */
+    private CuboidRegion translateRegion(CuboidRegion region, double dx, double dy, double dz, World newWorld) {
+        if (region == null) return null;
+        Location c1 = translateLocation(region.getCorner1(), dx, dy, dz, newWorld);
+        Location c2 = translateLocation(region.getCorner2(), dx, dy, dz, newWorld);
+        return new CuboidRegion(c1, c2);
     }
 
     public GameState getState() {
@@ -730,6 +825,10 @@ public class GameManager {
 
         broadcast(plugin.getConfig().getString("messages.game-start", ""));
         playSoundToAll(Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.5f, 1.2f);
+
+        // Avantage cosmétique : nuage de particules "tête" au tout début de la partie
+        // (une seule fois par match, pas à chaque round reset).
+        playParticleHeadPerkForAll();
     }
 
     /**
@@ -919,7 +1018,7 @@ public class GameManager {
             Location loc = player.getLocation();
             
             if (arena.isInCaptureZone(enemyTeam, player.getLocation())) {
-                scorePoint(playerTeam);
+                scorePoint(playerTeam, player);
                 break; // Un seul point à la fois
             }
         }
@@ -936,6 +1035,8 @@ public class GameManager {
     // Stats de la partie en cours (par joueur)
     private Map<UUID, Integer> playerKills = new HashMap<>();
     private Map<UUID, Integer> playerDeaths = new HashMap<>();
+    private Map<UUID, Integer> playerHits = new HashMap<>();
+    private Map<UUID, Integer> playerGoals = new HashMap<>();
     
     /**
      * Démarre le scheduler qui vérifie la capture à chaque tick.
@@ -963,8 +1064,9 @@ public class GameManager {
      * Marque un point pour l'équipe donnée, annonce le score, et soit termine la partie,
      * soit lance le compte à rebours du round suivant.
      */
-    private void scorePoint(Team scoringTeam) {
+    private void scorePoint(Team scoringTeam, Player scorer) {
         addScore(scoringTeam, 1);
+        addPlayerGoal(scorer.getUniqueId());
         int winScore = plugin.getConfig().getInt("points-to-win", 5);
         int currentScore = scores.get(scoringTeam);
 
@@ -1106,6 +1208,10 @@ public class GameManager {
             plugin.getStatsManager().addPlayerGameResult(uuid, pName, won, teamSize);
         }
 
+        // Calculer et attribuer les points/niveaux de fin de partie (coups, kills, buts, victoire),
+        // et annoncer dans le chat les meilleurs performeurs de chaque équipe.
+        awardEndGamePoints(winner);
+
         // Rafraîchir les leaderboards si actifs
         plugin.getLeaderboardManager().refreshAll();
 
@@ -1179,8 +1285,91 @@ public class GameManager {
 
         // Lancer des feux d'artifice aux spawns des joueurs de l'équipe gagnante
         launchVictoryFireworks(winner, delay);
+        // Effet cosmétique "étincelles de victoire" pour les joueurs de l'équipe gagnante
+        // ayant débloqué et équipé cet avantage (voir Perk.VICTORY_STARS)
+        playVictoryStarsPerk(winner);
 
         Bukkit.getScheduler().runTaskLater(plugin, this::resetToLobby, delay * 20L);
+    }
+
+    // ================= POINTS / NIVEAUX DE FIN DE PARTIE =================
+
+    /**
+     * Calcule et attribue à chaque joueur ayant participé les points de fin de partie
+     * (coups portés, kills, buts marqués, victoire), fait progresser son niveau via
+     * {@link LevelManager}, et annonce dans le chat de l'arène :
+     *  - le meilleur "frappeur" (le plus de coups) de chaque équipe
+     *  - le meilleur tueur de chaque équipe
+     *  - le meilleur buteur de chaque équipe
+     * Chaque joueur reçoit en plus un message privé détaillant ses points gagnés, et,
+     * le cas échéant, son passage de niveau et les avantages nouvellement débloqués.
+     */
+    private void awardEndGamePoints(Team winner) {
+        LevelManager levelManager = plugin.getLevelManager();
+        if (levelManager == null || playerTeams.isEmpty()) return;
+
+        broadcast("&8&m--------------------------------------------------");
+        broadcast("&6&lRÉCAPITULATIF DE LA PARTIE");
+
+        for (Team team : Team.values()) {
+            announceTopPerformer(team, "coup(s) portés",  this::getPlayerHits,  "&aMeilleur frappeur");
+            announceTopPerformer(team, "kill(s)",         this::getPlayerKills, "&cMeilleur tueur");
+            announceTopPerformer(team, "but(s) marqué(s)", this::getPlayerGoals, "&eMeilleur buteur");
+        }
+        broadcast("&8&m--------------------------------------------------");
+
+        for (Map.Entry<UUID, Team> entry : playerTeams.entrySet()) {
+            UUID uuid = entry.getKey();
+            Player player = Bukkit.getPlayer(uuid);
+            if (player == null) continue;
+
+            int hits  = getPlayerHits(uuid);
+            int kills = getPlayerKills(uuid);
+            int goals = getPlayerGoals(uuid);
+            boolean won = entry.getValue() == winner;
+
+            int gained = levelManager.computeMatchPoints(hits, kills, goals, won);
+            LevelManager.AwardResult result = levelManager.addPoints(uuid, player.getName(), gained);
+
+            MessageUtil.send(player, "&8&m----------&r &e&lPoints de fin de partie &8&m----------");
+            MessageUtil.send(player, "&f▸ Coups: &7" + hits + " &f/ Kills: &7" + kills + " &f/ Buts: &7" + goals
+                    + " &f/ Victoire: " + (won ? "&aoui" : "&cnon"));
+            MessageUtil.send(player, "&f▸ Points gagnés ce match: &6+" + result.pointsGained
+                    + " &7(total: &e" + result.totalPoints + "&7)");
+
+            if (result.leveledUp()) {
+                MessageUtil.send(player, "&a&l▲ NIVEAU SUPÉRIEUR ! &7Niveau &e" + result.oldLevel
+                        + " &7→ &a" + result.newLevel);
+                for (Perk perk : result.newlyUnlockedPerks) {
+                    MessageUtil.send(player, "&b▸ Nouvel avantage débloqué: " + MessageUtil.format(perk.getDisplayName())
+                            + " &7(/hb perk " + perk.getId() + " pour l'équiper)");
+                }
+            }
+            MessageUtil.send(player, "&8&m--------------------------------------------------");
+        }
+    }
+
+    /**
+     * Annonce dans le chat de l'arène le joueur d'une équipe donnée ayant le plus haut
+     * score pour une statistique (coups, kills ou buts). N'affiche rien si personne dans
+     * cette équipe n'a de score strictement positif.
+     */
+    private void announceTopPerformer(Team team, String unitLabel, java.util.function.Function<UUID, Integer> statGetter, String titleLabel) {
+        UUID bestUuid = null;
+        int bestValue = 0;
+        for (Map.Entry<UUID, Team> entry : playerTeams.entrySet()) {
+            if (entry.getValue() != team) continue;
+            int value = statGetter.apply(entry.getKey());
+            if (value > bestValue) {
+                bestValue = value;
+                bestUuid = entry.getKey();
+            }
+        }
+        if (bestUuid == null) return;
+
+        Player player = Bukkit.getPlayer(bestUuid);
+        String name = player != null ? player.getName() : "?";
+        broadcast(titleLabel + " (" + team.getColoredName() + "&7): &f" + name + " &7(" + team.getColor() + bestValue + " " + unitLabel + "&7)");
     }
 
     /**
@@ -1319,6 +1508,104 @@ public class GameManager {
         fw.setFireworkMeta(meta);
     }
 
+    // ================= AVANTAGES COSMÉTIQUES (PERKS) =================
+    // Ces effets sont purement visuels : ils ne donnent strictement aucun avantage en
+    // jeu et ne modifient jamais l'équité d'une partie (voir com.hikabrain.plugin.levels.Perk).
+
+    /**
+     * Déclenche, pour chaque joueur ayant débloqué ET équipé l'avantage
+     * {@link Perk#PARTICLE_HEAD}, un nuage de particules affichant sa propre tête
+     * flottant au-dessus de lui. Appelé une seule fois, au tout début de la partie
+     * (voir {@link #beginPlayPhase()}), jamais à chaque round reset.
+     */
+    private void playParticleHeadPerkForAll() {
+        LevelManager levelManager = plugin.getLevelManager();
+        if (levelManager == null) return;
+
+        for (UUID uuid : playerTeams.keySet()) {
+            Player player = Bukkit.getPlayer(uuid);
+            if (player == null) continue;
+            if (levelManager.getEquippedPerk(uuid) == Perk.PARTICLE_HEAD) {
+                playParticleHeadEffect(player);
+            }
+        }
+    }
+
+    /**
+     * Fait tourbillonner un petit nuage de particules "tête du joueur" au-dessus de lui
+     * pendant quelques secondes. Purement cosmétique.
+     */
+    private void playParticleHeadEffect(Player player) {
+        ItemStack skull = new ItemStack(org.bukkit.Material.PLAYER_HEAD);
+        if (skull.getItemMeta() instanceof SkullMeta meta) {
+            meta.setOwningPlayer(player);
+            skull.setItemMeta(meta);
+        }
+
+        int durationTicks = 60; // 3 secondes
+        BukkitTask[] taskHolder = new BukkitTask[1];
+        int[] tick = {0};
+        taskHolder[0] = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+            if (tick[0] >= durationTicks || !player.isOnline()) {
+                if (taskHolder[0] != null) taskHolder[0].cancel();
+                return;
+            }
+            double angle = tick[0] * 0.35;
+            Location center = player.getLocation().add(0, 2.3, 0);
+            for (int i = 0; i < 2; i++) {
+                double a = angle + i * Math.PI;
+                double dx = Math.cos(a) * 0.6;
+                double dz = Math.sin(a) * 0.6;
+                double dy = Math.sin(angle * 2) * 0.15;
+                Location particleLoc = center.clone().add(dx, dy, dz);
+                center.getWorld().spawnParticle(Particle.ITEM, particleLoc, 1, 0, 0, 0, 0, skull);
+            }
+            tick[0]++;
+        }, 0L, 2L);
+    }
+
+    /**
+     * Déclenche, pour chaque joueur de l'équipe gagnante ayant débloqué ET équipé
+     * l'avantage {@link Perk#VICTORY_STARS}, des étincelles dorées qui tourbillonnent
+     * autour de lui pendant l'écran de victoire.
+     */
+    private void playVictoryStarsPerk(Team winner) {
+        LevelManager levelManager = plugin.getLevelManager();
+        if (levelManager == null) return;
+
+        for (Map.Entry<UUID, Team> entry : playerTeams.entrySet()) {
+            if (entry.getValue() != winner) continue;
+            UUID uuid = entry.getKey();
+            Player player = Bukkit.getPlayer(uuid);
+            if (player == null) continue;
+            if (levelManager.getEquippedPerk(uuid) == Perk.VICTORY_STARS) {
+                playVictoryStarsEffect(player);
+            }
+        }
+    }
+
+    private void playVictoryStarsEffect(Player player) {
+        int durationTicks = 100; // 5 secondes
+        BukkitTask[] taskHolder = new BukkitTask[1];
+        int[] tick = {0};
+        taskHolder[0] = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+            if (tick[0] >= durationTicks || !player.isOnline()) {
+                if (taskHolder[0] != null) taskHolder[0].cancel();
+                return;
+            }
+            double angle = tick[0] * 0.4;
+            Location center = player.getLocation().add(0, 1.1, 0);
+            for (int i = 0; i < 3; i++) {
+                double a = angle + i * (2 * Math.PI / 3);
+                double dx = Math.cos(a) * 0.8;
+                double dz = Math.sin(a) * 0.8;
+                Location particleLoc = center.clone().add(dx, 0, dz);
+                center.getWorld().spawnParticle(Particle.END_ROD, particleLoc, 1, 0, 0, 0, 0.01);
+            }
+            tick[0]++;
+        }, 0L, 2L);
+    }
+
     // ================= UTILITAIRE =================
 
     private void broadcast(String rawMessage) {
@@ -1341,6 +1628,8 @@ public class GameManager {
     
     public int getPlayerKills(UUID uuid) { return playerKills.getOrDefault(uuid, 0); }
     public int getPlayerDeaths(UUID uuid) { return playerDeaths.getOrDefault(uuid, 0); }
+    public int getPlayerHits(UUID uuid) { return playerHits.getOrDefault(uuid, 0); }
+    public int getPlayerGoals(UUID uuid) { return playerGoals.getOrDefault(uuid, 0); }
     
     public void addKill(Team team) {
         if (team == Team.RED) redKills++;
@@ -1359,6 +1648,22 @@ public class GameManager {
     public void addPlayerDeath(UUID uuid) {
         playerDeaths.put(uuid, playerDeaths.getOrDefault(uuid, 0) + 1);
     }
+
+    /**
+     * Comptabilise un coup valide porté par ce joueur à un adversaire (utilisé pour le
+     * calcul des points de fin de partie, voir {@link #awardEndGamePoints}).
+     */
+    public void addPlayerHit(UUID uuid) {
+        playerHits.put(uuid, playerHits.getOrDefault(uuid, 0) + 1);
+    }
+
+    /**
+     * Comptabilise un but marqué par ce joueur (utilisé pour le calcul des points
+     * de fin de partie).
+     */
+    public void addPlayerGoal(UUID uuid) {
+        playerGoals.put(uuid, playerGoals.getOrDefault(uuid, 0) + 1);
+    }
     
     public void resetStats() {
         redKills = 0;
@@ -1367,5 +1672,7 @@ public class GameManager {
         blueDeaths = 0;
         playerKills.clear();
         playerDeaths.clear();
+        playerHits.clear();
+        playerGoals.clear();
     }
 }

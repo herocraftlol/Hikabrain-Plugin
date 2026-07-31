@@ -24,6 +24,7 @@ import java.util.*;
  * Le plugin gère plusieurs arènes HikaBrain nommées et indépendantes ; presque toutes
  * les commandes (autres que join/leave/list) attendent donc un nom d'arène en paramètre :
  *   /hb create <nom>                          - crée une nouvelle arène vide
+ *   /hb copy <source> <nouveau_nom>            - duplique une arène en translatant toutes les positions vers la position du joueur (nouveau lobby)
  *   /hb delete <nom>                          - supprime une arène
  *   /hb list                                  - liste toutes les arènes
  *   /hb setlobby <nom>                        - définit le lobby (à ta position)
@@ -70,6 +71,7 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
 
         switch (sub) {
             case "create" -> handleCreate(sender, args);
+            case "copy" -> handleCopy(sender, args);
             case "delete" -> handleDelete(sender, args);
             case "list" -> handleList(sender);
             case "setlobby" -> handleSetLobby(sender, args);
@@ -91,6 +93,8 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
             case "info" -> handleInfo(sender, args);
             case "stats" -> handleStats(sender, args);
             case "top" -> handleTop(sender, args);
+            case "points" -> handlePoints(sender, args);
+            case "perk" -> handlePerk(sender, args);
             case "resetstats" -> handleResetStats(sender);
             case "leaderboard" -> handleLeaderboard(sender, args);
             // Scoreboard commands
@@ -121,6 +125,50 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
         MessageUtil.send(sender, created
                 ? "&aArène '" + name + "' créée. Configure-la avec /hb setlobby " + name + ", etc."
                 : "&cUne arène '" + name + "' existe déjà.");
+    }
+
+    /**
+     * /hb copy <source> <nouveau_nom> : duplique intégralement une arène existante
+     * (lobby, spawns, zones de capture, zone de jeu + snapshot des blocs, min/max joueurs)
+     * sous un nouveau nom, pour déployer rapidement plusieurs arènes déjà configurées.
+     *
+     * Les coordonnées sont translatées : le joueur doit se tenir à l'endroit qui correspond
+     * au lobby de la nouvelle arène (là où il a reconstruit la map), sa position devient le
+     * nouveau point de référence, et tous les autres points (spawns, captures, zone de jeu,
+     * spectateur) sont décalés d'autant. La zone de jeu est re-capturée à son nouvel endroit.
+     */
+    private void handleCopy(CommandSender sender, String[] args) {
+        if (!sender.hasPermission("hikabrain.admin")) {
+            MessageUtil.send(sender, "&cTu n'as pas la permission.");
+            return;
+        }
+        if (args.length < 3) {
+            MessageUtil.send(sender, "&cUsage: /hb copy <arène source> <nouveau nom>");
+            MessageUtil.send(sender, "&7Tiens-toi à l'endroit où doit se trouver le lobby de la nouvelle arène avant de lancer la commande : "
+                    + "toutes les positions (spawns, zones de capture, zone de jeu...) seront décalées d'autant par rapport à l'arène source.");
+            return;
+        }
+        if (!(sender instanceof Player player)) {
+            MessageUtil.send(sender, "&cCette commande doit être exécutée par un joueur : ta position sert de nouveau point de référence (nouveau lobby).");
+            return;
+        }
+
+        String sourceName = args[1];
+        String newName = args[2];
+
+        ArenaManager.CopyResult result = plugin.getArenaManager().copy(sourceName, newName, player.getLocation());
+        switch (result) {
+            case SUCCESS -> MessageUtil.send(sender, "&aArène '" + sourceName + "' copiée vers '" + newName
+                    + "' ! &7Toutes les positions (spawns, zones de capture, zone de jeu, spectateur) ont été "
+                    + "décalées par rapport à ta position actuelle (nouveau lobby). "
+                    + "Ajuste-les individuellement avec /hb setspawn, setcapture, setgamezone si besoin.");
+            case SOURCE_NOT_FOUND -> MessageUtil.send(sender, "&cAucune arène '" + sourceName + "' trouvée.");
+            case TARGET_ALREADY_EXISTS -> MessageUtil.send(sender, "&cUne arène '" + newName + "' existe déjà.");
+            case SOURCE_HAS_NO_LOBBY -> MessageUtil.send(sender, "&cL'arène '" + sourceName
+                    + "' n'a pas de lobby défini : impossible de calculer le décalage des positions. "
+                    + "Configure d'abord son lobby avec /hb setlobby " + sourceName + ".");
+            case INVALID_NAME -> MessageUtil.send(sender, "&cNom d'arène invalide.");
+        }
     }
 
     private void handleDelete(CommandSender sender, String[] args) {
@@ -827,8 +875,13 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
     }
 
     private void handleTop(CommandSender sender, String[] args) {
-        // /hb top [kd|kills|wins|games]  -- "wins" par défaut
+        // /hb top [kd|kills|wins|games|points]  -- "wins" par défaut
         String criterion = args.length >= 2 ? args[1].toLowerCase(Locale.ROOT) : "wins";
+
+        if (criterion.equals("points")) {
+            handleTopPoints(sender);
+            return;
+        }
 
         Comparator<com.hikabrain.plugin.stats.StatsManager.PlayerStats> comparator;
         String label;
@@ -850,7 +903,7 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
                 label = "Plus de Victoires";
             }
             default -> {
-                MessageUtil.send(sender, "&cCritère inconnu. Utilise : &e/hb top <kd|kills|wins|games>");
+                MessageUtil.send(sender, "&cCritère inconnu. Utilise : &e/hb top <kd|kills|wins|games|points>");
                 return;
             }
         }
@@ -884,6 +937,140 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
         }
 
         MessageUtil.send(sender, "&8&m----------&r");
+    }
+
+    /**
+     * /hb top points : classement des 10 premiers joueurs par points HikaBrain cumulés.
+     */
+    private void handleTopPoints(CommandSender sender) {
+        com.hikabrain.plugin.levels.LevelManager lm = plugin.getLevelManager();
+        List<Map.Entry<UUID, com.hikabrain.plugin.levels.LevelManager.PlayerLevelData>> top = lm.getTopPlayers(10);
+
+        MessageUtil.send(sender, "&8&m----------&r &6&lClassement: Points HikaBrain &8&m----------");
+
+        if (top.isEmpty()) {
+            MessageUtil.send(sender, "&7Aucun joueur n'a encore gagné de points.");
+        } else {
+            int rank = 1;
+            for (Map.Entry<UUID, com.hikabrain.plugin.levels.LevelManager.PlayerLevelData> entry : top) {
+                com.hikabrain.plugin.levels.LevelManager.PlayerLevelData data = entry.getValue();
+                int level = lm.getLevelForPoints(data.points);
+                String rankColor = switch (rank) {
+                    case 1 -> "&6";
+                    case 2 -> "&7";
+                    case 3 -> "&c";
+                    default -> "&f";
+                };
+                MessageUtil.send(sender, rankColor + "&l#" + rank + " &f" + data.name
+                        + " &7- &e" + data.points + " pts &7(niv. &b" + level + "&7)");
+                rank++;
+            }
+        }
+
+        MessageUtil.send(sender, "&8&m----------&r");
+    }
+
+    /**
+     * /hb points [pseudo] : affiche les points, le niveau, la progression vers le niveau
+     * suivant, l'avantage équipé et les avantages débloqués d'un joueur (soi-même par défaut).
+     */
+    private void handlePoints(CommandSender sender, String[] args) {
+        UUID targetUuid;
+        String targetName;
+
+        if (args.length >= 2) {
+            targetName = args[1];
+            org.bukkit.OfflinePlayer offline = org.bukkit.Bukkit.getOfflinePlayer(targetName);
+            if (!offline.hasPlayedBefore() && !offline.isOnline()) {
+                MessageUtil.send(sender, "&cAucune donnée trouvée pour &e" + targetName + "&c.");
+                return;
+            }
+            targetUuid = offline.getUniqueId();
+            targetName = offline.getName() != null ? offline.getName() : targetName;
+        } else {
+            if (!(sender instanceof Player player)) {
+                MessageUtil.send(sender, "&cPrécise un pseudo : &e/hb points <pseudo>");
+                return;
+            }
+            targetUuid = player.getUniqueId();
+            targetName = player.getName();
+        }
+
+        com.hikabrain.plugin.levels.LevelManager lm = plugin.getLevelManager();
+        int points = lm.getPoints(targetUuid);
+        int level = lm.getLevelForPoints(points);
+        int toNext = lm.getPointsToNextLevel(targetUuid);
+        com.hikabrain.plugin.levels.Perk equipped = lm.getEquippedPerk(targetUuid);
+
+        MessageUtil.send(sender, "&8&m----------&r &bPoints de " + targetName + " &8&m----------");
+        MessageUtil.send(sender, "&f▸ Niveau: &a" + level + " &7(&e" + points + " pts&7)");
+        MessageUtil.send(sender, "&f▸ Points pour le niveau suivant: &e" + toNext);
+        MessageUtil.send(sender, "&f▸ Avantage équipé: " + (equipped != null ? MessageUtil.format(equipped.getDisplayName()) : "&7Aucun"));
+
+        List<com.hikabrain.plugin.levels.Perk> unlocked = lm.getUnlockedPerks(targetUuid);
+        if (unlocked.isEmpty()) {
+            MessageUtil.send(sender, "&f▸ Avantages débloqués: &7Aucun pour le moment");
+        } else {
+            StringBuilder sb = new StringBuilder("&f▸ Avantages débloqués: ");
+            for (int i = 0; i < unlocked.size(); i++) {
+                sb.append(MessageUtil.format(unlocked.get(i).getDisplayName()));
+                if (i < unlocked.size() - 1) sb.append("&7, ");
+            }
+            MessageUtil.send(sender, sb.toString());
+        }
+        MessageUtil.send(sender, "&7Utilise &e/hb perk list &7pour voir tous les avantages et &e/hb perk <id> &7pour en équiper un.");
+        MessageUtil.send(sender, "&8&m----------&r");
+    }
+
+    /**
+     * /hb perk               : équivalent de "/hb perk list"
+     * /hb perk list          : liste tous les avantages, débloqués ou non, avec l'ID à utiliser
+     * /hb perk none          : retire l'avantage équipé
+     * /hb perk <id>          : équipe un avantage débloqué
+     */
+    private void handlePerk(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player player)) {
+            MessageUtil.send(sender, "&cCette commande doit être exécutée par un joueur.");
+            return;
+        }
+
+        com.hikabrain.plugin.levels.LevelManager lm = plugin.getLevelManager();
+        UUID uuid = player.getUniqueId();
+
+        if (args.length < 2 || args[1].equalsIgnoreCase("list")) {
+            com.hikabrain.plugin.levels.Perk equipped = lm.getEquippedPerk(uuid);
+            MessageUtil.send(sender, "&8&m----------&r &dAvantages HikaBrain &8&m----------");
+            for (com.hikabrain.plugin.levels.Perk perk : com.hikabrain.plugin.levels.Perk.values()) {
+                boolean unlocked = lm.isPerkUnlocked(uuid, perk);
+                String status = !unlocked ? "&7(verrouillé, niveau " + perk.getUnlockLevel() + " requis)"
+                        : (perk == equipped ? "&a(équipé)" : "&7(/hb perk " + perk.getId() + ")");
+                MessageUtil.send(sender, (unlocked ? "&a" : "&8") + "▸ " + MessageUtil.format(perk.getDisplayName())
+                        + " &7- " + MessageUtil.format(perk.getDescription()));
+                MessageUtil.send(sender, "   " + status);
+            }
+            MessageUtil.send(sender, "&7Ces avantages sont purement cosmétiques : aucun n'affecte le jeu.");
+            MessageUtil.send(sender, "&8&m----------&r");
+            return;
+        }
+
+        if (args[1].equalsIgnoreCase("none")) {
+            lm.equipPerk(uuid, player.getName(), null);
+            MessageUtil.send(sender, "&aAvantage retiré.");
+            return;
+        }
+
+        com.hikabrain.plugin.levels.Perk perk = com.hikabrain.plugin.levels.Perk.fromId(args[1]);
+        if (perk == null) {
+            MessageUtil.send(sender, "&cAvantage inconnu. Utilise &e/hb perk list &cpour voir la liste.");
+            return;
+        }
+
+        boolean equipped = lm.equipPerk(uuid, player.getName(), perk);
+        if (!equipped) {
+            MessageUtil.send(sender, "&cTu n'as pas encore débloqué cet avantage (niveau " + perk.getUnlockLevel() + " requis).");
+        } else {
+            MessageUtil.send(sender, "&aAvantage équipé : " + MessageUtil.format(perk.getDisplayName()));
+        }
     }
 
     private void handleLeaderboard(CommandSender sender, String[] args) {
@@ -989,9 +1176,12 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
         MessageUtil.send(sender, "&e/hb arenas &7- Ouvrir le menu pour rejoindre une arène");
         MessageUtil.send(sender, "&e/hb info [nom] &7- Voir l'état d'une arène");
         MessageUtil.send(sender, "&e/hb stats [pseudo] &7- Voir tes statistiques (ou celles d'un joueur)");
-        MessageUtil.send(sender, "&e/hb top [kd|kills|wins|games] &7- Voir le classement des meilleurs joueurs");
+        MessageUtil.send(sender, "&e/hb top [kd|kills|wins|games|points] &7- Voir le classement des meilleurs joueurs");
+        MessageUtil.send(sender, "&e/hb points [pseudo] &7- Voir tes points, ton niveau et tes avantages débloqués");
+        MessageUtil.send(sender, "&e/hb perk [list|none|<id>] &7- Voir/équiper tes avantages cosmétiques débloqués");
         if (sender.hasPermission("hikabrain.admin")) {
             MessageUtil.send(sender, "&c/hb create <nom> &7- Créer une nouvelle arène");
+            MessageUtil.send(sender, "&c/hb copy <source> <nouveau nom> &7- Dupliquer une arène : tiens-toi au nouveau lobby, toutes les positions sont décalées d'autant");
             MessageUtil.send(sender, "&c/hb delete <nom> &7- Supprimer une arène");
             MessageUtil.send(sender, "&c/hb setlobby <nom> &7- Définir le point de lobby");
             MessageUtil.send(sender, "&c/hb setspectatorspawn <nom> &7- Définir le point de spawn des spectateurs");
@@ -1020,9 +1210,9 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            List<String> options = new ArrayList<>(List.of("join", "joinrandom", "leave", "spectate", "unspectate", "info", "list", "arenas", "stats", "top"));
+            List<String> options = new ArrayList<>(List.of("join", "joinrandom", "leave", "spectate", "unspectate", "info", "list", "arenas", "stats", "top", "points", "perk"));
             if (sender.hasPermission("hikabrain.admin")) {
-                options.addAll(List.of("create", "delete", "setlobby", "setspectatorspawn", "setspawn", "delspawn", "setcapture", "setgamezone", "setmaxplayers", "setminplayers", "start", "stop"));
+                options.addAll(List.of("create", "copy", "delete", "setlobby", "setspectatorspawn", "setspawn", "delspawn", "setcapture", "setgamezone", "setmaxplayers", "setminplayers", "start", "stop"));
                 options.addAll(List.of("setsbserver", "setsbgame", "setsbtitle", "setsblines", "reloadsb", "sbinfo"));
                 options.addAll(List.of("resetstats", "leaderboard"));
             }
@@ -1032,7 +1222,7 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
         String sub = args[0].toLowerCase(Locale.ROOT);
 
         // Le 2e argument est presque toujours un nom d'arène existant (sauf pour "create").
-        if (args.length == 2 && Set.of("join", "info", "delete", "setlobby", "setspectatorspawn", "setspawn", "delspawn", "setcapture", "setgamezone", "setmaxplayers", "setminplayers", "start", "stop", "spectate").contains(sub)) {
+        if (args.length == 2 && Set.of("join", "info", "delete", "copy", "setlobby", "setspectatorspawn", "setspawn", "delspawn", "setcapture", "setgamezone", "setmaxplayers", "setminplayers", "start", "stop", "spectate").contains(sub)) {
             return filterStartingWith(new ArrayList<>(plugin.getArenaManager().getNames()), args[1]);
         }
 
@@ -1053,7 +1243,21 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
         }
 
         if (args.length == 2 && sub.equals("top")) {
-            return filterStartingWith(List.of("kd", "kills", "wins", "games"), args[1]);
+            return filterStartingWith(List.of("kd", "kills", "wins", "games", "points"), args[1]);
+        }
+
+        if (args.length == 2 && sub.equals("points")) {
+            List<String> onlineNames = new ArrayList<>();
+            for (Player p : org.bukkit.Bukkit.getOnlinePlayers()) onlineNames.add(p.getName());
+            return filterStartingWith(onlineNames, args[1]);
+        }
+
+        if (args.length == 2 && sub.equals("perk")) {
+            List<String> options = new ArrayList<>(List.of("list", "none"));
+            for (com.hikabrain.plugin.levels.Perk perk : com.hikabrain.plugin.levels.Perk.values()) {
+                options.add(perk.getId());
+            }
+            return filterStartingWith(options, args[1]);
         }
 
         if (args.length == 2 && sub.equals("leaderboard")) {

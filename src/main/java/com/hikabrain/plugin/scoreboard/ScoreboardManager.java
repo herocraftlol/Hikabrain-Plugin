@@ -201,6 +201,42 @@ public class ScoreboardManager {
             mcTeam.addEntry(identifier);
             objective.getScore(identifier).setScore(0);
         }
+
+        // Affiche le niveau de chaque joueur de l'arène en suffixe de son nom (tab list /
+        // au-dessus de la tête), visible par ce spectateur/joueur puisque c'est SON scoreboard.
+        applyLevelSuffixes(board, gm);
+    }
+
+    /**
+     * Enregistre, dans le scoreboard donné (propre à UN joueur/spectateur), une équipe
+     * "niveau" par participant de l'arène, avec en suffixe son niveau HikaBrain actuel
+     * (ex: " &7[Nv.4]"). N'affecte que le scoreboard du joueur qui regarde : c'est donc
+     * bien affiché "en jeu", dans chaque partie d'arène, sans toucher au nom réel du joueur.
+     */
+    private void applyLevelSuffixes(Scoreboard board, GameManager gm) {
+        com.hikabrain.plugin.levels.LevelManager levelManager = plugin.getLevelManager();
+        if (levelManager == null) return;
+
+        int i = 0;
+        for (UUID participantId : gm.getPlayerTeams().keySet()) {
+            Player participant = Bukkit.getPlayer(participantId);
+            if (participant == null) continue;
+
+            int level = levelManager.getLevel(participantId);
+            boolean prestige = levelManager.getEquippedPerk(participantId) == com.hikabrain.plugin.levels.Perk.PRESTIGE_STAR;
+            String suffix = parseColor(" &7[Nv." + level + "]" + (prestige ? " &d\u2605" : ""));
+
+            String teamName = "lvl_" + i;
+            org.bukkit.scoreboard.Team mcTeam = board.getTeam(teamName);
+            if (mcTeam == null) {
+                mcTeam = board.registerNewTeam(teamName);
+            }
+            mcTeam.setSuffix(suffix.length() > 64 ? suffix.substring(0, 64) : suffix);
+            if (!mcTeam.hasEntry(participant.getName())) {
+                mcTeam.addEntry(participant.getName());
+            }
+            i++;
+        }
     }
 
     /**
@@ -259,7 +295,7 @@ public class ScoreboardManager {
         // Supprimer les anciennes entrées
         Set<org.bukkit.scoreboard.Team> oldTeams = new HashSet<>(board.getTeams());
         for (org.bukkit.scoreboard.Team team : oldTeams) {
-            if (team.getName().startsWith("sb_")) {
+            if (team.getName().startsWith("sb_") || team.getName().startsWith("lvl_")) {
                 for (String entry : team.getEntries()) {
                     board.resetScores(entry);
                 }

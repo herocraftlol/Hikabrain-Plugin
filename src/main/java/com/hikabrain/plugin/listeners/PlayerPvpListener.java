@@ -62,6 +62,13 @@ public class PlayerPvpListener implements Listener {
             Team damagerTeam = gm.getTeam(damager);
             if (victimTeam != null && victimTeam == damagerTeam) {
                 event.setCancelled(true);
+                return;
+            }
+
+            // Coup valide porté à un adversaire pendant la phase de jeu active : comptabilisé
+            // pour le calcul des points de fin de partie (voir GameManager#awardEndGamePoints).
+            if (state == GameState.PLAYING && victimTeam != null && damagerTeam != null) {
+                gm.addPlayerHit(damager.getUniqueId());
             }
         }
     }
