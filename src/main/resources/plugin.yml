@@ -1,5 +1,5 @@
 name: HikaBrain
-version: 1.0.13
+version: 1.0.15
 main: com.hikabrain.plugin.HikaBrainPlugin
 api-version: 1.21
 author: herocraftlol
@@ -8,7 +8,7 @@ description: Plugin de minijeu Hikabrain - Système de capture de zone par équi
 commands:
   hb:
     description: Commande principale du plugin Hikabrain
-    usage: /hb <create|delete|list|arenas|setlobby|setspectatorspawn|setspawn|delspawn|setcapture|setgamezone|start|stop|join|joinrandom|leave|spectate|unspectate|info|stats|leaderboard>
+    usage: /hb <create|delete|list|arenas|setlobby|setspectatorspawn|setspawn|delspawn|setcapture|setgamezone|start|stop|join|joinrandom|leave|spectate|unspectate|info|stats|top|points|perk|leaderboard>
   arenas:
     description: Ouvre le GUI de sélection d'arène
     usage: /arenas

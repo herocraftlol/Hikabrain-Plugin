@@ -8,6 +8,7 @@ import com.hikabrain.plugin.gui.ArenaGUIListener;
 import com.hikabrain.plugin.gui.TeamSelectGUI;
 import com.hikabrain.plugin.gui.TeamSelectGUIListener;
 import com.hikabrain.plugin.hologram.CategoryLeaderboardManager;
+import com.hikabrain.plugin.levels.LevelManager;
 import com.hikabrain.plugin.listeners.ArenaChatListener;
 import com.hikabrain.plugin.listeners.ArenaProtectionListener;
 import com.hikabrain.plugin.listeners.BlockPlaceListener;
@@ -41,6 +42,7 @@ public class HikaBrainPlugin extends JavaPlugin {
     private ArenaManager         arenaManager;
     private ScoreboardManager    scoreboardManager;
     private StatsManager         statsManager;
+    private LevelManager         levelManager;
     private ArenaGUI             arenaGUI;
     private TeamSelectGUI        teamSelectGUI;
     private CategoryLeaderboardManager leaderboardManager;
@@ -60,6 +62,7 @@ public class HikaBrainPlugin extends JavaPlugin {
         this.arenaManager.loadAll();
         this.scoreboardManager = new ScoreboardManager(this);
         this.statsManager      = new StatsManager(this);
+        this.levelManager      = new LevelManager(this);
         this.leaderboardManager = new CategoryLeaderboardManager(this);
         KitManager.init(this);
 
@@ -123,6 +126,7 @@ public class HikaBrainPlugin extends JavaPlugin {
         if (leaderboardManager != null) leaderboardManager.despawnAll();
         if (scoreboardManager != null) scoreboardManager.stop();
         if (statsManager      != null) statsManager.saveStats();
+        if (levelManager      != null) levelManager.save();
         if (arenaManager      != null) { arenaManager.stopAll(); arenaManager.saveAll(); }
         getLogger().info("HikaBrain désactivé.");
     }
@@ -132,6 +136,7 @@ public class HikaBrainPlugin extends JavaPlugin {
     public TeamSelectGUI        getTeamSelectGUI()      { return teamSelectGUI; }
     public ScoreboardManager    getScoreboardManager()  { return scoreboardManager; }
     public StatsManager         getStatsManager()       { return statsManager; }
+    public LevelManager         getLevelManager()       { return levelManager; }
     public CategoryLeaderboardManager getLeaderboardManager() { return leaderboardManager; }
 
     public DuelArenaManager          getDuelArenaManager()          { return duelArenaManager; }
