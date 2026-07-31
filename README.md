@@ -92,9 +92,9 @@ Le fichier `config.yml` permet de configurer :
 - Apparence complète du scoreboard (titre, lignes, couleurs)
 - Messages personnalisés avec préfixe
 
-## 🆕 Dernière Mise à Jour (v1.0.14)
+## 🆕 Dernière Mise à Jour (v1.0.15)
 
-### Améliorations du Système de Kit
+### 🔒 Améliorations du Système de Kit
 - **Protection Renforcée des Items** - Les items du kit (épée en fer, pioche, pomme dorée et blocs) sont désormais parfaitement protégés contre :
   - Le déplacement via clic droit, touche numérique ou échange offhand
   - Le drop accidentel
@@ -102,7 +102,7 @@ Le fichier `config.yml` permet de configurer :
 - **Double Emplacement pour les Blocs** - Les blocs de construction (grès lisse) sont désormais disponibles dans l'offhand ET dans le slot 4 de la hotbar pour une meilleure expérience de jeu
 - **Gestion du Drag-and-Drop** - Empêche désormais efficacement le glisser-déposer des items du kit vers d'autres emplacements
 
-### Corrections de Bugs
+### 🐛 Corrections de Bugs
 - Correction d'un problème où les items du kit pouvaient être déplacés ou perdus dans certaines conditions
 - Amélioration de la cohérence de la protection des items à travers tous les types d'interactions
 
@@ -143,7 +143,7 @@ mvn clean package
 ## 📝 Auteur
 
 - **Développeur**: herocraftlol
-- **Version**: 1.0.14
+- **Version**: 1.0.15
 
 ## 📄 Licence
 
