@@ -6,7 +6,6 @@ import com.hikabrain.plugin.levels.LevelManager;
 import com.hikabrain.plugin.levels.Perk;
 import com.hikabrain.plugin.util.MessageUtil;
 import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
 import org.bukkit.FireworkEffect;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
@@ -62,6 +61,14 @@ public class GameManager {
 
     // Joueurs actuellement gelés (après un point marqué)
     private final Set<UUID> frozenPlayers = new HashSet<>();
+
+    /**
+     * Entités décoratives temporaires (armor stands invisibles portant une tête de joueur
+     * pour l'avantage cosmétique {@link Perk#PARTICLE_HEAD}). Suivies ici pour garantir
+     * qu'elles sont bien supprimées même si la partie s'arrête brutalement en plein effet
+     * (forceStop, tout le monde quitte...), et non seulement quand leur minuteur se termine.
+     */
+    private final Set<org.bukkit.entity.ArmorStand> cosmeticArmorStands = new HashSet<>();
 
     // ================= SPECTATEURS =================
 
@@ -1208,17 +1215,13 @@ public class GameManager {
             plugin.getStatsManager().addPlayerGameResult(uuid, pName, won, teamSize);
         }
 
-        // Calculer et attribuer les points/niveaux de fin de partie (coups, kills, buts, victoire),
-        // et annoncer dans le chat les meilleurs performeurs de chaque équipe.
-        awardEndGamePoints(winner);
-
         // Rafraîchir les leaderboards si actifs
         plugin.getLeaderboardManager().refreshAll();
 
-        // Mettre tous les joueurs en spectateur et afficher l'écran de victoire
+        // Mettre tous les joueurs en spectateur, en listant les membres de chaque équipe
         List<String> redPlayers = new ArrayList<>();
         List<String> bluePlayers = new ArrayList<>();
-        
+
         for (UUID uuid : playerTeams.keySet()) {
             Player player = Bukkit.getPlayer(uuid);
             if (player != null) {
@@ -1228,7 +1231,7 @@ public class GameManager {
                 player.setFlySpeed(0.1f);
                 // Mettre en spectateur
                 player.setGameMode(GameMode.SPECTATOR);
-                
+
                 // Ajouter à la liste de son équipe
                 if (playerTeams.get(uuid) == Team.RED) {
                     redPlayers.add(player.getName());
@@ -1237,49 +1240,23 @@ public class GameManager {
                 }
             }
         }
-        
-        // Afficher l'écran de victoire à tous les joueurs
+
+        // Titre plein écran de victoire pour tout le monde
         for (UUID uuid : playerTeams.keySet()) {
             Player player = Bukkit.getPlayer(uuid);
             if (player != null) {
-                // Titre principal
                 player.sendTitle(
-                    winner.getColoredName() + " \u00a7lVICTOIRE!",
-                    "\u00a7f\u00a7oF\u00e9licitations \u00e0 l'\u00e9quipe gagnante!",
-                    10, 70, 20
+                    MessageUtil.format(winner.getColoredName() + " &l\uD83C\uDFC6 VICTOIRE !"),
+                    MessageUtil.format("&f&oF\u00e9licitations \u00e0 l'\u00e9quipe gagnante !"),
+                    10, 60, 20
                 );
-                
-                // Message de chat avec les membres
-                StringBuilder message = new StringBuilder();
-                message.append("\n");
-                message.append(ChatColor.GOLD).append("\u00a7\u00a7------------------------------\n");
-                message.append(ChatColor.WHITE).append("  \u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\n");
-                message.append(ChatColor.GOLD).append("  \u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7 VICTOIRE DES ").append(winner.getColoredName()).append(" \u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\n");
-                message.append(ChatColor.GOLD).append("  \u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\n");
-                message.append("\n");
-                
-                if (winner == Team.RED) {
-                    message.append(ChatColor.RED).append("  \u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7  \u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\n");
-                    message.append(ChatColor.RED).append("  \u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7  \u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7  ").append(ChatColor.BLUE).append("BLEUS\n");
-                    message.append(ChatColor.RED).append("  \u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7  \u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7  ").append(ChatColor.BLUE).append(bluePlayers.isEmpty() ? "(aucun)" : String.join(", ", bluePlayers)).append("\n");
-                    message.append(ChatColor.RED).append("  \u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7  \u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7  ").append(ChatColor.GRAY).append("\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\n");
-                    message.append(ChatColor.RED).append("  ROUGES\n");
-                    message.append(ChatColor.RED).append("  ").append(redPlayers.isEmpty() ? "(aucun)" : String.join(", ", redPlayers)).append("\n");
-                } else {
-                    message.append(ChatColor.BLUE).append("  \u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7  \u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7  ").append(ChatColor.RED).append("ROUGES\n");
-                    message.append(ChatColor.BLUE).append("  \u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7  \u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7  ").append(ChatColor.RED).append(redPlayers.isEmpty() ? "(aucun)" : String.join(", ", redPlayers)).append("\n");
-                    message.append(ChatColor.BLUE).append("  \u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7  \u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7  ").append(ChatColor.GRAY).append("\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\n");
-                    message.append(ChatColor.BLUE).append("  BLEUS\n");
-                    message.append(ChatColor.BLUE).append("  ").append(bluePlayers.isEmpty() ? "(aucun)" : String.join(", ", bluePlayers)).append("\n");
-                }
-                
-                message.append(ChatColor.GOLD).append("\n  \u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\n");
-                message.append(ChatColor.WHITE).append("  \u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7  \u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7  \u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\n");
-                message.append(ChatColor.GRAY).append("  \u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\u00a7\n");
-                
-                player.sendMessage(message.toString());
             }
         }
+
+        // Récapitulatif de fin de partie : vainqueurs + meilleurs performeurs + points de
+        // chaque joueur, le tout tenant sur un minimum de lignes pour rester visible sans
+        // avoir à remonter le chat.
+        announceEndGameSummary(winner, redPlayers, bluePlayers);
 
         int delay = plugin.getConfig().getInt("restart-delay", 5);
 
@@ -1295,28 +1272,38 @@ public class GameManager {
     // ================= POINTS / NIVEAUX DE FIN DE PARTIE =================
 
     /**
-     * Calcule et attribue à chaque joueur ayant participé les points de fin de partie
-     * (coups portés, kills, buts marqués, victoire), fait progresser son niveau via
-     * {@link LevelManager}, et annonce dans le chat de l'arène :
-     *  - le meilleur "frappeur" (le plus de coups) de chaque équipe
-     *  - le meilleur tueur de chaque équipe
-     *  - le meilleur buteur de chaque équipe
-     * Chaque joueur reçoit en plus un message privé détaillant ses points gagnés, et,
-     * le cas échéant, son passage de niveau et les avantages nouvellement débloqués.
+     * Affiche le récapitulatif de fin de partie le plus concis possible :
+     *  - une bannière avec l'équipe gagnante + la liste des membres de chaque équipe
+     *  - le meilleur frappeur, meilleur tueur et meilleur buteur, TOUTES ÉQUIPES CONFONDUES
+     *  - pour chaque joueur, une seule ligne privée avec les points gagnés ce match et son total
+     * Le tout tient sur 4-5 lignes de chat maximum (visibles sans remonter), pour que
+     * l'information reste lisible immédiatement après la partie.
+     *
+     * En plus du chat, si un joueur monte de niveau, il reçoit un titre plein écran avec un
+     * son de niveau supérieur (et le nom du nouvel avantage débloqué, le cas échéant), plutôt
+     * que des lignes de chat supplémentaires.
      */
-    private void awardEndGamePoints(Team winner) {
+    private void announceEndGameSummary(Team winner, List<String> redPlayers, List<String> bluePlayers) {
         LevelManager levelManager = plugin.getLevelManager();
-        if (levelManager == null || playerTeams.isEmpty()) return;
 
-        broadcast("&8&m--------------------------------------------------");
-        broadcast("&6&lRÉCAPITULATIF DE LA PARTIE");
+        String redList = redPlayers.isEmpty() ? "&8(aucun)" : "&f" + String.join("&7, &f", redPlayers);
+        String blueList = bluePlayers.isEmpty() ? "&8(aucun)" : "&f" + String.join("&7, &f", bluePlayers);
 
-        for (Team team : Team.values()) {
-            announceTopPerformer(team, "coup(s) portés",  this::getPlayerHits,  "&aMeilleur frappeur");
-            announceTopPerformer(team, "kill(s)",         this::getPlayerKills, "&cMeilleur tueur");
-            announceTopPerformer(team, "but(s) marqué(s)", this::getPlayerGoals, "&eMeilleur buteur");
+        broadcast("&8&m------------------------------------------------------");
+        broadcast("&6&l\uD83C\uDFC6 Victoire des " + winner.getColoredName() + "&6&l ! &r&7- &cRouges&7: " + redList + " &8| &9Bleus&7: " + blueList);
+
+        if (levelManager != null && !playerTeams.isEmpty()) {
+            List<String> performerFragments = new ArrayList<>();
+            addTopPerformerFragment(performerFragments, "&e\u2694", "coups",  this::getPlayerHits);
+            addTopPerformerFragment(performerFragments, "&c\u2620", "kills",  this::getPlayerKills);
+            addTopPerformerFragment(performerFragments, "&a\u26bd", "buts",   this::getPlayerGoals);
+            if (!performerFragments.isEmpty()) {
+                broadcast(String.join(" &8| ", performerFragments));
+            }
         }
-        broadcast("&8&m--------------------------------------------------");
+        broadcast("&8&m------------------------------------------------------");
+
+        if (levelManager == null) return;
 
         for (Map.Entry<UUID, Team> entry : playerTeams.entrySet()) {
             UUID uuid = entry.getKey();
@@ -1331,47 +1318,58 @@ public class GameManager {
             int gained = levelManager.computeMatchPoints(hits, kills, goals, won);
             LevelManager.AwardResult result = levelManager.addPoints(uuid, player.getName(), gained);
 
-            MessageUtil.send(player, "&8&m----------&r &e&lPoints de fin de partie &8&m----------");
-            MessageUtil.send(player, "&f▸ Coups: &7" + hits + " &f/ Kills: &7" + kills + " &f/ Buts: &7" + goals
-                    + " &f/ Victoire: " + (won ? "&aoui" : "&cnon"));
-            MessageUtil.send(player, "&f▸ Points gagnés ce match: &6+" + result.pointsGained
-                    + " &7(total: &e" + result.totalPoints + "&7)");
+            MessageUtil.send(player, "&d+" + result.pointsGained + " pts &7(\u2694" + hits + " \u2620" + kills + " \u26bd" + goals
+                    + (won ? " \uD83C\uDFC6" : "") + ") &7\u2192 &b" + result.totalPoints + " pts &7(Niv." + result.newLevel + ")");
 
             if (result.leveledUp()) {
-                MessageUtil.send(player, "&a&l▲ NIVEAU SUPÉRIEUR ! &7Niveau &e" + result.oldLevel
-                        + " &7→ &a" + result.newLevel);
-                for (Perk perk : result.newlyUnlockedPerks) {
-                    MessageUtil.send(player, "&b▸ Nouvel avantage débloqué: " + MessageUtil.format(perk.getDisplayName())
-                            + " &7(/hb perk " + perk.getId() + " pour l'équiper)");
-                }
+                playLevelUpEffect(player, result);
             }
-            MessageUtil.send(player, "&8&m--------------------------------------------------");
         }
     }
 
     /**
-     * Annonce dans le chat de l'arène le joueur d'une équipe donnée ayant le plus haut
-     * score pour une statistique (coups, kills ou buts). N'affiche rien si personne dans
-     * cette équipe n'a de score strictement positif.
+     * Cherche le joueur ayant le meilleur score pour une statistique donnée, TOUTES ÉQUIPES
+     * CONFONDUES, et ajoute un fragment formaté à la liste donnée (rien n'est ajouté si
+     * personne n'a de score strictement positif).
      */
-    private void announceTopPerformer(Team team, String unitLabel, java.util.function.Function<UUID, Integer> statGetter, String titleLabel) {
+    private void addTopPerformerFragment(List<String> fragments, String icon, String unitLabel, java.util.function.Function<UUID, Integer> statGetter) {
         UUID bestUuid = null;
         int bestValue = 0;
-        for (Map.Entry<UUID, Team> entry : playerTeams.entrySet()) {
-            if (entry.getValue() != team) continue;
-            int value = statGetter.apply(entry.getKey());
+        for (UUID uuid : playerTeams.keySet()) {
+            int value = statGetter.apply(uuid);
             if (value > bestValue) {
                 bestValue = value;
-                bestUuid = entry.getKey();
+                bestUuid = uuid;
             }
         }
         if (bestUuid == null) return;
 
         Player player = Bukkit.getPlayer(bestUuid);
         String name = player != null ? player.getName() : "?";
-        broadcast(titleLabel + " (" + team.getColoredName() + "&7): &f" + name + " &7(" + team.getColor() + bestValue + " " + unitLabel + "&7)");
+        fragments.add(icon + " &f" + name + " &7(" + bestValue + " " + unitLabel + ")");
     }
 
+    /**
+     * Titre plein écran + son sympa affichés quand un joueur monte de niveau, mentionnant
+     * au passage le nouvel avantage débloqué le cas échéant (au lieu de lignes de chat en plus).
+     */
+    private void playLevelUpEffect(Player player, LevelManager.AwardResult result) {
+        String title = "&a&l\u25b2 NIVEAU " + result.newLevel + " !";
+        String subtitle;
+        if (!result.newlyUnlockedPerks.isEmpty()) {
+            StringBuilder names = new StringBuilder();
+            for (int i = 0; i < result.newlyUnlockedPerks.size(); i++) {
+                if (i > 0) names.append("&7, ");
+                names.append(result.newlyUnlockedPerks.get(i).getDisplayName());
+            }
+            subtitle = "&d\u2605 Débloqué: " + names;
+        } else {
+            subtitle = "&7Continue comme ça !";
+        }
+
+        player.sendTitle(MessageUtil.format(title), MessageUtil.format(subtitle), 5, 50, 15);
+        player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1f, 1f);
+    }
     /**
      * Arrêt forcé sans vainqueur (ex: tout le monde a quitté).
      */
@@ -1391,6 +1389,10 @@ public class GameManager {
         }
         // S'assurer que personne n'est encore gelé
         unfreezeAllPlayers();
+        // Filet de sécurité : si une partie s'arrête pendant un effet cosmétique en cours
+        // (nuage de particules "tête", étincelles de victoire...), on force la suppression
+        // des entités décoratives restantes plutôt que de compter uniquement sur leur minuteur.
+        clearCosmeticArmorStands();
         clearColoredNames(playerTeams.keySet());
         for (UUID uuid : new ArrayList<>(playerTeams.keySet())) {
             Player player = Bukkit.getPlayer(uuid);
@@ -1532,8 +1534,16 @@ public class GameManager {
     }
 
     /**
-     * Fait tourbillonner un petit nuage de particules "tête du joueur" au-dessus de lui
+     * Fait flotter et tourner un petit nuage de mini-têtes du joueur au-dessus de lui
      * pendant quelques secondes. Purement cosmétique.
+     *
+     * Note technique : on utilise volontairement des ArmorStand invisibles portant une
+     * tête de joueur en "casque", plutôt que la particule Particle.ITEM avec un
+     * ItemStack de tête. Cette dernière ne charge pas la texture réelle du skin (le
+     * client affiche une texture par défaut, qui peut ressembler à un bloc de terre) et
+     * ne garantit pas non plus un arrêt propre. Un ArmorStand affiche systématiquement
+     * la vraie tête du joueur, et est un minuteur strict (voir #clearCosmeticArmorStands
+     * pour le filet de sécurité en cas d'arrêt brutal de la partie).
      */
     private void playParticleHeadEffect(Player player) {
         ItemStack skull = new ItemStack(org.bukkit.Material.PLAYER_HEAD);
@@ -1542,26 +1552,65 @@ public class GameManager {
             skull.setItemMeta(meta);
         }
 
+        Location spawnLoc = player.getLocation().add(0, 2.3, 0);
+        int orbCount = 3;
+        List<org.bukkit.entity.ArmorStand> stands = new ArrayList<>(orbCount);
+        for (int i = 0; i < orbCount; i++) {
+            org.bukkit.entity.ArmorStand stand = spawnLoc.getWorld().spawn(spawnLoc, org.bukkit.entity.ArmorStand.class, as -> {
+                as.setVisible(false);
+                as.setGravity(false);
+                as.setSmall(true);
+                as.setMarker(true);
+                as.setInvulnerable(true);
+                as.setBasePlate(false);
+                as.setCustomNameVisible(false);
+                as.setPersistent(false);
+                as.getEquipment().setHelmet(skull.clone());
+            });
+            stands.add(stand);
+            cosmeticArmorStands.add(stand);
+        }
+
         int durationTicks = 60; // 3 secondes
         BukkitTask[] taskHolder = new BukkitTask[1];
         int[] tick = {0};
         taskHolder[0] = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
-            if (tick[0] >= durationTicks || !player.isOnline()) {
+            boolean shouldStop = tick[0] >= durationTicks || !player.isOnline();
+            if (shouldStop) {
+                for (org.bukkit.entity.ArmorStand stand : stands) {
+                    if (stand != null && !stand.isDead()) stand.remove();
+                    cosmeticArmorStands.remove(stand);
+                }
                 if (taskHolder[0] != null) taskHolder[0].cancel();
                 return;
             }
             double angle = tick[0] * 0.35;
             Location center = player.getLocation().add(0, 2.3, 0);
-            for (int i = 0; i < 2; i++) {
-                double a = angle + i * Math.PI;
+            for (int i = 0; i < stands.size(); i++) {
+                org.bukkit.entity.ArmorStand stand = stands.get(i);
+                if (stand == null || stand.isDead()) continue;
+                double a = angle + i * (2 * Math.PI / stands.size());
                 double dx = Math.cos(a) * 0.6;
                 double dz = Math.sin(a) * 0.6;
                 double dy = Math.sin(angle * 2) * 0.15;
-                Location particleLoc = center.clone().add(dx, dy, dz);
-                center.getWorld().spawnParticle(Particle.ITEM, particleLoc, 1, 0, 0, 0, 0, skull);
+                stand.teleport(center.clone().add(dx, dy, dz));
             }
             tick[0]++;
         }, 0L, 2L);
+    }
+
+    /**
+     * Filet de sécurité : force la suppression de toute entité décorative cosmétique
+     * encore en vie (voir {@link #playParticleHeadEffect}), utilisé quand une partie
+     * s'arrête (normalement ou brutalement) avant la fin naturelle d'un effet.
+     */
+    private void clearCosmeticArmorStands() {
+        for (org.bukkit.entity.ArmorStand stand : cosmeticArmorStands) {
+            if (stand != null && !stand.isDead()) {
+                stand.remove();
+            }
+        }
+        cosmeticArmorStands.clear();
     }
 
     /**

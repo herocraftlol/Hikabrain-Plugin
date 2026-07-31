@@ -92,22 +92,30 @@ Le fichier `config.yml` permet de configurer :
 - Apparence complète du scoreboard (titre, lignes, couleurs)
 - Messages personnalisés avec préfixe
 
-## 🆕 Dernière Mise à Jour (v1.0.17)
+## 🆕 Dernière Mise à Jour (v1.0.18)
 
-### 🎨 Personnalisation Avancée du GUI des Arènes
+### 🔧 Améliorations et Corrections
 
-Cette mise à jour ajoute un contrôle total sur le placement des arènes dans le menu de sélection `/arenas` :
+Cette mise à jour apporte des corrections et améliorations générales au plugin HikaBrain :
 
-#### Nouvelle Commande `/hb guislot`
-- **Placez vos arènes où vous le souhaitez** — Utilisez `/hb guislot <emplacement 1-45> <arène>` pour assigner une arène à un emplacement précis du GUI
-- **Réservation d'emplacements** — Les emplacements 46 à 54 (dernière ligne) restent réservés au bouton "arène aléatoire"
-- **Assignation persistente** — Les placements sont sauvegardés automatiquement et persistent au redémarrage du serveur
-- **Flexibilité totale** — Retirez une assignation avec `/hb guislot <emplacement> clear` et l'emplacement sera automatiquement rempli par le système
+#### Corrections de Bugs
+- Amélioration de la gestion des entités dans les arènes
+- Optimisation du nettoyage des ressources lors de l'arrêt des parties
+- Correction de problèmes de synchronisation dans le système de scoreboard
 
-#### Amélioration Technique : Affichage des Têtes de Joueur
-- Correction du rendu des têtes de joueur pour l'effet cosmétique "Nuage de particules"
-- Utilisation d'ArmorStands pour un affichage fidèle des skins Minecraft
-- Nettoyage automatique des entités en cas d'arrêt brutal de partie
+#### Améliorations de Performance
+- Optimisation de la gestion mémoire
+- Amélioration de la réactivité du GUI de sélection d'arène
+- Optimisation du système de détection de zone de capture
+
+---
+
+### 🆕 Fonctionnalités Versions Précédentes
+
+#### ✨ Personnalisation Avancée du GUI des Arènes (v1.0.17)
+- **Nouvelle commande `/hb guislot`** — Placez vos arènes où vous le souhaitez dans le GUI avec `/hb guislot <emplacement 1-45> <arène>`
+- **Assignation persistente** — Les placements sont sauvegardés automatiquement
+- **Affichage des têtes de joueur** — Correction du rendu pour l'effet cosmétique "Nuage de particules" avec ArmorStands
 
 ---
 
@@ -184,7 +192,7 @@ mvn clean package
 ## 📝 Auteur
 
 - **Développeur**: herocraftlol
-- **Version**: 1.0.17
+- **Version**: 1.0.18
 
 ## 📄 Licence
 

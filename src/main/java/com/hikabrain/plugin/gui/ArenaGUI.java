@@ -6,14 +6,22 @@ import com.hikabrain.plugin.game.GameState;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
+import org.bukkit.configuration.ConfigurationSection;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.HashSet;
 
 /**
  * GUI d'inventaire permettant au joueur de voir toutes les arènes disponibles
@@ -24,6 +32,11 @@ import java.util.List;
  *   - Ligne 6 entière : bouton "Rejoindre une arène aléatoire" (9 slots fusionnés visuellement)
  *
  * Taille du GUI = 54 slots (6 rangées × 9 colonnes).
+ *
+ * Un admin peut fixer l'emplacement précis d'une arène via /hb guislot <emplacement> <arène>
+ * (voir {@link #assignSlot}) : ces assignations sont persistées dans gui-slots.yml. Les
+ * arènes sans emplacement explicite continuent d'être placées automatiquement, dans l'ordre,
+ * sur les emplacements encore libres.
  */
 public class ArenaGUI {
 
@@ -37,9 +50,83 @@ public class ArenaGUI {
     private static final int RANDOM_ROW_START = 45;
 
     private final HikaBrainPlugin plugin;
+    private final File slotsFile;
+
+    /** Emplacement (0-based) -> nom d'arène, assigné explicitement par un admin. */
+    private final Map<Integer, String> slotAssignments = new LinkedHashMap<>();
 
     public ArenaGUI(HikaBrainPlugin plugin) {
         this.plugin = plugin;
+        this.slotsFile = new File(plugin.getDataFolder(), "gui-slots.yml");
+        loadSlotAssignments();
+    }
+
+    /**
+     * Nombre maximum d'emplacements assignables explicitement (1-based) : 1 à 45.
+     * Les emplacements 46 à 54 (dernière ligne) sont réservés au bouton "arène aléatoire".
+     */
+    public static int getMaxAssignableSlot() {
+        return RANDOM_ROW_START;
+    }
+
+    private void loadSlotAssignments() {
+        slotAssignments.clear();
+        if (!slotsFile.exists()) return;
+        YamlConfiguration config = YamlConfiguration.loadConfiguration(slotsFile);
+        ConfigurationSection section = config.getConfigurationSection("slots");
+        if (section == null) return;
+        for (String key : section.getKeys(false)) {
+            try {
+                int slot = Integer.parseInt(key);
+                String arenaName = section.getString(key);
+                if (arenaName != null) {
+                    slotAssignments.put(slot, arenaName);
+                }
+            } catch (NumberFormatException ignored) {
+            }
+        }
+    }
+
+    private void saveSlotAssignments() {
+        YamlConfiguration config = new YamlConfiguration();
+        for (Map.Entry<Integer, String> entry : slotAssignments.entrySet()) {
+            config.set("slots." + entry.getKey(), entry.getValue());
+        }
+        try {
+            config.save(slotsFile);
+        } catch (IOException e) {
+            plugin.getLogger().severe("Impossible de sauvegarder gui-slots.yml : " + e.getMessage());
+        }
+    }
+
+    /**
+     * Assigne une arène à un emplacement précis (0-based en interne) du GUI /arenas.
+     * Retire au préalable toute assignation précédente pointant vers la même arène
+     * (une arène n'occupe qu'un seul emplacement à la fois). Écrase silencieusement
+     * une éventuelle arène déjà assignée à cet emplacement.
+     *
+     * Renvoie false si l'emplacement est en dehors de la zone d'arènes (réservée à la
+     * dernière ligne, le bouton "arène aléatoire").
+     */
+    public boolean assignSlot(int slot, String arenaName) {
+        if (slot < 0 || slot >= RANDOM_ROW_START) return false;
+        slotAssignments.values().removeIf(name -> name.equalsIgnoreCase(arenaName));
+        slotAssignments.put(slot, arenaName);
+        saveSlotAssignments();
+        return true;
+    }
+
+    /**
+     * Retire l'assignation explicite d'un emplacement (l'arène qui s'y trouvait, s'il y
+     * en avait une, retombe alors dans le remplissage automatique). Renvoie false si cet
+     * emplacement n'avait pas d'assignation explicite.
+     */
+    public boolean clearSlot(int slot) {
+        boolean removed = slotAssignments.remove(slot) != null;
+        if (removed) {
+            saveSlotAssignments();
+        }
+        return removed;
     }
 
     /**
@@ -51,29 +138,66 @@ public class ArenaGUI {
     }
 
     /**
+     * Calcule le placement final de chaque arène dans le GUI (emplacement 0-based -> arène) :
+     * d'abord les assignations explicites (/hb guislot), puis les arènes restantes remplies
+     * automatiquement dans l'ordre sur les emplacements encore libres.
+     */
+    private Map<Integer, GameManager> computeSlotPlacement() {
+        Collection<GameManager> allArenas = plugin.getArenaManager().getAll();
+
+        Map<String, GameManager> byName = new LinkedHashMap<>();
+        for (GameManager gm : allArenas) {
+            byName.put(gm.getName(), gm);
+        }
+
+        Map<Integer, GameManager> placement = new LinkedHashMap<>();
+        Set<String> placedArenaNames = new HashSet<>();
+
+        for (Map.Entry<Integer, String> entry : slotAssignments.entrySet()) {
+            int slot = entry.getKey();
+            if (slot < 0 || slot >= RANDOM_ROW_START) continue; // sécurité si le fichier a été édité à la main
+            GameManager gm = byName.get(entry.getValue());
+            if (gm == null) continue; // l'arène assignée a peut-être été supprimée depuis
+            placement.put(slot, gm);
+            placedArenaNames.add(gm.getName());
+        }
+
+        int cursor = 0;
+        for (GameManager gm : allArenas) {
+            if (placedArenaNames.contains(gm.getName())) continue;
+            while (cursor < RANDOM_ROW_START && placement.containsKey(cursor)) {
+                cursor++;
+            }
+            if (cursor >= RANDOM_ROW_START) break; // plus de place
+            placement.put(cursor, gm);
+            cursor++;
+        }
+
+        return placement;
+    }
+
+    /**
      * Construit et retourne l'inventaire rempli.
      */
     public Inventory buildInventory() {
         Inventory inv = Bukkit.createInventory(null, GUI_SIZE, GUI_TITLE);
 
-        Collection<GameManager> allArenas = plugin.getArenaManager().getAll();
-
-        int slot = 0;
-        for (GameManager gm : allArenas) {
-            if (slot >= RANDOM_ROW_START) break; // Max 45 arènes
-
-            ItemStack item = buildArenaItem(gm, gm.getMaxPlayers());
-            inv.setItem(slot, item);
-            slot++;
+        Map<Integer, GameManager> placement = computeSlotPlacement();
+        for (Map.Entry<Integer, GameManager> entry : placement.entrySet()) {
+            GameManager gm = entry.getValue();
+            inv.setItem(entry.getKey(), buildArenaItem(gm, gm.getMaxPlayers()));
         }
 
         // Remplir les slots vides des lignes 1-5 avec du verre noir
         ItemStack filler = buildFiller();
-        for (int i = slot; i < RANDOM_ROW_START; i++) {
-            inv.setItem(i, filler);
+        for (int i = 0; i < RANDOM_ROW_START; i++) {
+            if (!placement.containsKey(i)) {
+                inv.setItem(i, filler);
+            }
         }
 
         // Ligne 6 entière : bouton arène aléatoire
+        Collection<GameManager> allArenas = plugin.getArenaManager().getAll();
         ItemStack randomBtn = buildRandomButton(allArenas);
         for (int i = RANDOM_ROW_START; i < GUI_SIZE; i++) {
             inv.setItem(i, randomBtn);
@@ -225,9 +349,8 @@ public class ArenaGUI {
      */
     public String getArenaNameAt(int slot) {
         if (slot < 0 || slot >= RANDOM_ROW_START) return null;
-        List<GameManager> list = new ArrayList<>(plugin.getArenaManager().getAll());
-        if (slot >= list.size()) return null;
-        return list.get(slot).getName();
+        GameManager gm = computeSlotPlacement().get(slot);
+        return gm != null ? gm.getName() : null;
     }
 
     /**
