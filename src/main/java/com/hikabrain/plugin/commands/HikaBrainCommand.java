@@ -41,6 +41,8 @@ import java.util.*;
  *   /hb start <nom>                           - forcer le démarrage
  *   /hb stop <nom>                            - forcer l'arrêt
  *   /hb info <nom>                            - infos sur une arène
+ *   /hb top [kd|kills|wins|games|points|force] - classement des meilleurs joueurs
+ *   /hb force [pseudo]                        - classement de force "qui bat qui" d'un joueur
  *
  * Pour la sélection des coins de zone, on utilise une astuce simple en deux étapes :
  * pos1 enregistre le premier coin à la position du joueur, pos2 enregistre le second
@@ -96,6 +98,7 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
             case "stats" -> handleStats(sender, args);
             case "top" -> handleTop(sender, args);
             case "points" -> handlePoints(sender, args);
+            case "force" -> handleForce(sender, args);
             case "perk" -> handlePerk(sender, args);
             case "resetstats" -> handleResetStats(sender);
             case "leaderboard" -> handleLeaderboard(sender, args);
@@ -945,11 +948,15 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
     }
 
     private void handleTop(CommandSender sender, String[] args) {
-        // /hb top [kd|kills|wins|games|points]  -- "wins" par défaut
+        // /hb top [kd|kills|wins|games|points|force]  -- "wins" par défaut
         String criterion = args.length >= 2 ? args[1].toLowerCase(Locale.ROOT) : "wins";
 
         if (criterion.equals("points")) {
             handleTopPoints(sender);
+            return;
+        }
+        if (criterion.equals("force")) {
+            handleTopForce(sender);
             return;
         }
 
@@ -973,7 +980,7 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
                 label = "Plus de Victoires";
             }
             default -> {
-                MessageUtil.send(sender, "&cCritère inconnu. Utilise : &e/hb top <kd|kills|wins|games|points>");
+                MessageUtil.send(sender, "&cCritère inconnu. Utilise : &e/hb top <kd|kills|wins|games|points|force>");
                 return;
             }
         }
@@ -1037,6 +1044,90 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
             }
         }
 
+        MessageUtil.send(sender, "&8&m----------&r");
+    }
+
+    /**
+     * /hb top force : classement des 10 joueurs les plus forts, calculé à partir des
+     * confrontations directes entre joueurs (qui a battu qui), pas seulement du nombre
+     * brut de victoires — voir com.hikabrain.plugin.stats.PowerRankingCalculator.
+     */
+    private void handleTopForce(CommandSender sender) {
+        com.hikabrain.plugin.stats.HeadToHeadManager h2h = plugin.getHeadToHeadManager();
+        List<com.hikabrain.plugin.stats.PowerRankingCalculator.PlayerPower> ranking =
+                com.hikabrain.plugin.stats.PowerRankingCalculator.compute(h2h);
+
+        MessageUtil.send(sender, "&8&m----------&r &6&lClassement: Force (qui bat qui) &8&m----------");
+
+        if (ranking.isEmpty()) {
+            MessageUtil.send(sender, "&7Aucune confrontation enregistrée pour le moment (il faut au moins une partie terminée).");
+        } else {
+            int rank = 1;
+            for (com.hikabrain.plugin.stats.PowerRankingCalculator.PlayerPower p : ranking) {
+                if (rank > 10) break;
+                String rankColor = switch (rank) {
+                    case 1 -> "&6";
+                    case 2 -> "&7";
+                    case 3 -> "&c";
+                    default -> "&f";
+                };
+                MessageUtil.send(sender, rankColor + "&l#" + rank + " &f" + p.name
+                        + " &7- &e" + String.format(java.util.Locale.FRANCE, "%.1f", p.score * 1000)
+                        + " &7(&a" + p.totalWins + "V &7/ &c" + p.totalLosses + "D&7, " + p.distinctOpponents + " adversaire(s))");
+                rank++;
+            }
+        }
+
+        MessageUtil.send(sender, "&8&m----------&r");
+    }
+
+    /**
+     * /hb force [pseudo] : détail du classement de force d'un joueur (soi-même par défaut) :
+     * score, rang, bilan, et sa "meilleure victoire" (l'adversaire le mieux classé qu'il a
+     * déjà battu, ce qui illustre concrètement la logique "qui bat qui").
+     */
+    private void handleForce(CommandSender sender, String[] args) {
+        UUID targetUuid;
+        String targetName;
+
+        if (args.length >= 2) {
+            targetName = args[1];
+            org.bukkit.OfflinePlayer offline = org.bukkit.Bukkit.getOfflinePlayer(targetName);
+            if (!offline.hasPlayedBefore() && !offline.isOnline()) {
+                MessageUtil.send(sender, "&cAucune donnée trouvée pour &e" + targetName + "&c.");
+                return;
+            }
+            targetUuid = offline.getUniqueId();
+            targetName = offline.getName() != null ? offline.getName() : targetName;
+        } else {
+            if (!(sender instanceof Player player)) {
+                MessageUtil.send(sender, "&cPrécise un pseudo : &e/hb force <pseudo>");
+                return;
+            }
+            targetUuid = player.getUniqueId();
+            targetName = player.getName();
+        }
+
+        com.hikabrain.plugin.stats.HeadToHeadManager h2h = plugin.getHeadToHeadManager();
+        com.hikabrain.plugin.stats.PowerRankingCalculator.PlayerPowerWithRank result =
+                com.hikabrain.plugin.stats.PowerRankingCalculator.computeForPlayer(h2h, targetUuid);
+
+        if (result == null) {
+            MessageUtil.send(sender, "&c" + targetName + " n'a encore aucune confrontation enregistrée (il faut avoir terminé au moins une partie).");
+            return;
+        }
+
+        com.hikabrain.plugin.stats.PowerRankingCalculator.PlayerPower p = result.power;
+
+        MessageUtil.send(sender, "&8&m----------&r &bForce de " + targetName + " &8&m----------");
+        MessageUtil.send(sender, "&f▸ Rang: &e#" + result.rank + " &7/ " + result.totalRanked);
+        MessageUtil.send(sender, "&f▸ Score de force: &e" + String.format(java.util.Locale.FRANCE, "%.1f", p.score * 1000));
+        MessageUtil.send(sender, "&f▸ Bilan: &a" + p.totalWins + " victoire(s) &7/ &c" + p.totalLosses + " défaite(s)"
+                + " &7face à &f" + p.distinctOpponents + " &7adversaire(s) différent(s)");
+        if (p.bestWinOpponentName != null) {
+            MessageUtil.send(sender, "&f▸ Meilleure victoire: &6" + p.bestWinOpponentName
+                    + " &7(l'adversaire le mieux classé qu'il/elle a déjà battu)");
+        }
         MessageUtil.send(sender, "&8&m----------&r");
     }
 
@@ -1210,7 +1301,8 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
             return;
         }
         plugin.getStatsManager().resetStats();
-        MessageUtil.send(sender, "&aToutes les statistiques ont été réinitialisées.");
+        plugin.getHeadToHeadManager().resetAll();
+        MessageUtil.send(sender, "&aToutes les statistiques (dont les confrontations directes/classement de force) ont été réinitialisées.");
     }
 
     // ================= UTILITAIRES =================
@@ -1246,8 +1338,9 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
         MessageUtil.send(sender, "&e/hb arenas &7- Ouvrir le menu pour rejoindre une arène");
         MessageUtil.send(sender, "&e/hb info [nom] &7- Voir l'état d'une arène");
         MessageUtil.send(sender, "&e/hb stats [pseudo] &7- Voir tes statistiques (ou celles d'un joueur)");
-        MessageUtil.send(sender, "&e/hb top [kd|kills|wins|games|points] &7- Voir le classement des meilleurs joueurs");
+        MessageUtil.send(sender, "&e/hb top [kd|kills|wins|games|points|force] &7- Voir le classement des meilleurs joueurs");
         MessageUtil.send(sender, "&e/hb points [pseudo] &7- Voir tes points, ton niveau et tes avantages débloqués");
+        MessageUtil.send(sender, "&e/hb force [pseudo] &7- Voir ton classement de force (qui bat qui) et ta meilleure victoire");
         MessageUtil.send(sender, "&e/hb perk [list|none|<id>] &7- Voir/équiper tes avantages cosmétiques débloqués");
         if (sender.hasPermission("hikabrain.admin")) {
             MessageUtil.send(sender, "&c/hb create <nom> &7- Créer une nouvelle arène");
@@ -1281,7 +1374,7 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            List<String> options = new ArrayList<>(List.of("join", "joinrandom", "leave", "spectate", "unspectate", "info", "list", "arenas", "stats", "top", "points", "perk"));
+            List<String> options = new ArrayList<>(List.of("join", "joinrandom", "leave", "spectate", "unspectate", "info", "list", "arenas", "stats", "top", "points", "perk", "force"));
             if (sender.hasPermission("hikabrain.admin")) {
                 options.addAll(List.of("create", "copy", "delete", "setlobby", "setspectatorspawn", "setspawn", "delspawn", "setcapture", "setgamezone", "setmaxplayers", "setminplayers", "guislot", "start", "stop"));
                 options.addAll(List.of("setsbserver", "setsbgame", "setsbtitle", "setsblines", "reloadsb", "sbinfo"));
@@ -1314,7 +1407,13 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
         }
 
         if (args.length == 2 && sub.equals("top")) {
-            return filterStartingWith(List.of("kd", "kills", "wins", "games", "points"), args[1]);
+            return filterStartingWith(List.of("kd", "kills", "wins", "games", "points", "force"), args[1]);
+        }
+
+        if (args.length == 2 && sub.equals("force")) {
+            List<String> onlineNames = new ArrayList<>();
+            for (Player p : org.bukkit.Bukkit.getOnlinePlayers()) onlineNames.add(p.getName());
+            return filterStartingWith(onlineNames, args[1]);
         }
 
         if (args.length == 2 && sub.equals("guislot")) {

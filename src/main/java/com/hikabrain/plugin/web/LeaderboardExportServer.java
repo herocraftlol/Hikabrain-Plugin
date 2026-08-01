@@ -12,7 +12,10 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -88,10 +91,23 @@ public class LeaderboardExportServer {
 
             StatsManager statsManager = plugin.getStatsManager();
             LevelManager levelManager = plugin.getLevelManager();
+            com.hikabrain.plugin.stats.HeadToHeadManager h2hManager = plugin.getHeadToHeadManager();
 
-            // Union des joueurs connus par les deux gestionnaires (en pratique quasi
-            // toujours identiques, chaque partie mettant à jour les deux en même temps,
-            // mais on reste robuste si l'un des deux fichiers a été édité/reset à part).
+            // Classement de force ("qui bat qui", voir PowerRankingCalculator) : calculé une
+            // fois par requête et indexé par UUID pour un accès O(1) ci-dessous.
+            List<com.hikabrain.plugin.stats.PowerRankingCalculator.PlayerPower> powerRanking =
+                    com.hikabrain.plugin.stats.PowerRankingCalculator.compute(h2hManager);
+            Map<UUID, Integer> powerRank = new HashMap<>();
+            Map<UUID, Double> powerScore = new HashMap<>();
+            for (int i = 0; i < powerRanking.size(); i++) {
+                com.hikabrain.plugin.stats.PowerRankingCalculator.PlayerPower pp = powerRanking.get(i);
+                powerRank.put(pp.uuid, i + 1);
+                powerScore.put(pp.uuid, pp.score * 1000);
+            }
+
+            // Union des joueurs connus par les gestionnaires (en pratique quasi toujours
+            // identiques, chaque partie mettant à jour tout le monde en même temps, mais on
+            // reste robuste si l'un des fichiers a été édité/reset à part).
             Set<UUID> allUuids = new HashSet<>();
             allUuids.addAll(statsManager.getAllPlayerStats().keySet());
             allUuids.addAll(levelManager.getAllPlayerLevels().keySet());
@@ -120,6 +136,8 @@ public class LeaderboardExportServer {
                 int level  = levelManager.getLevelForPoints(points);
 
                 boolean online = Bukkit.getPlayer(uuid) != null;
+                double force = powerScore.getOrDefault(uuid, 0.0);
+                Integer forceRank = powerRank.get(uuid); // null si aucune confrontation enregistrée
 
                 if (!first) json.append(',');
                 first = false;
@@ -138,7 +156,9 @@ public class LeaderboardExportServer {
                         .append("\"goalsScored\":").append(goalsScored).append(',')
                         .append("\"playtimeSeconds\":").append(playtimeSeconds).append(',')
                         .append("\"level\":").append(level).append(',')
-                        .append("\"points\":").append(points)
+                        .append("\"points\":").append(points).append(',')
+                        .append("\"force\":").append(force).append(',')
+                        .append("\"forceRank\":").append(forceRank != null ? forceRank : "null")
                         .append('}');
             }
             json.append(']');

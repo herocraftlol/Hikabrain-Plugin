@@ -92,31 +92,32 @@ Le fichier `config.yml` permet de configurer :
 - Apparence complète du scoreboard (titre, lignes, couleurs)
 - Messages personnalisés avec préfixe
 
-## 🆕 Dernière Mise à Jour (v1.0.19)
+## 🆕 Dernière Mise à Jour (v1.0.20)
 
-### 🔧 Nouvelles Fonctionnalités et Améliorations
+### 🏆 Système de Classement Amélioré
 
-Cette mise à jour apporte de nouvelles fonctionnalités et améliorations au plugin HikaBrain :
+Cette mise à jour enrichit le système de statistiques et de classement du plugin :
 
-#### 🌐 Module Web API
-- **Nouvelle API Web intégrée** — Le plugin peut désormais communiquer avec des services web externes
-- **Endpoints configurables** — Configuration flexible pour连接到 des APIs personnalisées
-- **Gestion des connexions** — Système robuste de gestion des requêtes HTTP
+#### 📊 Nouveau Module Head-to-Head
+- **HeadToHeadManager** — Gestion des affrontements directs entre joueurs
+- **PowerRankingCalculator** — Système de calcul de Power Ranking pour évaluer les joueurs
+- Statistiques enrichies avec comparaisons entre joueurs
 
-#### Améliorations Techniques
-- Optimisation du système de niveau et de progression
-- Amélioration du système de statistiques
-- Optimisation du GUI des arènes
-- Correction de bugs et améliorations de stabilité
+#### 🔧 Améliorations Techniques
+- Optimisation du système de statistiques
+- Amélioration du module Web API
+- Corrections de bugs et améliorations de stabilité
 
 ---
 
 ### 🆕 Fonctionnalités Versions Précédentes
 
-#### ✨ Personnalisation Avancée du GUI des Arènes (v1.0.17)
-- **Nouvelle commande `/hb guislot`** — Placez vos arènes où vous le souhaitez dans le GUI avec `/hb guislot <emplacement 1-45> <arène>`
-- **Assignation persistente** — Les placements sont sauvegardés automatiquement
-- **Affichage des têtes de joueur** — Correction du rendu pour l'effet cosmétique "Nuage de particules" avec ArmorStands
+#### 🌐 Module Web API (v1.0.19)
+- LeaderboardExportServer pour exporter les données
+- Communication HTTP avec APIs externes
+
+#### ✨ Personnalisation du GUI (v1.0.17)
+- Commande `/hb guislot` pour placer les arènes
 
 ---
 
@@ -193,7 +194,7 @@ mvn clean package
 ## 📝 Auteur
 
 - **Développeur**: herocraftlol
-- **Version**: 1.0.19
+- **Version**: 1.0.20
 
 ## 📄 Licence
 

@@ -22,6 +22,7 @@ import com.hikabrain.plugin.listeners.PlayerMoveListener;
 import com.hikabrain.plugin.listeners.PlayerPvpListener;
 import com.hikabrain.plugin.listeners.TeamSelectListener;
 import com.hikabrain.plugin.scoreboard.ScoreboardManager;
+import com.hikabrain.plugin.stats.HeadToHeadManager;
 import com.hikabrain.plugin.stats.StatsManager;
 import com.hikabrain.plugin.tournament.DuelArenaManager;
 import com.hikabrain.plugin.tournament.TournamentCommand;
@@ -43,6 +44,7 @@ public class HikaBrainPlugin extends JavaPlugin {
     private ArenaManager         arenaManager;
     private ScoreboardManager    scoreboardManager;
     private StatsManager         statsManager;
+    private HeadToHeadManager    headToHeadManager;
     private LevelManager         levelManager;
     private ArenaGUI             arenaGUI;
     private TeamSelectGUI        teamSelectGUI;
@@ -64,6 +66,7 @@ public class HikaBrainPlugin extends JavaPlugin {
         this.arenaManager.loadAll();
         this.scoreboardManager = new ScoreboardManager(this);
         this.statsManager      = new StatsManager(this);
+        this.headToHeadManager = new HeadToHeadManager(this);
         this.levelManager      = new LevelManager(this);
         this.leaderboardManager = new CategoryLeaderboardManager(this);
         this.leaderboardExportServer = new LeaderboardExportServer(this);
@@ -131,6 +134,7 @@ public class HikaBrainPlugin extends JavaPlugin {
         if (leaderboardManager != null) leaderboardManager.despawnAll();
         if (scoreboardManager != null) scoreboardManager.stop();
         if (statsManager      != null) statsManager.saveStats();
+        if (headToHeadManager != null) headToHeadManager.save();
         if (levelManager      != null) levelManager.save();
         if (arenaManager      != null) { arenaManager.stopAll(); arenaManager.saveAll(); }
         getLogger().info("HikaBrain désactivé.");
@@ -141,6 +145,7 @@ public class HikaBrainPlugin extends JavaPlugin {
     public TeamSelectGUI        getTeamSelectGUI()      { return teamSelectGUI; }
     public ScoreboardManager    getScoreboardManager()  { return scoreboardManager; }
     public StatsManager         getStatsManager()       { return statsManager; }
+    public HeadToHeadManager    getHeadToHeadManager()  { return headToHeadManager; }
     public LevelManager         getLevelManager()       { return levelManager; }
     public CategoryLeaderboardManager getLeaderboardManager() { return leaderboardManager; }
 

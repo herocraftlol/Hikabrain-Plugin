@@ -1215,6 +1215,11 @@ public class GameManager {
         int teamSize = Math.max(getPlayerCountForTeam(Team.RED), getPlayerCountForTeam(Team.BLUE));
         plugin.getStatsManager().addWin(winner, teamSize);
 
+        // Enregistrer les confrontations directes (qui a battu qui), utilisées par le
+        // classement de force (voir com.hikabrain.plugin.stats.PowerRankingCalculator) :
+        // chaque joueur de l'équipe gagnante "bat" chaque joueur de l'équipe perdante.
+        recordHeadToHeadResults(winner);
+
         // Enregistrer le résultat individuel de chaque joueur
         for (Map.Entry<UUID, Team> entry : playerTeams.entrySet()) {
             UUID uuid = entry.getKey();
@@ -1277,6 +1282,39 @@ public class GameManager {
         playVictoryStarsPerk(winner);
 
         Bukkit.getScheduler().runTaskLater(plugin, this::resetToLobby, delay * 20L);
+    }
+
+    /**
+     * Enregistre, dans {@link com.hikabrain.plugin.stats.HeadToHeadManager}, le résultat
+     * de CE match entre chaque joueur de l'équipe gagnante et chaque joueur de l'équipe
+     * perdante (chaque gagnant "bat" chaque perdant une fois). C'est la donnée brute à
+     * partir de laquelle {@link com.hikabrain.plugin.stats.PowerRankingCalculator} calcule
+     * le classement de force (/hb top force, /hb force).
+     */
+    private void recordHeadToHeadResults(Team winner) {
+        Team loser = winner == Team.RED ? Team.BLUE : Team.RED;
+
+        List<UUID> winners = new ArrayList<>();
+        List<UUID> losers = new ArrayList<>();
+        for (Map.Entry<UUID, Team> entry : playerTeams.entrySet()) {
+            if (entry.getValue() == winner) winners.add(entry.getKey());
+            else if (entry.getValue() == loser) losers.add(entry.getKey());
+        }
+        if (winners.isEmpty() || losers.isEmpty()) return;
+
+        com.hikabrain.plugin.stats.HeadToHeadManager h2h = plugin.getHeadToHeadManager();
+
+        for (UUID winnerUuid : winners) {
+            Player winnerPlayer = Bukkit.getPlayer(winnerUuid);
+            String winnerName = winnerPlayer != null ? winnerPlayer.getName() : null;
+
+            for (UUID loserUuid : losers) {
+                Player loserPlayer = Bukkit.getPlayer(loserUuid);
+                String loserName = loserPlayer != null ? loserPlayer.getName() : null;
+
+                h2h.recordResult(winnerUuid, winnerName, loserUuid, loserName);
+            }
+        }
     }
 
     // ================= POINTS / NIVEAUX DE FIN DE PARTIE =================
