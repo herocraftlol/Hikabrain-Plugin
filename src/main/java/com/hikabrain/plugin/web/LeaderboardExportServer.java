@@ -97,12 +97,12 @@ public class LeaderboardExportServer {
             // fois par requête et indexé par UUID pour un accès O(1) ci-dessous.
             List<com.hikabrain.plugin.stats.PowerRankingCalculator.PlayerPower> powerRanking =
                     com.hikabrain.plugin.stats.PowerRankingCalculator.compute(h2hManager);
+            Map<UUID, com.hikabrain.plugin.stats.PowerRankingCalculator.PlayerPower> powerByUuid = new HashMap<>();
             Map<UUID, Integer> powerRank = new HashMap<>();
-            Map<UUID, Double> powerScore = new HashMap<>();
             for (int i = 0; i < powerRanking.size(); i++) {
                 com.hikabrain.plugin.stats.PowerRankingCalculator.PlayerPower pp = powerRanking.get(i);
+                powerByUuid.put(pp.uuid, pp);
                 powerRank.put(pp.uuid, i + 1);
-                powerScore.put(pp.uuid, pp.score * 1000);
             }
 
             // Union des joueurs connus par les gestionnaires (en pratique quasi toujours
@@ -136,8 +136,13 @@ public class LeaderboardExportServer {
                 int level  = levelManager.getLevelForPoints(points);
 
                 boolean online = Bukkit.getPlayer(uuid) != null;
-                double force = powerScore.getOrDefault(uuid, 0.0);
+                com.hikabrain.plugin.stats.PowerRankingCalculator.PlayerPower power = powerByUuid.get(uuid);
+                double force = power != null ? power.score * 1000 : 0.0;
                 Integer forceRank = powerRank.get(uuid); // null si aucune confrontation enregistrée
+                int forceWins = power != null ? power.totalWins : 0;
+                int forceLosses = power != null ? power.totalLosses : 0;
+                int forceOpponents = power != null ? power.distinctOpponents : 0;
+                String bestWinName = power != null ? power.bestWinOpponentName : null;
 
                 if (!first) json.append(',');
                 first = false;
@@ -158,7 +163,11 @@ public class LeaderboardExportServer {
                         .append("\"level\":").append(level).append(',')
                         .append("\"points\":").append(points).append(',')
                         .append("\"force\":").append(force).append(',')
-                        .append("\"forceRank\":").append(forceRank != null ? forceRank : "null")
+                        .append("\"forceRank\":").append(forceRank != null ? forceRank : "null").append(',')
+                        .append("\"forceWins\":").append(forceWins).append(',')
+                        .append("\"forceLosses\":").append(forceLosses).append(',')
+                        .append("\"forceOpponents\":").append(forceOpponents).append(',')
+                        .append("\"bestWinOpponent\":").append(bestWinName != null ? ("\"" + escape(bestWinName) + "\"") : "null")
                         .append('}');
             }
             json.append(']');

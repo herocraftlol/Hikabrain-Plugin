@@ -92,32 +92,32 @@ Le fichier `config.yml` permet de configurer :
 - Apparence complète du scoreboard (titre, lignes, couleurs)
 - Messages personnalisés avec préfixe
 
-## 🆕 Dernière Mise à Jour (v1.0.20)
+## 🆕 Dernière Mise à Jour (v1.0.21)
 
-### 🏆 Système de Classement Amélioré
+### 🌐 Améliorations du Module Web API
 
-Cette mise à jour enrichit le système de statistiques et de classement du plugin :
+Cette mise à jour améliore le module Web API du plugin HikaBrain :
 
-#### 📊 Nouveau Module Head-to-Head
-- **HeadToHeadManager** — Gestion des affrontements directs entre joueurs
-- **PowerRankingCalculator** — Système de calcul de Power Ranking pour évaluer les joueurs
-- Statistiques enrichies avec comparaisons entre joueurs
+#### LeaderboardExportServer Amélioré
+- Meilleure gestion des connexions HTTP
+- Optimisation de l'export des données
+- Amélioration de la stabilité du serveur intégré
 
 #### 🔧 Améliorations Techniques
-- Optimisation du système de statistiques
-- Amélioration du module Web API
-- Corrections de bugs et améliorations de stabilité
+- Corrections de bugs
+- Optimisation des performances
+- Amélioration de la fiabilité
 
 ---
 
 ### 🆕 Fonctionnalités Versions Précédentes
 
+#### 🏆 Système de Classement Amélioré (v1.0.20)
+- HeadToHeadManager pour les affrontements directs
+- PowerRankingCalculator pour évaluer les joueurs
+
 #### 🌐 Module Web API (v1.0.19)
 - LeaderboardExportServer pour exporter les données
-- Communication HTTP avec APIs externes
-
-#### ✨ Personnalisation du GUI (v1.0.17)
-- Commande `/hb guislot` pour placer les arènes
 
 ---
 
@@ -194,7 +194,7 @@ mvn clean package
 ## 📝 Auteur
 
 - **Développeur**: herocraftlol
-- **Version**: 1.0.20
+- **Version**: 1.0.21
 
 ## 📄 Licence
 
