@@ -292,4 +292,12 @@ public class LevelManager {
         playerLevels.clear();
         save();
     }
+
+    /**
+     * Vue non modifiable de tous les joueurs connus (points/niveau), utilisée par le
+     * serveur d'export web du classement (voir com.hikabrain.plugin.web).
+     */
+    public Map<UUID, PlayerLevelData> getAllPlayerLevels() {
+        return java.util.Collections.unmodifiableMap(playerLevels);
+    }
 }

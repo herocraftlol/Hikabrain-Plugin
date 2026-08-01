@@ -1,5 +1,5 @@
 name: HikaBrain
-version: 1.0.18
+version: 1.0.19
 main: com.hikabrain.plugin.HikaBrainPlugin
 api-version: 1.21
 author: herocraftlol

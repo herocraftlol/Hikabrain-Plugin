@@ -14,6 +14,7 @@ import org.bukkit.event.inventory.InventoryClickEvent;
  * - Clic sur une arène disponible → /hb join <nom>
  * - Clic sur une arène en cours de partie → /hb spectate <nom>
  * - Clic sur le bouton aléatoire → /hb joinrandom
+ * - Clic sur les flèches de navigation → change de page du GUI (voir {@link ArenaGUI})
  */
 public class ArenaGUIListener implements Listener {
 
@@ -27,8 +28,9 @@ public class ArenaGUIListener implements Listener {
 
     @EventHandler
     public void onInventoryClick(InventoryClickEvent event) {
-        // Vérifier que c'est bien notre GUI (par le titre)
-        if (!ArenaGUI.GUI_TITLE.equals(event.getView().getTitle())) return;
+        // Vérifier que c'est bien notre GUI (par le titre, quelle que soit la page affichée)
+        String title = event.getView().getTitle();
+        if (!ArenaGUI.isArenaGuiTitle(title)) return;
 
         // Annuler toujours le clic pour éviter de prendre des items
         event.setCancelled(true);
@@ -37,8 +39,19 @@ public class ArenaGUIListener implements Listener {
         if (event.getCurrentItem() == null) return;
 
         int slot = event.getRawSlot();
+        int page = ArenaGUI.parsePageFromTitle(title);
 
-        // Clic sur le bouton "arène aléatoire" (ligne 6)
+        // Clic sur une flèche de navigation
+        if (ArenaGUI.isPrevPageButton(slot)) {
+            arenaGUI.open(player, page - 1);
+            return;
+        }
+        if (ArenaGUI.isNextPageButton(slot)) {
+            arenaGUI.open(player, page + 1);
+            return;
+        }
+
+        // Clic sur le bouton "arène aléatoire" (fonctionne sur toutes les pages/arènes)
         if (ArenaGUI.isRandomButton(slot)) {
             player.closeInventory();
             GameManager best = plugin.getArenaManager().findBestArenaForRandomJoin();
@@ -51,7 +64,7 @@ public class ArenaGUIListener implements Listener {
         }
 
         // Clic sur une arène spécifique (lignes 1-5)
-        String arenaName = arenaGUI.getArenaNameAt(slot);
+        String arenaName = arenaGUI.getArenaNameAt(page, slot);
         if (arenaName == null) return; // Slot vide / filler
 
         GameManager gm = plugin.getArenaManager().get(arenaName);

@@ -63,6 +63,32 @@ levels:
   base-points: 100
 
 # ===========================================
+#    Export web du classement (site vitrine)
+# ===========================================
+# Expose un petit serveur HTTP JSON (endpoint /hikabrain/leaderboard) avec les stats
+# de tous les joueurs (kills, morts, K/D, victoires, coups donnés/reçus, buts, temps de
+# jeu, niveau, points), pour que le site web affiche un classement HikaBrain (onglet
+# "Classements"). Même principe que le plugin Velocity "WebStatusVelocity" déjà utilisé
+# pour le statut du réseau : authentification par clé API (en-tête X-Api-Key).
+#
+# DÉSACTIVÉ PAR DÉFAUT : n'importe qui pouvant atteindre ce port lirait sinon les
+# statistiques de tous les joueurs. N'active que si le site web doit s'y connecter, et
+# pense à changer 'api-key' ci-dessous.
+web-export:
+  enabled: false
+
+  # Port d'écoute du mini serveur HTTP exposant le classement
+  port: 8182
+
+  # Adresse d'écoute : 127.0.0.1 si le backend Node du site tourne sur la même machine
+  # que ce serveur Paper (recommandé). Mets 0.0.0.0 seulement si le backend est ailleurs,
+  # et protège alors ce port avec un pare-feu.
+  bind-address: "127.0.0.1"
+
+  # Clé secrète à renseigner aussi côté backend du site (HIKABRAIN_API_KEY dans .env)
+  api-key: "change-moi"
+
+# ===========================================
 #         Configuration Scoreboard
 # ===========================================
 scoreboard:

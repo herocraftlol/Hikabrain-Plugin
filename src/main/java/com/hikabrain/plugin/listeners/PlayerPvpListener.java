@@ -66,9 +66,12 @@ public class PlayerPvpListener implements Listener {
             }
 
             // Coup valide porté à un adversaire pendant la phase de jeu active : comptabilisé
-            // pour le calcul des points de fin de partie (voir GameManager#awardEndGamePoints).
+            // pour le calcul des points de fin de partie (voir GameManager#awardEndGamePoints)
+            // ET cumulé à vie dans les statistiques (utilisées notamment par le classement web).
             if (state == GameState.PLAYING && victimTeam != null && damagerTeam != null) {
                 gm.addPlayerHit(damager.getUniqueId());
+                plugin.getStatsManager().addPlayerHitGiven(damager.getUniqueId(), damager.getName());
+                plugin.getStatsManager().addPlayerHitReceived(victim.getUniqueId(), victim.getName());
             }
         }
     }

@@ -34,7 +34,7 @@ import java.util.*;
  *   /hb setgamezone <nom> <pos1|pos2>          - définit + capture la zone de jeu protégée
  *   /hb setmaxplayers <nom> <nombre>          - définit le max de joueurs de l'arène (0 = global)
  *   /hb setminplayers <nom> <nombre>          - définit le min de joueurs de l'arène (0 = global)
- *   /hb guislot <emplacement 1-45> <arène|clear> - place une arène à un emplacement précis du menu /arenas
+ *   /hb guislot <page> <emplacement 1-45> <arène|clear> - place une arène à un emplacement précis d'une page du menu /arenas
  *   /hb join <nom>                            - rejoindre une arène
  *   /hb joinrandom                            - rejoindre une arène au hasard (priorité à celles déjà occupées)
  *   /hb leave                                 - quitter l'arène en cours
@@ -504,10 +504,10 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
     }
 
     /**
-     * /hb guislot <emplacement 1-45> <arène|clear> : place une arène à un emplacement précis
-     * du menu /arenas (le GUI d'inventaire), ou retire son assignation explicite avec "clear".
-     * Les emplacements 46 à 54 (dernière ligne) sont réservés au bouton "arène aléatoire" et
-     * ne peuvent pas être utilisés.
+     * /hb guislot <page> <emplacement 1-45> <arène|clear> : place une arène à un emplacement
+     * précis d'une page précise du menu /arenas (le GUI d'inventaire), ou retire son
+     * assignation explicite avec "clear". La dernière ligne de chaque page (navigation +
+     * bouton "arène aléatoire") n'est pas assignable.
      */
     private void handleGuiSlot(CommandSender sender, String[] args) {
         if (!sender.hasPermission("hikabrain.admin")) {
@@ -517,15 +517,27 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
 
         int maxSlot = com.hikabrain.plugin.gui.ArenaGUI.getMaxAssignableSlot();
 
-        if (args.length < 3) {
-            MessageUtil.send(sender, "&cUsage: /hb guislot <emplacement 1-" + maxSlot + "> <arène|clear>");
-            MessageUtil.send(sender, "&7Les emplacements " + (maxSlot + 1) + " à 54 sont réservés au bouton \"arène aléatoire\" (dernière ligne du menu).");
+        if (args.length < 4) {
+            MessageUtil.send(sender, "&cUsage: /hb guislot <page> <emplacement 1-" + maxSlot + "> <arène|clear>");
+            MessageUtil.send(sender, "&7Exemple: /hb guislot 1 5 arena1 → place 'arena1' au 5ème emplacement de la page 1.");
+            return;
+        }
+
+        int page1Based;
+        try {
+            page1Based = Integer.parseInt(args[1]);
+        } catch (NumberFormatException e) {
+            MessageUtil.send(sender, "&cLa page doit être un nombre (1 = première page).");
+            return;
+        }
+        if (page1Based < 1) {
+            MessageUtil.send(sender, "&cLa page doit être supérieure ou égale à 1.");
             return;
         }
 
         int slot1Based;
         try {
-            slot1Based = Integer.parseInt(args[1]);
+            slot1Based = Integer.parseInt(args[2]);
         } catch (NumberFormatException e) {
             MessageUtil.send(sender, "&cL'emplacement doit être un nombre entre 1 et " + maxSlot + ".");
             return;
@@ -533,29 +545,30 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
 
         if (slot1Based < 1 || slot1Based > maxSlot) {
             MessageUtil.send(sender, "&cL'emplacement doit être compris entre 1 et " + maxSlot
-                    + " (les emplacements " + (maxSlot + 1) + " à 54 sont réservés au bouton \"arène aléatoire\").");
+                    + " (la dernière ligne de chaque page est réservée à la navigation et au bouton \"arène aléatoire\").");
             return;
         }
 
+        int page0Based = page1Based - 1;
         int slot0Based = slot1Based - 1;
 
-        if (args[2].equalsIgnoreCase("clear")) {
-            boolean removed = plugin.getArenaGUI().clearSlot(slot0Based);
+        if (args[3].equalsIgnoreCase("clear")) {
+            boolean removed = plugin.getArenaGUI().clearSlot(page0Based, slot0Based);
             MessageUtil.send(sender, removed
-                    ? "&aEmplacement &e" + slot1Based + " &alibéré : cette case sera de nouveau remplie automatiquement."
-                    : "&cAucune arène n'était explicitement assignée à l'emplacement " + slot1Based + ".");
+                    ? "&aEmplacement &e" + slot1Based + " &a(page " + page1Based + ") libéré : cette case sera de nouveau remplie automatiquement."
+                    : "&cAucune arène n'était explicitement assignée à cet emplacement (page " + page1Based + ").");
             return;
         }
 
-        String arenaName = args[2];
+        String arenaName = args[3];
         if (!plugin.getArenaManager().exists(arenaName)) {
             MessageUtil.send(sender, "&cAucune arène '" + arenaName + "' trouvée.");
             return;
         }
 
-        plugin.getArenaGUI().assignSlot(slot0Based, arenaName);
+        plugin.getArenaGUI().assignSlot(page0Based, slot0Based, arenaName);
         MessageUtil.send(sender, "&aArène '" + arenaName + "' placée à l'emplacement &e" + slot1Based
-                + " &adu menu /arenas.");
+                + " &ade la page &e" + page1Based + " &adu menu /arenas.");
     }
 
     // ================= JOUEUR =================
@@ -1248,7 +1261,7 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
             MessageUtil.send(sender, "&c/hb setgamezone <nom> <pos1|pos2> &7- Définir la zone de jeu (protection + restauration)");
             MessageUtil.send(sender, "&c/hb setmaxplayers <nom> <nombre> &7- Définir le nombre max de joueurs de l'arène (0 = global)");
             MessageUtil.send(sender, "&c/hb setminplayers <nom> <nombre> &7- Définir le nombre min de joueurs de l'arène (0 = global)");
-            MessageUtil.send(sender, "&c/hb guislot <emplacement 1-45> <arène|clear> &7- Placer une arène à un emplacement précis du menu /arenas");
+            MessageUtil.send(sender, "&c/hb guislot <page> <emplacement 1-45> <arène|clear> &7- Placer une arène à un emplacement précis d'une page du menu /arenas");
             MessageUtil.send(sender, "&c/hb start <nom> &7- Forcer le démarrage");
             MessageUtil.send(sender, "&c/hb stop <nom> &7- Forcer l'arrêt");
             MessageUtil.send(sender, "&c/hb resetstats &7- Réinitialiser les statistiques");
@@ -1305,13 +1318,17 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
         }
 
         if (args.length == 2 && sub.equals("guislot")) {
-            return filterStartingWith(List.of("1", "2", "3", "9", "10", "18", "27", "36", "45"), args[1]);
+            return filterStartingWith(List.of("1", "2", "3"), args[1]);
         }
 
         if (args.length == 3 && sub.equals("guislot")) {
+            return filterStartingWith(List.of("1", "2", "3", "9", "10", "18", "27", "36", "45"), args[2]);
+        }
+
+        if (args.length == 4 && sub.equals("guislot")) {
             List<String> options = new ArrayList<>(List.of("clear"));
             options.addAll(plugin.getArenaManager().getNames());
-            return filterStartingWith(options, args[2]);
+            return filterStartingWith(options, args[3]);
         }
 
         if (args.length == 2 && sub.equals("points")) {

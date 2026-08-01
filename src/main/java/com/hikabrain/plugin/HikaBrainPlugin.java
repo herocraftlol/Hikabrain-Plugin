@@ -33,6 +33,7 @@ import com.hikabrain.plugin.tournament.gui.TournamentRoomsGUI;
 import com.hikabrain.plugin.tournament.gui.TournamentRoomsGUIListener;
 import com.hikabrain.plugin.tournament.history.TournamentHistoryManager;
 import com.hikabrain.plugin.tournament.hologram.TournamentHologramManager;
+import com.hikabrain.plugin.web.LeaderboardExportServer;
 import org.bukkit.GameRule;
 import org.bukkit.World;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -46,6 +47,7 @@ public class HikaBrainPlugin extends JavaPlugin {
     private ArenaGUI             arenaGUI;
     private TeamSelectGUI        teamSelectGUI;
     private CategoryLeaderboardManager leaderboardManager;
+    private LeaderboardExportServer    leaderboardExportServer;
 
     private DuelArenaManager          duelArenaManager;
     private TournamentHistoryManager  tournamentHistoryManager;
@@ -64,6 +66,8 @@ public class HikaBrainPlugin extends JavaPlugin {
         this.statsManager      = new StatsManager(this);
         this.levelManager      = new LevelManager(this);
         this.leaderboardManager = new CategoryLeaderboardManager(this);
+        this.leaderboardExportServer = new LeaderboardExportServer(this);
+        this.leaderboardExportServer.start();
         KitManager.init(this);
 
         this.arenaGUI = new ArenaGUI(this);
@@ -121,6 +125,7 @@ public class HikaBrainPlugin extends JavaPlugin {
     @Override
     public void onDisable() {
         if (tournamentManager   != null) tournamentManager.shutdown();
+        if (leaderboardExportServer != null) leaderboardExportServer.stop();
         if (tournamentHologramManager != null) tournamentHologramManager.shutdown();
         if (duelArenaManager    != null) duelArenaManager.saveAll();
         if (leaderboardManager != null) leaderboardManager.despawnAll();

@@ -92,21 +92,22 @@ Le fichier `config.yml` permet de configurer :
 - Apparence complète du scoreboard (titre, lignes, couleurs)
 - Messages personnalisés avec préfixe
 
-## 🆕 Dernière Mise à Jour (v1.0.18)
+## 🆕 Dernière Mise à Jour (v1.0.19)
 
-### 🔧 Améliorations et Corrections
+### 🔧 Nouvelles Fonctionnalités et Améliorations
 
-Cette mise à jour apporte des corrections et améliorations générales au plugin HikaBrain :
+Cette mise à jour apporte de nouvelles fonctionnalités et améliorations au plugin HikaBrain :
 
-#### Corrections de Bugs
-- Amélioration de la gestion des entités dans les arènes
-- Optimisation du nettoyage des ressources lors de l'arrêt des parties
-- Correction de problèmes de synchronisation dans le système de scoreboard
+#### 🌐 Module Web API
+- **Nouvelle API Web intégrée** — Le plugin peut désormais communiquer avec des services web externes
+- **Endpoints configurables** — Configuration flexible pour连接到 des APIs personnalisées
+- **Gestion des connexions** — Système robuste de gestion des requêtes HTTP
 
-#### Améliorations de Performance
-- Optimisation de la gestion mémoire
-- Amélioration de la réactivité du GUI de sélection d'arène
-- Optimisation du système de détection de zone de capture
+#### Améliorations Techniques
+- Optimisation du système de niveau et de progression
+- Amélioration du système de statistiques
+- Optimisation du GUI des arènes
+- Correction de bugs et améliorations de stabilité
 
 ---
 
@@ -192,7 +193,7 @@ mvn clean package
 ## 📝 Auteur
 
 - **Développeur**: herocraftlol
-- **Version**: 1.0.18
+- **Version**: 1.0.19
 
 ## 📄 Licence
 

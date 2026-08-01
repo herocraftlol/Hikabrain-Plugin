@@ -60,6 +60,11 @@ public class StatsManager {
         public int deaths;
         public int gamesPlayed;
         public int gamesWon;
+        // Nouvelles stats cumulées (utilisées notamment par le classement du site web)
+        public int hitsGiven;
+        public int hitsReceived;
+        public int goalsScored;
+        public long playtimeSeconds;
         // Stats par mode
         public final Map<GameMode, PlayerModeStats> byMode = new HashMap<>();
 
@@ -144,6 +149,10 @@ public class StatsManager {
                     ps.deaths      = section.getInt("deaths", 0);
                     ps.gamesPlayed = section.getInt("games-played", 0);
                     ps.gamesWon    = section.getInt("games-won", 0);
+                    ps.hitsGiven      = section.getInt("hits-given", 0);
+                    ps.hitsReceived   = section.getInt("hits-received", 0);
+                    ps.goalsScored    = section.getInt("goals-scored", 0);
+                    ps.playtimeSeconds = section.getLong("playtime-seconds", 0L);
 
                     // Stats par mode
                     for (GameMode m : GameMode.values()) {
@@ -183,6 +192,10 @@ public class StatsManager {
             statsConfig.set(path + ".deaths",       ps.deaths);
             statsConfig.set(path + ".games-played", ps.gamesPlayed);
             statsConfig.set(path + ".games-won",    ps.gamesWon);
+            statsConfig.set(path + ".hits-given",      ps.hitsGiven);
+            statsConfig.set(path + ".hits-received",   ps.hitsReceived);
+            statsConfig.set(path + ".goals-scored",    ps.goalsScored);
+            statsConfig.set(path + ".playtime-seconds", ps.playtimeSeconds);
             for (GameMode m : GameMode.values()) {
                 String mp = path + ".mode." + m.getLabel() + ".";
                 PlayerModeStats pms = ps.byMode.get(m);
@@ -263,6 +276,31 @@ public class StatsManager {
     }
     public void addPlayerGameResult(UUID uuid, String name, boolean won) { addPlayerGameResult(uuid, name, won, 1); }
 
+    /** Coup valide porté à un adversaire (cumulé à vie, utilisé notamment par le site web). */
+    public void addPlayerHitGiven(UUID uuid, String name) {
+        getOrCreate(uuid, name).hitsGiven++;
+        saveStats();
+    }
+
+    /** Coup valide reçu d'un adversaire (cumulé à vie). */
+    public void addPlayerHitReceived(UUID uuid, String name) {
+        getOrCreate(uuid, name).hitsReceived++;
+        saveStats();
+    }
+
+    /** But marqué (cumulé à vie). */
+    public void addPlayerGoal(UUID uuid, String name) {
+        getOrCreate(uuid, name).goalsScored++;
+        saveStats();
+    }
+
+    /** Ajoute du temps de jeu (en secondes) passé dans une arène HikaBrain (cumulé à vie). */
+    public void addPlayerPlaytime(UUID uuid, String name, long seconds) {
+        if (seconds <= 0) return;
+        getOrCreate(uuid, name).playtimeSeconds += seconds;
+        saveStats();
+    }
+
     // ── Accesseurs équipes globaux ─────────────────────────────────────────────
 
     public int getRedWins()    { return modes.values().stream().mapToInt(s -> s.redWins).sum(); }
@@ -300,6 +338,14 @@ public class StatsManager {
     public PlayerStats getPlayerStats(UUID uuid, String fallbackName) {
         PlayerStats ps = playerStats.get(uuid);
         return ps != null ? ps : new PlayerStats(fallbackName);
+    }
+
+    /**
+     * Vue non modifiable de tous les joueurs connus (ayant au moins joué une fois),
+     * utilisée par le serveur d'export web du classement (voir com.hikabrain.plugin.web).
+     */
+    public Map<UUID, PlayerStats> getAllPlayerStats() {
+        return java.util.Collections.unmodifiableMap(playerStats);
     }
 
     /**

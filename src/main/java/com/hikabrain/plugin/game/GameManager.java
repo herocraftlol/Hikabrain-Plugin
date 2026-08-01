@@ -70,6 +70,13 @@ public class GameManager {
      */
     private final Set<org.bukkit.entity.ArmorStand> cosmeticArmorStands = new HashSet<>();
 
+    /**
+     * Horodatage (ms) de l'entrée d'un joueur dans cette arène (lobby inclus), utilisé
+     * pour cumuler le temps de jeu HikaBrain à vie dans les statistiques (voir
+     * {@link #flushPlaytime}), consommées ensuite par le classement du site web.
+     */
+    private final Map<UUID, Long> sessionStartMillis = new HashMap<>();
+
     // ================= SPECTATEURS =================
 
     /** Joueurs actuellement en mode spectateur sur cette arène. */
@@ -347,6 +354,7 @@ public class GameManager {
 
         Team team = pickBalancedTeam();
         playerTeams.put(player.getUniqueId(), team);
+        sessionStartMillis.put(player.getUniqueId(), System.currentTimeMillis());
 
         // Sauvegarder la position du joueur avant de le téléporter au lobby
         preLobbyLocations.put(player.getUniqueId(), player.getLocation().clone());
@@ -373,6 +381,7 @@ public class GameManager {
             return;
         }
         playerTeams.remove(uuid);
+        flushPlaytime(uuid, player.getName());
 
         // Dégeler si besoin
         if (frozenPlayers.remove(uuid)) {
@@ -1074,6 +1083,7 @@ public class GameManager {
     private void scorePoint(Team scoringTeam, Player scorer) {
         addScore(scoringTeam, 1);
         addPlayerGoal(scorer.getUniqueId());
+        plugin.getStatsManager().addPlayerGoal(scorer.getUniqueId(), scorer.getName());
         int winScore = plugin.getConfig().getInt("points-to-win", 5);
         int currentScore = scores.get(scoringTeam);
 
@@ -1382,6 +1392,21 @@ public class GameManager {
         resetToLobby();
     }
 
+    /**
+     * Cumule à vie (dans les statistiques du site web) le temps passé par ce joueur dans
+     * cette arène depuis son entrée (voir {@link #sessionStartMillis}), puis oublie sa
+     * session en cours. Ne fait rien si le joueur n'a pas de session enregistrée.
+     */
+    private void flushPlaytime(UUID uuid, String fallbackName) {
+        Long start = sessionStartMillis.remove(uuid);
+        if (start == null) return;
+        long elapsedSeconds = Math.max(0, (System.currentTimeMillis() - start) / 1000);
+        if (elapsedSeconds <= 0) return;
+        Player online = Bukkit.getPlayer(uuid);
+        String name = online != null ? online.getName() : fallbackName;
+        plugin.getStatsManager().addPlayerPlaytime(uuid, name, elapsedSeconds);
+    }
+
     private void resetToLobby() {
         if (offhandReplenishTask != null) {
             offhandReplenishTask.cancel();
@@ -1393,6 +1418,11 @@ public class GameManager {
         // (nuage de particules "tête", étincelles de victoire...), on force la suppression
         // des entités décoratives restantes plutôt que de compter uniquement sur leur minuteur.
         clearCosmeticArmorStands();
+        // Cumuler le temps de jeu de tout le monde avant de vider playerTeams (sinon la
+        // session en cours de chacun serait perdue sans jamais être comptabilisée).
+        for (UUID uuid : playerTeams.keySet()) {
+            flushPlaytime(uuid, null);
+        }
         clearColoredNames(playerTeams.keySet());
         for (UUID uuid : new ArrayList<>(playerTeams.keySet())) {
             Player player = Bukkit.getPlayer(uuid);
