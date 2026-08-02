@@ -1052,6 +1052,7 @@ public class GameManager {
     private Map<UUID, Integer> playerKills = new HashMap<>();
     private Map<UUID, Integer> playerDeaths = new HashMap<>();
     private Map<UUID, Integer> playerHits = new HashMap<>();
+    private Map<UUID, Integer> playerHitsReceived = new HashMap<>();
     private Map<UUID, Integer> playerGoals = new HashMap<>();
     
     /**
@@ -1303,16 +1304,18 @@ public class GameManager {
         if (winners.isEmpty() || losers.isEmpty()) return;
 
         com.hikabrain.plugin.stats.HeadToHeadManager h2h = plugin.getHeadToHeadManager();
+        com.hikabrain.plugin.stats.MatchHistoryManager history = plugin.getMatchHistoryManager();
 
         for (UUID winnerUuid : winners) {
             Player winnerPlayer = Bukkit.getPlayer(winnerUuid);
-            String winnerName = winnerPlayer != null ? winnerPlayer.getName() : null;
+            String winnerName = winnerPlayer != null ? winnerPlayer.getName() : "?";
 
             for (UUID loserUuid : losers) {
                 Player loserPlayer = Bukkit.getPlayer(loserUuid);
-                String loserName = loserPlayer != null ? loserPlayer.getName() : null;
+                String loserName = loserPlayer != null ? loserPlayer.getName() : "?";
 
                 h2h.recordResult(winnerUuid, winnerName, loserUuid, loserName);
+                history.recordHeadToHead(winnerUuid, winnerName, loserUuid, loserName);
             }
         }
     }
@@ -1359,12 +1362,16 @@ public class GameManager {
             if (player == null) continue;
 
             int hits  = getPlayerHits(uuid);
+            int hitsReceived = getPlayerHitsReceived(uuid);
             int kills = getPlayerKills(uuid);
             int goals = getPlayerGoals(uuid);
+            int deaths = getPlayerDeaths(uuid);
             boolean won = entry.getValue() == winner;
 
             int gained = levelManager.computeMatchPoints(hits, kills, goals, won);
             LevelManager.AwardResult result = levelManager.addPoints(uuid, player.getName(), gained);
+
+            plugin.getMatchHistoryManager().recordPlayerMatch(uuid, player.getName(), hits, hitsReceived, kills, deaths, goals, won, gained);
 
             MessageUtil.send(player, "&d+" + result.pointsGained + " pts &7(\u2694" + hits + " \u2620" + kills + " \u26bd" + goals
                     + (won ? " \uD83C\uDFC6" : "") + ") &7\u2192 &b" + result.totalPoints + " pts &7(Niv." + result.newLevel + ")");
@@ -1746,6 +1753,7 @@ public class GameManager {
     public int getPlayerKills(UUID uuid) { return playerKills.getOrDefault(uuid, 0); }
     public int getPlayerDeaths(UUID uuid) { return playerDeaths.getOrDefault(uuid, 0); }
     public int getPlayerHits(UUID uuid) { return playerHits.getOrDefault(uuid, 0); }
+    public int getPlayerHitsReceived(UUID uuid) { return playerHitsReceived.getOrDefault(uuid, 0); }
     public int getPlayerGoals(UUID uuid) { return playerGoals.getOrDefault(uuid, 0); }
     
     public void addKill(Team team) {
@@ -1775,6 +1783,14 @@ public class GameManager {
     }
 
     /**
+     * Comptabilise un coup valide reçu par ce joueur de la part d'un adversaire (symétrique
+     * de {@link #addPlayerHit}, utilisé pour l'historique/les classements par plage de temps).
+     */
+    public void addPlayerHitReceived(UUID uuid) {
+        playerHitsReceived.put(uuid, playerHitsReceived.getOrDefault(uuid, 0) + 1);
+    }
+
+    /**
      * Comptabilise un but marqué par ce joueur (utilisé pour le calcul des points
      * de fin de partie).
      */
@@ -1790,6 +1806,7 @@ public class GameManager {
         playerKills.clear();
         playerDeaths.clear();
         playerHits.clear();
+        playerHitsReceived.clear();
         playerGoals.clear();
     }
 }

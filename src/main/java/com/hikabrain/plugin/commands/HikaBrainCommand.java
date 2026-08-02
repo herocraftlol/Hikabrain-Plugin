@@ -16,6 +16,8 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.*;
 
 /**
@@ -948,132 +950,290 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
     }
 
     private void handleTop(CommandSender sender, String[] args) {
-        // /hb top [kd|kills|wins|games|points|force]  -- "wins" par défaut
+        // /hb top [kd|kills|wins|games|points|force] [alltime|today|week|custom <de> <à>]  -- "wins"/"alltime" par défaut
         String criterion = args.length >= 2 ? args[1].toLowerCase(Locale.ROOT) : "wins";
 
         if (criterion.equals("points")) {
-            handleTopPoints(sender);
+            handleTopPoints(sender, args);
             return;
         }
         if (criterion.equals("force")) {
-            handleTopForce(sender);
+            handleTopForce(sender, args);
             return;
         }
 
-        Comparator<com.hikabrain.plugin.stats.StatsManager.PlayerStats> comparator;
+        LocalDate[] range = parsePeriodArg(sender, args, 2);
+        if (range != null && range.length == 0) return; // erreur déjà envoyée par parsePeriodArg
+
         String label;
-        switch (criterion) {
-            case "kd" -> {
-                comparator = Comparator.comparingDouble(com.hikabrain.plugin.stats.StatsManager.PlayerStats::getKD);
-                label = "Meilleur K/D";
-            }
-            case "kills" -> {
-                comparator = Comparator.comparingInt(s -> s.kills);
-                label = "Plus de Kills";
-            }
-            case "games" -> {
-                comparator = Comparator.comparingInt(s -> s.gamesPlayed);
-                label = "Plus de Parties Jouées";
-            }
-            case "wins" -> {
-                comparator = Comparator.comparingInt(s -> s.gamesWon);
-                label = "Plus de Victoires";
-            }
-            default -> {
-                MessageUtil.send(sender, "&cCritère inconnu. Utilise : &e/hb top <kd|kills|wins|games|points|force>");
-                return;
-            }
-        }
+        List<String> lines = new ArrayList<>();
 
-        List<Map.Entry<UUID, com.hikabrain.plugin.stats.StatsManager.PlayerStats>> top =
-                plugin.getStatsManager().getTopPlayers(10, comparator);
+        if (range == null) {
+            // ── Classement "depuis toujours" (comportement historique, inchangé) ──
+            Comparator<com.hikabrain.plugin.stats.StatsManager.PlayerStats> comparator;
+            switch (criterion) {
+                case "kd" -> {
+                    comparator = Comparator.comparingDouble(com.hikabrain.plugin.stats.StatsManager.PlayerStats::getKD);
+                    label = "Meilleur K/D";
+                }
+                case "kills" -> {
+                    comparator = Comparator.comparingInt(s -> s.kills);
+                    label = "Plus de Kills";
+                }
+                case "games" -> {
+                    comparator = Comparator.comparingInt(s -> s.gamesPlayed);
+                    label = "Plus de Parties Jouées";
+                }
+                case "wins" -> {
+                    comparator = Comparator.comparingInt(s -> s.gamesWon);
+                    label = "Plus de Victoires";
+                }
+                case "hits" -> {
+                    comparator = Comparator.comparingInt(s -> s.hitsGiven);
+                    label = "Plus de Coups Donnés";
+                }
+                case "hitsreceived" -> {
+                    comparator = Comparator.comparingInt(s -> s.hitsReceived);
+                    label = "Plus de Coups Reçus";
+                }
+                case "goals" -> {
+                    comparator = Comparator.comparingInt(s -> s.goalsScored);
+                    label = "Plus de Buts Marqués";
+                }
+                default -> {
+                    MessageUtil.send(sender, "&cCritère inconnu. Utilise : &e/hb top <kd|kills|wins|games|points|force|hits|hitsreceived|goals>");
+                    return;
+                }
+            }
 
-        MessageUtil.send(sender, "&8&m----------&r &6&lClassement: " + label + " &8&m----------");
+            List<Map.Entry<UUID, com.hikabrain.plugin.stats.StatsManager.PlayerStats>> top =
+                    plugin.getStatsManager().getTopPlayers(10, comparator);
 
-        if (top.isEmpty()) {
-            MessageUtil.send(sender, "&7Aucune statistique enregistrée pour le moment.");
-        } else {
             int rank = 1;
             for (Map.Entry<UUID, com.hikabrain.plugin.stats.StatsManager.PlayerStats> entry : top) {
                 com.hikabrain.plugin.stats.StatsManager.PlayerStats s = entry.getValue();
-                String rankColor = switch (rank) {
-                    case 1 -> "&6";
-                    case 2 -> "&7";
-                    case 3 -> "&c";
-                    default -> "&f";
-                };
                 String value = switch (criterion) {
                     case "kd"    -> String.valueOf(s.getKD());
                     case "kills" -> String.valueOf(s.kills);
                     case "games" -> String.valueOf(s.gamesPlayed);
+                    case "hits"  -> String.valueOf(s.hitsGiven);
+                    case "hitsreceived" -> String.valueOf(s.hitsReceived);
+                    case "goals" -> String.valueOf(s.goalsScored);
                     default      -> String.valueOf(s.gamesWon);
                 };
-                MessageUtil.send(sender, rankColor + "&l#" + rank + " &f" + s.name + " &7- &e" + value);
-                rank++;
+                lines.add(rankLine(rank++, s.name, value));
+            }
+        } else {
+            // ── Classement limité à une plage de temps (voir MatchHistoryManager) ──
+            Comparator<com.hikabrain.plugin.stats.MatchHistoryManager.AggregatedStats> comparator;
+            switch (criterion) {
+                case "kd" -> {
+                    comparator = Comparator.comparingDouble(com.hikabrain.plugin.stats.MatchHistoryManager.AggregatedStats::getKD);
+                    label = "Meilleur K/D";
+                }
+                case "kills" -> {
+                    comparator = Comparator.comparingInt(s -> s.kills);
+                    label = "Plus de Kills";
+                }
+                case "games" -> {
+                    comparator = Comparator.comparingInt(s -> s.gamesPlayed);
+                    label = "Plus de Parties Jouées";
+                }
+                case "wins" -> {
+                    comparator = Comparator.comparingInt(s -> s.wins);
+                    label = "Plus de Victoires";
+                }
+                case "hits" -> {
+                    comparator = Comparator.comparingInt(s -> s.hits);
+                    label = "Plus de Coups Donnés";
+                }
+                case "hitsreceived" -> {
+                    comparator = Comparator.comparingInt(s -> s.hitsReceived);
+                    label = "Plus de Coups Reçus";
+                }
+                case "goals" -> {
+                    comparator = Comparator.comparingInt(s -> s.goals);
+                    label = "Plus de Buts Marqués";
+                }
+                default -> {
+                    MessageUtil.send(sender, "&cCritère inconnu. Utilise : &e/hb top <kd|kills|wins|games|points|force|hits|hitsreceived|goals>");
+                    return;
+                }
+            }
+
+            List<Map.Entry<UUID, com.hikabrain.plugin.stats.MatchHistoryManager.AggregatedStats>> top =
+                    new ArrayList<>(plugin.getMatchHistoryManager().aggregatePlayerStats(range[0], range[1]).entrySet());
+            top.sort((a, b) -> comparator.compare(b.getValue(), a.getValue()));
+            if (top.size() > 10) top = top.subList(0, 10);
+
+            int rank = 1;
+            for (Map.Entry<UUID, com.hikabrain.plugin.stats.MatchHistoryManager.AggregatedStats> entry : top) {
+                com.hikabrain.plugin.stats.MatchHistoryManager.AggregatedStats s = entry.getValue();
+                String value = switch (criterion) {
+                    case "kd"    -> String.valueOf(s.getKD());
+                    case "kills" -> String.valueOf(s.kills);
+                    case "games" -> String.valueOf(s.gamesPlayed);
+                    case "hits"  -> String.valueOf(s.hits);
+                    case "hitsreceived" -> String.valueOf(s.hitsReceived);
+                    case "goals" -> String.valueOf(s.goals);
+                    default      -> String.valueOf(s.wins);
+                };
+                lines.add(rankLine(rank++, s.name, value));
             }
         }
 
+        MessageUtil.send(sender, "&8&m----------&r &6&lClassement: " + label + " " + describePeriod(range) + " &8&m----------");
+        if (lines.isEmpty()) {
+            MessageUtil.send(sender, "&7Aucune statistique enregistrée pour cette période.");
+        } else {
+            lines.forEach(l -> MessageUtil.send(sender, l));
+        }
         MessageUtil.send(sender, "&8&m----------&r");
+    }
+
+    /**
+     * Formate une ligne de classement "#rang nom - valeur", avec la couleur d'or/argent/
+     * bronze pour le podium. Petit utilitaire commun à tous les /hb top.
+     */
+    private String rankLine(int rank, String name, String value) {
+        String rankColor = switch (rank) {
+            case 1 -> "&6";
+            case 2 -> "&7";
+            case 3 -> "&c";
+            default -> "&f";
+        };
+        return rankColor + "&l#" + rank + " &f" + name + " &7- &e" + value;
+    }
+
+    /**
+     * Interprète l'argument de période optionnel d'un /hb top (à partir de l'index donné) :
+     *  - absent, "alltime"/"all"/"total"       → null (= classement "depuis toujours")
+     *  - "today"/"jour"/"aujourdhui"           → aujourd'hui uniquement
+     *  - "week"/"semaine"                       → 7 derniers jours glissants (aujourd'hui inclus)
+     *  - "custom" <AAAA-MM-JJ> <AAAA-MM-JJ>     → plage de dates précise, incluse des deux côtés
+     * Renvoie un tableau vide (longueur 0, à distinguer de null) si la syntaxe est invalide
+     * — un message d'erreur a alors déjà été envoyé, l'appelant doit juste s'arrêter.
+     */
+    private LocalDate[] parsePeriodArg(CommandSender sender, String[] args, int index) {
+        if (args.length <= index) return null; // pas précisé → "depuis toujours"
+
+        String period = args[index].toLowerCase(Locale.ROOT);
+        switch (period) {
+            case "alltime", "all", "total" -> {
+                return null;
+            }
+            case "today", "jour", "aujourdhui" -> {
+                return plugin.getMatchHistoryManager().rangeForToday();
+            }
+            case "week", "semaine" -> {
+                return plugin.getMatchHistoryManager().rangeForWeek();
+            }
+            case "custom" -> {
+                if (args.length < index + 3) {
+                    MessageUtil.send(sender, "&cUsage: ... custom <AAAA-MM-JJ> <AAAA-MM-JJ>");
+                    return new LocalDate[0];
+                }
+                try {
+                    LocalDate from = LocalDate.parse(args[index + 1]);
+                    LocalDate to = LocalDate.parse(args[index + 2]);
+                    if (from.isAfter(to)) {
+                        LocalDate tmp = from;
+                        from = to;
+                        to = tmp;
+                    }
+                    return new LocalDate[]{ from, to };
+                } catch (DateTimeParseException e) {
+                    MessageUtil.send(sender, "&cDates invalides. Format attendu : &eAAAA-MM-JJ &c(ex: 2026-08-01)");
+                    return new LocalDate[0];
+                }
+            }
+            default -> {
+                MessageUtil.send(sender, "&cPériode inconnue. Utilise : &ealltime&c, &etoday&c, &eweek&c, ou &ecustom <AAAA-MM-JJ> <AAAA-MM-JJ>");
+                return new LocalDate[0];
+            }
+        }
+    }
+
+    /** Petit texte "(cette semaine)"/"(aujourd'hui)"/"(du X au Y)" pour l'en-tête d'un classement. Vide si "depuis toujours". */
+    private String describePeriod(LocalDate[] range) {
+        if (range == null) return "";
+        LocalDate today = LocalDate.now();
+        if (range[0].equals(today) && range[1].equals(today)) return "&7(aujourd'hui)";
+        if (range[1].equals(today) && range[0].equals(today.minusDays(6))) return "&7(cette semaine)";
+        return "&7(du " + range[0] + " au " + range[1] + ")";
     }
 
     /**
      * /hb top points : classement des 10 premiers joueurs par points HikaBrain cumulés.
      */
-    private void handleTopPoints(CommandSender sender) {
-        com.hikabrain.plugin.levels.LevelManager lm = plugin.getLevelManager();
-        List<Map.Entry<UUID, com.hikabrain.plugin.levels.LevelManager.PlayerLevelData>> top = lm.getTopPlayers(10);
+    /**
+     * /hb top points [alltime|today|week|custom <de> <à>] : classement par points.
+     * "alltime" (par défaut) classe par total de points cumulés à vie. Pour une période
+     * précise, classe par points GAGNÉS pendant cette période (pas le total à vie) — donc
+     * "qui a le plus progressé cette semaine", par exemple.
+     */
+    private void handleTopPoints(CommandSender sender, String[] args) {
+        LocalDate[] range = parsePeriodArg(sender, args, 2);
+        if (range != null && range.length == 0) return; // erreur déjà envoyée
 
-        MessageUtil.send(sender, "&8&m----------&r &6&lClassement: Points HikaBrain &8&m----------");
+        List<String> lines = new ArrayList<>();
 
-        if (top.isEmpty()) {
-            MessageUtil.send(sender, "&7Aucun joueur n'a encore gagné de points.");
-        } else {
+        if (range == null) {
+            com.hikabrain.plugin.levels.LevelManager lm = plugin.getLevelManager();
+            List<Map.Entry<UUID, com.hikabrain.plugin.levels.LevelManager.PlayerLevelData>> top = lm.getTopPlayers(10);
             int rank = 1;
             for (Map.Entry<UUID, com.hikabrain.plugin.levels.LevelManager.PlayerLevelData> entry : top) {
                 com.hikabrain.plugin.levels.LevelManager.PlayerLevelData data = entry.getValue();
                 int level = lm.getLevelForPoints(data.points);
-                String rankColor = switch (rank) {
-                    case 1 -> "&6";
-                    case 2 -> "&7";
-                    case 3 -> "&c";
-                    default -> "&f";
-                };
-                MessageUtil.send(sender, rankColor + "&l#" + rank + " &f" + data.name
-                        + " &7- &e" + data.points + " pts &7(niv. &b" + level + "&7)");
-                rank++;
+                lines.add(rankLine(rank++, data.name, data.points + " pts &7(niv. &b" + level + "&7)"));
+            }
+        } else {
+            List<Map.Entry<UUID, com.hikabrain.plugin.stats.MatchHistoryManager.AggregatedStats>> top =
+                    new ArrayList<>(plugin.getMatchHistoryManager().aggregatePlayerStats(range[0], range[1]).entrySet());
+            top.sort((a, b) -> Integer.compare(b.getValue().pointsGained, a.getValue().pointsGained));
+            if (top.size() > 10) top = top.subList(0, 10);
+            int rank = 1;
+            for (Map.Entry<UUID, com.hikabrain.plugin.stats.MatchHistoryManager.AggregatedStats> entry : top) {
+                com.hikabrain.plugin.stats.MatchHistoryManager.AggregatedStats s = entry.getValue();
+                lines.add(rankLine(rank++, s.name, "+" + s.pointsGained + " pts"));
             }
         }
 
+        MessageUtil.send(sender, "&8&m----------&r &6&lClassement: Points HikaBrain " + describePeriod(range) + " &8&m----------");
+        if (lines.isEmpty()) {
+            MessageUtil.send(sender, "&7Aucun joueur n'a encore gagné de points sur cette période.");
+        } else {
+            lines.forEach(l -> MessageUtil.send(sender, l));
+        }
         MessageUtil.send(sender, "&8&m----------&r");
     }
 
     /**
-     * /hb top force : classement des 10 joueurs les plus forts, calculé à partir des
-     * confrontations directes entre joueurs (qui a battu qui), pas seulement du nombre
-     * brut de victoires — voir com.hikabrain.plugin.stats.PowerRankingCalculator.
+     * /hb top force [alltime|today|week|custom <de> <à>] : classement des joueurs les plus
+     * forts, calculé à partir des confrontations directes entre joueurs (qui a battu qui),
+     * pas seulement du nombre brut de victoires — voir PowerRankingCalculator. Pour une
+     * période précise, le graphe de confrontations est recalculé UNIQUEMENT à partir des
+     * parties de cette période (voir MatchHistoryManager#aggregateHeadToHead).
      */
-    private void handleTopForce(CommandSender sender) {
-        com.hikabrain.plugin.stats.HeadToHeadManager h2h = plugin.getHeadToHeadManager();
-        List<com.hikabrain.plugin.stats.PowerRankingCalculator.PlayerPower> ranking =
-                com.hikabrain.plugin.stats.PowerRankingCalculator.compute(h2h);
+    private void handleTopForce(CommandSender sender, String[] args) {
+        LocalDate[] range = parsePeriodArg(sender, args, 2);
+        if (range != null && range.length == 0) return; // erreur déjà envoyée
 
-        MessageUtil.send(sender, "&8&m----------&r &6&lClassement: Force (qui bat qui) &8&m----------");
+        List<com.hikabrain.plugin.stats.PowerRankingCalculator.PlayerPower> ranking = range == null
+                ? com.hikabrain.plugin.stats.PowerRankingCalculator.compute(plugin.getHeadToHeadManager())
+                : com.hikabrain.plugin.stats.PowerRankingCalculator.compute(plugin.getMatchHistoryManager().aggregateHeadToHead(range[0], range[1]));
+
+        MessageUtil.send(sender, "&8&m----------&r &6&lClassement: Force (qui bat qui) " + describePeriod(range) + " &8&m----------");
 
         if (ranking.isEmpty()) {
-            MessageUtil.send(sender, "&7Aucune confrontation enregistrée pour le moment (il faut au moins une partie terminée).");
+            MessageUtil.send(sender, "&7Aucune confrontation enregistrée sur cette période (il faut au moins une partie terminée).");
         } else {
             int rank = 1;
             for (com.hikabrain.plugin.stats.PowerRankingCalculator.PlayerPower p : ranking) {
                 if (rank > 10) break;
-                String rankColor = switch (rank) {
-                    case 1 -> "&6";
-                    case 2 -> "&7";
-                    case 3 -> "&c";
-                    default -> "&f";
-                };
-                MessageUtil.send(sender, rankColor + "&l#" + rank + " &f" + p.name
-                        + " &7- &e" + String.format(java.util.Locale.FRANCE, "%.1f", p.score * 1000)
-                        + " &7(&a" + p.totalWins + "V &7/ &c" + p.totalLosses + "D&7, " + p.distinctOpponents + " adversaire(s))");
+                MessageUtil.send(sender, rankLine(rank, p.name,
+                        String.format(java.util.Locale.FRANCE, "%.1f", p.score * 1000)
+                                + " &7(&a" + p.totalWins + "V &7/ &c" + p.totalLosses + "D&7, " + p.distinctOpponents + " adversaire(s))"));
                 rank++;
             }
         }
@@ -1338,7 +1498,8 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
         MessageUtil.send(sender, "&e/hb arenas &7- Ouvrir le menu pour rejoindre une arène");
         MessageUtil.send(sender, "&e/hb info [nom] &7- Voir l'état d'une arène");
         MessageUtil.send(sender, "&e/hb stats [pseudo] &7- Voir tes statistiques (ou celles d'un joueur)");
-        MessageUtil.send(sender, "&e/hb top [kd|kills|wins|games|points|force] &7- Voir le classement des meilleurs joueurs");
+        MessageUtil.send(sender, "&e/hb top <kd|kills|wins|games|points|force|hits|hitsreceived|goals> [période] &7- Classement");
+        MessageUtil.send(sender, "  &7Période optionnelle : &falltime &7(déf.), &ftoday&7, &fweek&7, ou &fcustom <AAAA-MM-JJ> <AAAA-MM-JJ>");
         MessageUtil.send(sender, "&e/hb points [pseudo] &7- Voir tes points, ton niveau et tes avantages débloqués");
         MessageUtil.send(sender, "&e/hb force [pseudo] &7- Voir ton classement de force (qui bat qui) et ta meilleure victoire");
         MessageUtil.send(sender, "&e/hb perk [list|none|<id>] &7- Voir/équiper tes avantages cosmétiques débloqués");
@@ -1407,7 +1568,11 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
         }
 
         if (args.length == 2 && sub.equals("top")) {
-            return filterStartingWith(List.of("kd", "kills", "wins", "games", "points", "force"), args[1]);
+            return filterStartingWith(List.of("kd", "kills", "wins", "games", "points", "force", "hits", "hitsreceived", "goals"), args[1]);
+        }
+
+        if (args.length == 3 && sub.equals("top")) {
+            return filterStartingWith(List.of("alltime", "today", "week", "custom"), args[2]);
         }
 
         if (args.length == 2 && sub.equals("force")) {

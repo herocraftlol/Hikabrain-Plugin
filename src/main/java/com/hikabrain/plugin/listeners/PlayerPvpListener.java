@@ -70,6 +70,7 @@ public class PlayerPvpListener implements Listener {
             // ET cumulé à vie dans les statistiques (utilisées notamment par le classement web).
             if (state == GameState.PLAYING && victimTeam != null && damagerTeam != null) {
                 gm.addPlayerHit(damager.getUniqueId());
+                gm.addPlayerHitReceived(victim.getUniqueId());
                 plugin.getStatsManager().addPlayerHitGiven(damager.getUniqueId(), damager.getName());
                 plugin.getStatsManager().addPlayerHitReceived(victim.getUniqueId(), victim.getName());
             }
