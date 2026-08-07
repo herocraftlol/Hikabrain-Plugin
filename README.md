@@ -92,21 +92,26 @@ Le fichier `config.yml` permet de configurer :
 - Apparence complète du scoreboard (titre, lignes, couleurs)
 - Messages personnalisés avec préfixe
 
-## 🆕 Dernière Mise à Jour (v1.0.21)
+## 🆕 Dernière Mise à Jour (v1.0.22)
 
-### 🌐 Améliorations du Module Web API
+### 🔧 Corrections et Améliorations
 
-Cette mise à jour améliore le module Web API du plugin HikaBrain :
+Cette mise à jour inclut des corrections de bugs et des améliorations générales du plugin :
 
-#### LeaderboardExportServer Amélioré
-- Meilleure gestion des connexions HTTP
-- Optimisation de l'export des données
-- Amélioration de la stabilité du serveur intégré
+#### 🐛 Corrections de Bugs
+- Résolution de problèmes de synchronisation des scores
+- Corrections sur le système de détection de capture de zone
+- Amélioration de la stabilité des listeners d'événements
+
+#### ⚡ Optimisations
+- Optimisation de la gestion de la mémoire
+- Amélioration des performances du scoreboard en temps réel
+- Réduction de la latence dans les calculs de statistiques
 
 #### 🔧 Améliorations Techniques
-- Corrections de bugs
-- Optimisation des performances
-- Amélioration de la fiabilité
+- Refactoring du code pour une meilleure maintenabilité
+- Nettoyage des dépendances inutilisées
+- Amélioration de la journalisation (logs) pour le débogage
 
 ---
 
@@ -194,7 +199,7 @@ mvn clean package
 ## 📝 Auteur
 
 - **Développeur**: herocraftlol
-- **Version**: 1.0.21
+- **Version**: 1.0.22
 
 ## 📄 Licence
 

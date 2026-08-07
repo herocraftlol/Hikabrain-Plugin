@@ -23,6 +23,7 @@ import com.hikabrain.plugin.listeners.PlayerPvpListener;
 import com.hikabrain.plugin.listeners.TeamSelectListener;
 import com.hikabrain.plugin.scoreboard.ScoreboardManager;
 import com.hikabrain.plugin.stats.HeadToHeadManager;
+import com.hikabrain.plugin.stats.MatchHistoryManager;
 import com.hikabrain.plugin.stats.StatsManager;
 import com.hikabrain.plugin.tournament.DuelArenaManager;
 import com.hikabrain.plugin.tournament.TournamentCommand;
@@ -45,6 +46,7 @@ public class HikaBrainPlugin extends JavaPlugin {
     private ScoreboardManager    scoreboardManager;
     private StatsManager         statsManager;
     private HeadToHeadManager    headToHeadManager;
+    private MatchHistoryManager  matchHistoryManager;
     private LevelManager         levelManager;
     private ArenaGUI             arenaGUI;
     private TeamSelectGUI        teamSelectGUI;
@@ -67,6 +69,7 @@ public class HikaBrainPlugin extends JavaPlugin {
         this.scoreboardManager = new ScoreboardManager(this);
         this.statsManager      = new StatsManager(this);
         this.headToHeadManager = new HeadToHeadManager(this);
+        this.matchHistoryManager = new MatchHistoryManager(this);
         this.levelManager      = new LevelManager(this);
         this.leaderboardManager = new CategoryLeaderboardManager(this);
         this.leaderboardExportServer = new LeaderboardExportServer(this);
@@ -116,6 +119,7 @@ public class HikaBrainPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new LeaveItemListener(this), this);
         getServer().getPluginManager().registerEvents(new PlayerItemListener(this), this);
         getServer().getPluginManager().registerEvents(new BlockPlaceListener(this), this);
+        getServer().getPluginManager().registerEvents(new com.hikabrain.plugin.listeners.QuickChatListener(this), this);
         getServer().getPluginManager().registerEvents(new ArenaGUIListener(this, arenaGUI), this);
         getServer().getPluginManager().registerEvents(new TeamSelectGUIListener(this), this);
         getServer().getPluginManager().registerEvents(new TournamentListener(this), this);
@@ -146,6 +150,7 @@ public class HikaBrainPlugin extends JavaPlugin {
     public ScoreboardManager    getScoreboardManager()  { return scoreboardManager; }
     public StatsManager         getStatsManager()       { return statsManager; }
     public HeadToHeadManager    getHeadToHeadManager()  { return headToHeadManager; }
+    public MatchHistoryManager  getMatchHistoryManager(){ return matchHistoryManager; }
     public LevelManager         getLevelManager()       { return levelManager; }
     public CategoryLeaderboardManager getLeaderboardManager() { return leaderboardManager; }
 

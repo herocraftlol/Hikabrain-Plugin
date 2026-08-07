@@ -69,10 +69,20 @@ public final class PowerRankingCalculator {
     }
 
     /**
-     * Calcule et renvoie le classement complet, du plus fort au plus faible.
+     * Calcule et renvoie le classement complet, du plus fort au plus faible, à partir des
+     * confrontations connues par le gestionnaire (historique complet, "depuis toujours").
      */
     public static List<PlayerPower> compute(HeadToHeadManager manager) {
-        Map<UUID, HeadToHeadManager.PlayerHeadToHead> all = manager.getAll();
+        return compute(manager.getAll());
+    }
+
+    /**
+     * Calcule et renvoie le classement complet à partir d'une map de confrontations
+     * arbitraire — utilisé pour le classement "depuis toujours" (voir l'autre surcharge)
+     * mais aussi pour un classement limité à une plage de temps (voir
+     * MatchHistoryManager#aggregateHeadToHead).
+     */
+    public static List<PlayerPower> compute(Map<UUID, HeadToHeadManager.PlayerHeadToHead> all) {
         Set<UUID> players = all.keySet();
         int n = players.size();
 

@@ -1,6 +1,7 @@
 package com.hikabrain.plugin.game;
 
 import com.hikabrain.plugin.HikaBrainPlugin;
+import com.hikabrain.plugin.chat.QuickMessage;
 import com.hikabrain.plugin.gui.TeamSelectGUI;
 import com.hikabrain.plugin.levels.LevelManager;
 import com.hikabrain.plugin.levels.Perk;
@@ -988,6 +989,58 @@ public class GameManager {
         frozenPlayers.clear();
     }
 
+    /**
+     * Remplace TEMPORAIREMENT l'inventaire de tous les joueurs en partie par les 4 blocs
+     * de couleur "message rapide" (voir {@link QuickMessage}), pendant le temps d'attente
+     * après un point marqué ou à l'écran de victoire finale — pas le temps d'écrire dans
+     * le chat entre deux rounds. Le kit normal est reposé ensuite (voir
+     * {@link #restoreKitForAllPlayers()}), sauf à la victoire où la partie se termine.
+     */
+    private void giveQuickChatItemsToAll() {
+        for (UUID uuid : playerTeams.keySet()) {
+            Player player = Bukkit.getPlayer(uuid);
+            if (player == null) continue;
+            giveQuickChatItems(player);
+        }
+    }
+
+    private void giveQuickChatItems(Player player) {
+        org.bukkit.inventory.PlayerInventory inv = player.getInventory();
+        inv.clear();
+        for (QuickMessage message : QuickMessage.values()) {
+            inv.setItem(message.getHotbarSlot(), message.createItem());
+        }
+    }
+
+    /**
+     * Reposent le kit normal (épée, pioche, pomme dorée, blocs, armure) de tous les
+     * joueurs en partie, remplaçant les blocs de message rapide — appelé quand le
+     * prochain round commence réellement (voir {@link #startRoundReset}).
+     */
+    private void restoreKitForAllPlayers() {
+        for (Map.Entry<UUID, Team> entry : playerTeams.entrySet()) {
+            Player player = Bukkit.getPlayer(entry.getKey());
+            if (player == null) continue;
+            KitManager.giveFullKit(player, entry.getValue());
+        }
+    }
+
+    /**
+     * Envoie un message rapide (voir {@link QuickMessage}) dans le chat de l'arène, de la
+     * couleur du bloc cliqué. Chaque destinataire reçoit le texte traduit dans SA PROPRE
+     * langue (détectée via son client, voir {@link QuickMessage#getTextFor}) — deux
+     * adversaires peuvent donc voir des langues différentes pour le même message envoyé.
+     */
+    public void sendQuickChatMessage(Player sender, QuickMessage message) {
+        String prefix = MessageUtil.format(plugin.getConfig().getString("messages.prefix", ""));
+        for (UUID uuid : playerTeams.keySet()) {
+            Player recipient = Bukkit.getPlayer(uuid);
+            if (recipient == null) continue;
+            String text = message.getTextFor(recipient);
+            recipient.sendMessage(prefix + message.getColor() + sender.getName() + " §7» " + message.getColor() + text);
+        }
+    }
+
     private void teleportAllToSpawns() {
         for (UUID uuid : playerTeams.keySet()) {
             Player player = Bukkit.getPlayer(uuid);
@@ -1052,6 +1105,7 @@ public class GameManager {
     private Map<UUID, Integer> playerKills = new HashMap<>();
     private Map<UUID, Integer> playerDeaths = new HashMap<>();
     private Map<UUID, Integer> playerHits = new HashMap<>();
+    private Map<UUID, Integer> playerHitsReceived = new HashMap<>();
     private Map<UUID, Integer> playerGoals = new HashMap<>();
     
     /**
@@ -1129,6 +1183,10 @@ public class GameManager {
 
         // Geler les joueurs immédiatement après téléportation
         freezeAllPlayers();
+        // Le temps d'attente ne permet pas d'écrire dans le chat : donner à la place les
+        // blocs de message rapide (voir QuickMessage), le kit normal sera reposé quand le
+        // round reprendra réellement (voir plus bas, à la fin du compte à rebours).
+        giveQuickChatItemsToAll();
 
         roundResetSecondsLeft = plugin.getConfig().getInt("round-reset-countdown", 5);
 
@@ -1138,8 +1196,9 @@ public class GameManager {
                     roundResetTask.cancel();
                     roundResetTask = null;
                 }
-                // Dégeler avant de reprendre
+                // Dégeler avant de reprendre, et reposer le kit normal (fini les blocs de message rapide)
                 unfreezeAllPlayers();
+                restoreKitForAllPlayers();
                 state = GameState.PLAYING;
                 broadcast("&a&lÀ vous de jouer !");
                 // Son de départ
@@ -1246,6 +1305,10 @@ public class GameManager {
                 player.setFlySpeed(0.1f);
                 // Mettre en spectateur
                 player.setGameMode(GameMode.SPECTATOR);
+                // Le temps d'attente avant le retour au lobby ne permet pas d'écrire dans
+                // le chat : donner les blocs de message rapide, comme après chaque point
+                // (voir QuickMessage). Pas besoin de reposer le kit ensuite, la partie est finie.
+                giveQuickChatItems(player);
 
                 // Ajouter à la liste de son équipe
                 if (playerTeams.get(uuid) == Team.RED) {
@@ -1303,16 +1366,18 @@ public class GameManager {
         if (winners.isEmpty() || losers.isEmpty()) return;
 
         com.hikabrain.plugin.stats.HeadToHeadManager h2h = plugin.getHeadToHeadManager();
+        com.hikabrain.plugin.stats.MatchHistoryManager history = plugin.getMatchHistoryManager();
 
         for (UUID winnerUuid : winners) {
             Player winnerPlayer = Bukkit.getPlayer(winnerUuid);
-            String winnerName = winnerPlayer != null ? winnerPlayer.getName() : null;
+            String winnerName = winnerPlayer != null ? winnerPlayer.getName() : "?";
 
             for (UUID loserUuid : losers) {
                 Player loserPlayer = Bukkit.getPlayer(loserUuid);
-                String loserName = loserPlayer != null ? loserPlayer.getName() : null;
+                String loserName = loserPlayer != null ? loserPlayer.getName() : "?";
 
                 h2h.recordResult(winnerUuid, winnerName, loserUuid, loserName);
+                history.recordHeadToHead(winnerUuid, winnerName, loserUuid, loserName);
             }
         }
     }
@@ -1359,12 +1424,16 @@ public class GameManager {
             if (player == null) continue;
 
             int hits  = getPlayerHits(uuid);
+            int hitsReceived = getPlayerHitsReceived(uuid);
             int kills = getPlayerKills(uuid);
             int goals = getPlayerGoals(uuid);
+            int deaths = getPlayerDeaths(uuid);
             boolean won = entry.getValue() == winner;
 
             int gained = levelManager.computeMatchPoints(hits, kills, goals, won);
             LevelManager.AwardResult result = levelManager.addPoints(uuid, player.getName(), gained);
+
+            plugin.getMatchHistoryManager().recordPlayerMatch(uuid, player.getName(), hits, hitsReceived, kills, deaths, goals, won, gained);
 
             MessageUtil.send(player, "&d+" + result.pointsGained + " pts &7(\u2694" + hits + " \u2620" + kills + " \u26bd" + goals
                     + (won ? " \uD83C\uDFC6" : "") + ") &7\u2192 &b" + result.totalPoints + " pts &7(Niv." + result.newLevel + ")");
@@ -1746,6 +1815,7 @@ public class GameManager {
     public int getPlayerKills(UUID uuid) { return playerKills.getOrDefault(uuid, 0); }
     public int getPlayerDeaths(UUID uuid) { return playerDeaths.getOrDefault(uuid, 0); }
     public int getPlayerHits(UUID uuid) { return playerHits.getOrDefault(uuid, 0); }
+    public int getPlayerHitsReceived(UUID uuid) { return playerHitsReceived.getOrDefault(uuid, 0); }
     public int getPlayerGoals(UUID uuid) { return playerGoals.getOrDefault(uuid, 0); }
     
     public void addKill(Team team) {
@@ -1775,6 +1845,14 @@ public class GameManager {
     }
 
     /**
+     * Comptabilise un coup valide reçu par ce joueur de la part d'un adversaire (symétrique
+     * de {@link #addPlayerHit}, utilisé pour l'historique/les classements par plage de temps).
+     */
+    public void addPlayerHitReceived(UUID uuid) {
+        playerHitsReceived.put(uuid, playerHitsReceived.getOrDefault(uuid, 0) + 1);
+    }
+
+    /**
      * Comptabilise un but marqué par ce joueur (utilisé pour le calcul des points
      * de fin de partie).
      */
@@ -1790,6 +1868,7 @@ public class GameManager {
         playerKills.clear();
         playerDeaths.clear();
         playerHits.clear();
+        playerHitsReceived.clear();
         playerGoals.clear();
     }
 }

@@ -35,6 +35,14 @@ public class BlockPlaceListener implements Listener {
                 && gm.getState() != GameState.STARTING) {
             return;
         }
+
+        // Pendant le temps d'attente après un point marqué, les joueurs sont gelés
+        // (voir GameManager#freezeAllPlayers) et n'ont d'ailleurs plus leur kit en main
+        // (juste les blocs de message rapide) : aucune pose de bloc ne doit être possible.
+        if (gm.isFrozen(player)) {
+            event.setCancelled(true);
+            return;
+        }
         
         Location blockLoc = event.getBlock().getLocation();
         
