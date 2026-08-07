@@ -843,6 +843,9 @@ public class GameManager {
         broadcast(plugin.getConfig().getString("messages.game-start", ""));
         playSoundToAll(Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.5f, 1.2f);
 
+        // Musique d'ambiance (facultative, voir MusicManager / config.yml "music")
+        plugin.getMusicManager().startMusicForArena(this);
+
         // Avantage cosmétique : nuage de particules "tête" au tout début de la partie
         // (une seule fois par match, pas à chaque round reset).
         playParticleHeadPerkForAll();
@@ -914,6 +917,12 @@ public class GameManager {
             offhandReplenishTask.cancel();
         }
         offhandReplenishTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+            // Uniquement pendant la phase de jeu active : pendant le temps d'attente
+            // (ROUND_RESET) et à la victoire (ENDING), l'inventaire contient les blocs de
+            // message rapide (voir QuickMessage) et ne doit surtout pas être touché ici,
+            // sinon cette tâche y réinjecte un bloc de construction par-dessus.
+            if (state != GameState.PLAYING) return;
+
             for (UUID uuid : playerTeams.keySet()) {
                 Player player = Bukkit.getPlayer(uuid);
                 if (player != null) {
@@ -1008,7 +1017,7 @@ public class GameManager {
         org.bukkit.inventory.PlayerInventory inv = player.getInventory();
         inv.clear();
         for (QuickMessage message : QuickMessage.values()) {
-            inv.setItem(message.getHotbarSlot(), message.createItem());
+            inv.setItem(message.getHotbarSlot(), message.createItem(player));
         }
     }
 
@@ -1187,6 +1196,8 @@ public class GameManager {
         // blocs de message rapide (voir QuickMessage), le kit normal sera reposé quand le
         // round reprendra réellement (voir plus bas, à la fin du compte à rebours).
         giveQuickChatItemsToAll();
+        // Silence pendant le temps d'attente (la musique reprendra quand le round redémarre)
+        plugin.getMusicManager().stopMusicForArena(this);
 
         roundResetSecondsLeft = plugin.getConfig().getInt("round-reset-countdown", 5);
 
@@ -1200,6 +1211,8 @@ public class GameManager {
                 unfreezeAllPlayers();
                 restoreKitForAllPlayers();
                 state = GameState.PLAYING;
+                // Reprise de la musique d'ambiance
+                plugin.getMusicManager().startMusicForArena(this);
                 broadcast("&a&lÀ vous de jouer !");
                 // Son de départ
                 playSoundToAll(Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.5f, 1.2f);
@@ -1246,6 +1259,7 @@ public class GameManager {
     private void endGame(Team winner) {
         if (state != GameState.PLAYING && state != GameState.ROUND_RESET && state != GameState.STARTING) return;
         state = GameState.ENDING;
+        plugin.getMusicManager().stopMusicForArena(this);
 
         // Notifier le système de tournoi si ce match était un match de tournoi réservé.
         // On retire le callback immédiatement pour éviter un double appel.
@@ -1519,6 +1533,9 @@ public class GameManager {
             offhandReplenishTask.cancel();
             offhandReplenishTask = null;
         }
+        // Filet de sécurité : la musique aurait déjà dû être coupée par endGame(), mais on
+        // s'assure qu'il n'en reste jamais en cas d'arrêt brutal (forceStop, etc.)
+        plugin.getMusicManager().stopMusicForArena(this);
         // S'assurer que personne n'est encore gelé
         unfreezeAllPlayers();
         // Filet de sécurité : si une partie s'arrête pendant un effet cosmétique en cours

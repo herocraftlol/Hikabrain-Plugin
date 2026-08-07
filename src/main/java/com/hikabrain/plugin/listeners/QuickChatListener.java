@@ -5,9 +5,11 @@ import com.hikabrain.plugin.chat.QuickMessage;
 import com.hikabrain.plugin.game.GameManager;
 import com.hikabrain.plugin.game.GameState;
 import org.bukkit.entity.Player;
+import org.bukkit.event.Event;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
-import org.bukkit.event.player.PlayerItemHeldEvent;
+import org.bukkit.event.block.Action;
+import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.ItemStack;
 
 import java.util.HashMap;
@@ -15,19 +17,14 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Détecte quand un joueur sélectionne (en scrollant/appuyant sur 1-9) un bloc de couleur
- * "message rapide" dans sa hotbar pendant le temps d'attente après un point (ou à la
- * victoire finale), et envoie alors le message correspondant dans le chat de l'arène —
- * voir {@link QuickMessage} et {@link GameManager#sendQuickChatMessage}.
- *
- * On déclenche sur la SÉLECTION du slot (PlayerItemHeldEvent), pas sur un clic/interaction
- * classique : c'est plus rapide (pas besoin de viser/cliquer), ça fonctionne même en mode
- * spectateur (les interactions y sont très restreintes), et ça correspond exactement à
- * l'usage "je n'ai pas le temps d'écrire dans le chat, je veux juste presser 1/2/3/4".
+ * Détecte quand un joueur fait un CLIC GAUCHE en tenant un bloc de couleur "message
+ * rapide" pendant le temps d'attente après un point (ou à la victoire finale), et
+ * envoie alors le message correspondant dans le chat de l'arène — voir
+ * {@link QuickMessage} et {@link GameManager#sendQuickChatMessage}.
  */
 public class QuickChatListener implements Listener {
 
-    /** Anti-spam : évite qu'un scroll rapide dans la hotbar déclenche une rafale de messages. */
+    /** Anti-spam : évite qu'un clic gauche maintenu déclenche une rafale de messages. */
     private static final long COOLDOWN_MILLIS = 1500;
 
     private final HikaBrainPlugin plugin;
@@ -38,7 +35,10 @@ public class QuickChatListener implements Listener {
     }
 
     @EventHandler
-    public void onItemHeld(PlayerItemHeldEvent event) {
+    public void onPlayerInteract(PlayerInteractEvent event) {
+        Action action = event.getAction();
+        if (action != Action.LEFT_CLICK_AIR && action != Action.LEFT_CLICK_BLOCK) return;
+
         Player player = event.getPlayer();
         GameManager gm = plugin.getArenaManager().findArenaOf(player);
         if (gm == null) return;
@@ -48,9 +48,15 @@ public class QuickChatListener implements Listener {
         GameState state = gm.getState();
         if (state != GameState.ROUND_RESET && state != GameState.ENDING) return;
 
-        ItemStack newItem = player.getInventory().getItem(event.getNewSlot());
-        QuickMessage message = QuickMessage.fromItem(newItem);
+        ItemStack item = player.getInventory().getItemInMainHand();
+        QuickMessage message = QuickMessage.fromItem(item);
         if (message == null) return;
+
+        // Empêche le clic gauche de casser un bloc regardé (LEFT_CLICK_BLOCK) ou de
+        // déclencher toute autre interaction pendant que ce bloc sert de message rapide.
+        event.setUseInteractedBlock(Event.Result.DENY);
+        event.setUseItemInHand(Event.Result.DENY);
+        event.setCancelled(true);
 
         long now = System.currentTimeMillis();
         Long last = lastSentAt.get(player.getUniqueId());

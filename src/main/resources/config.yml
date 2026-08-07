@@ -89,6 +89,32 @@ web-export:
   api-key: "change-moi"
 
 # ===========================================
+#         Musique d'ambiance (facultative)
+# ===========================================
+# Joue une musique via les sons de bloc de notes vanilla pendant les parties (aucun
+# plugin externe requis). Place tes fichiers .nbs dans plugins/HikaBrain/music/.
+#
+# ⚠️ Convertir une musique en blocs de notes ne supprime PAS ses droits d'auteur.
+# Privilégie de la musique du domaine public (classique) ou explicitement libre de
+# droits (incompetech.com, opengameart.org, pixabay.com/music...), convertie toi-même
+# via Open Note Block Studio (https://opennbs.org). Pour trouver des .nbs déjà prêts :
+# https://noteblock.world
+music:
+  enabled: false
+
+  # "random" = tire une piste au hasard parmi plugins/HikaBrain/music/*.nbs à chaque
+  # début de partie. Sinon, mets le nom exact d'un fichier (ex: "epique.nbs"), ou "off"
+  # pour désactiver. Peut être surchargé arène par arène avec /hb music <arène> <choix>.
+  default-track: "random"
+
+  # Volume global (0.0 à 1.0). Chaque joueur peut aussi baisser/couper la musique lui-même
+  # via le curseur "Disques" (Records) dans ses propres options de son Minecraft.
+  volume: 1.0
+
+  # Reboucle automatiquement la piste une fois terminée, tant que la partie continue
+  loop: true
+
+# ===========================================
 #         Configuration Scoreboard
 # ===========================================
 scoreboard:

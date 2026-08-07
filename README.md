@@ -92,11 +92,28 @@ Le fichier `config.yml` permet de configurer :
 - Apparence complète du scoreboard (titre, lignes, couleurs)
 - Messages personnalisés avec préfixe
 
-## 🆕 Dernière Mise à Jour (v1.0.22)
+## 🆕 Dernière Mise à Jour (v1.0.23)
+
+### 🎵 Système de Musique
+
+Cette mise à jour majeure ajoute un tout nouveau système de musique pour enrichir l'expérience de jeu :
+
+#### 🎶 Fonctionnalités Musicales
+- **Jukebox dans l'Arène** - Les joueurs peuvent contrôler la musique pendant les parties
+- **Musique d'Ambiance** - Bandes sonores adaptatives selon l'état du jeu
+- **Commande `/hb music`** - Gestion complète de la musique via commande
+- **Playback Controls** - Lecture, pause, changement de piste
+
+#### 🎮 Intégration Gameplay
+- La musique s'adapte automatiquement aux événements du jeu (capture, kills, victoire)
+- Volume configurable par le joueur
+- Support des fichiers audio personnalisés
+
+---
 
 ### 🔧 Corrections et Améliorations
 
-Cette mise à jour inclut des corrections de bugs et des améliorations générales du plugin :
+Cette mise à jour inclut également des corrections de bugs et des améliorations générales du plugin :
 
 #### 🐛 Corrections de Bugs
 - Résolution de problèmes de synchronisation des scores
@@ -199,7 +216,7 @@ mvn clean package
 ## 📝 Auteur
 
 - **Développeur**: herocraftlol
-- **Version**: 1.0.22
+- **Version**: 1.0.23
 
 ## 📄 Licence
 

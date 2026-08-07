@@ -87,6 +87,7 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
             case "setmaxplayers" -> handleSetMaxPlayers(sender, args);
             case "setminplayers" -> handleSetMinPlayers(sender, args);
             case "guislot" -> handleGuiSlot(sender, args);
+            case "music" -> handleMusic(sender, args);
             case "join" -> handleJoin(sender, args);
             case "joinrandom" -> handleJoinRandom(sender);
             case "arenas" -> handleArenasGui(sender);
@@ -574,6 +575,68 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
         plugin.getArenaGUI().assignSlot(page0Based, slot0Based, arenaName);
         MessageUtil.send(sender, "&aArène '" + arenaName + "' placée à l'emplacement &e" + slot1Based
                 + " &ade la page &e" + page1Based + " &adu menu /arenas.");
+    }
+
+    /**
+     * /hb music                          : liste les pistes disponibles + réglage actuel de chaque arène
+     * /hb music <arène>                  : affiche la piste actuellement choisie pour cette arène
+     * /hb music <arène> <fichier.nbs>    : impose cette piste pour cette arène
+     * /hb music <arène> random           : tire une piste au hasard à chaque partie (comportement par défaut)
+     * /hb music <arène> off              : coupe la musique pour cette arène
+     * /hb music <arène> reset            : retire le réglage spécifique, retombe sur le réglage global
+     */
+    private void handleMusic(CommandSender sender, String[] args) {
+        if (!sender.hasPermission("hikabrain.admin")) {
+            MessageUtil.send(sender, "&cTu n'as pas la permission.");
+            return;
+        }
+
+        com.hikabrain.plugin.music.MusicManager musicManager = plugin.getMusicManager();
+
+        if (args.length < 2) {
+            java.util.List<String> tracks = musicManager.listAvailableTracks();
+            MessageUtil.send(sender, "&8&m----------&r &6&lMusique d'ambiance &8&m----------");
+            MessageUtil.send(sender, "&f▸ Activée globalement: " + (plugin.getConfig().getBoolean("music.enabled", false) ? "&aoui" : "&cnon")
+                    + " &7(voir 'music.enabled' dans config.yml)");
+            MessageUtil.send(sender, "&f▸ Piste par défaut: &e" + plugin.getConfig().getString("music.default-track", "random"));
+            if (tracks.isEmpty()) {
+                MessageUtil.send(sender, "&7Aucun fichier .nbs trouvé dans plugins/HikaBrain/music/.");
+            } else {
+                MessageUtil.send(sender, "&f▸ Pistes disponibles (&e" + tracks.size() + "&f): &7" + String.join(", ", tracks));
+            }
+            MessageUtil.send(sender, "&7Usage: &e/hb music <arène> <fichier.nbs|random|off|reset>");
+            MessageUtil.send(sender, "&8&m----------&r");
+            return;
+        }
+
+        String arenaName = args[1];
+        if (!plugin.getArenaManager().exists(arenaName)) {
+            MessageUtil.send(sender, "&cAucune arène '" + arenaName + "' trouvée.");
+            return;
+        }
+
+        if (args.length == 2) {
+            MessageUtil.send(sender, "&aArène '" + arenaName + "' : piste actuelle = &e" + musicManager.getArenaTrackChoice(arenaName));
+            return;
+        }
+
+        String choice = args[2];
+        if (choice.equalsIgnoreCase("reset")) {
+            musicManager.setArenaTrack(arenaName, null);
+            MessageUtil.send(sender, "&aRéglage de musique spécifique retiré pour '" + arenaName + "' (retombe sur le réglage global).");
+            return;
+        }
+
+        if (!choice.equalsIgnoreCase("random") && !choice.equalsIgnoreCase("off")) {
+            if (!musicManager.listAvailableTracks().contains(choice)) {
+                MessageUtil.send(sender, "&cFichier '" + choice + "' introuvable dans plugins/HikaBrain/music/. "
+                        + "Utilise &e/hb music &cpour voir les pistes disponibles.");
+                return;
+            }
+        }
+
+        musicManager.setArenaTrack(arenaName, choice);
+        MessageUtil.send(sender, "&aMusique de l'arène '" + arenaName + "' réglée sur : &e" + choice);
     }
 
     // ================= JOUEUR =================
@@ -1516,6 +1579,7 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
             MessageUtil.send(sender, "&c/hb setmaxplayers <nom> <nombre> &7- Définir le nombre max de joueurs de l'arène (0 = global)");
             MessageUtil.send(sender, "&c/hb setminplayers <nom> <nombre> &7- Définir le nombre min de joueurs de l'arène (0 = global)");
             MessageUtil.send(sender, "&c/hb guislot <page> <emplacement 1-45> <arène|clear> &7- Placer une arène à un emplacement précis d'une page du menu /arenas");
+            MessageUtil.send(sender, "&c/hb music [arène] [fichier.nbs|random|off|reset] &7- Régler la musique d'ambiance d'une arène");
             MessageUtil.send(sender, "&c/hb start <nom> &7- Forcer le démarrage");
             MessageUtil.send(sender, "&c/hb stop <nom> &7- Forcer l'arrêt");
             MessageUtil.send(sender, "&c/hb resetstats &7- Réinitialiser les statistiques");
@@ -1537,7 +1601,7 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
         if (args.length == 1) {
             List<String> options = new ArrayList<>(List.of("join", "joinrandom", "leave", "spectate", "unspectate", "info", "list", "arenas", "stats", "top", "points", "perk", "force"));
             if (sender.hasPermission("hikabrain.admin")) {
-                options.addAll(List.of("create", "copy", "delete", "setlobby", "setspectatorspawn", "setspawn", "delspawn", "setcapture", "setgamezone", "setmaxplayers", "setminplayers", "guislot", "start", "stop"));
+                options.addAll(List.of("create", "copy", "delete", "setlobby", "setspectatorspawn", "setspawn", "delspawn", "setcapture", "setgamezone", "setmaxplayers", "setminplayers", "guislot", "music", "start", "stop"));
                 options.addAll(List.of("setsbserver", "setsbgame", "setsbtitle", "setsblines", "reloadsb", "sbinfo"));
                 options.addAll(List.of("resetstats", "leaderboard"));
             }
@@ -1593,6 +1657,16 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
             List<String> options = new ArrayList<>(List.of("clear"));
             options.addAll(plugin.getArenaManager().getNames());
             return filterStartingWith(options, args[3]);
+        }
+
+        if (args.length == 2 && sub.equals("music")) {
+            return filterStartingWith(new ArrayList<>(plugin.getArenaManager().getNames()), args[1]);
+        }
+
+        if (args.length == 3 && sub.equals("music")) {
+            List<String> options = new ArrayList<>(List.of("random", "off", "reset"));
+            options.addAll(plugin.getMusicManager().listAvailableTracks());
+            return filterStartingWith(options, args[2]);
         }
 
         if (args.length == 2 && sub.equals("points")) {

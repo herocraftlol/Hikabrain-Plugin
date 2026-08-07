@@ -1,6 +1,7 @@
 package com.hikabrain.plugin.listeners;
 
 import com.hikabrain.plugin.HikaBrainPlugin;
+import com.hikabrain.plugin.chat.QuickMessage;
 import com.hikabrain.plugin.game.GameManager;
 import com.hikabrain.plugin.game.GameState;
 import com.hikabrain.plugin.game.KitManager;
@@ -23,6 +24,8 @@ import org.bukkit.inventory.ItemStack;
  * - Empêche de déplacer, droppée ou perdre l'épée, la pioche, la pomme dorée
  *   et les blocs du kit de jeu, sous aucun prétexte (clic, glisser-déposer,
  *   touche numéro, échange offhand, ou mort)
+ * - Empêche de déplacer ou droppée les blocs de message rapide (voir QuickMessage),
+ *   sous les mêmes conditions que les items du kit
  */
 public class PlayerItemListener implements Listener {
 
@@ -30,6 +33,16 @@ public class PlayerItemListener implements Listener {
 
     public PlayerItemListener(HikaBrainPlugin plugin) {
         this.plugin = plugin;
+    }
+
+    /**
+     * Un item "protégé" pendant la partie est soit un item du kit normal (épée, pioche,
+     * pomme dorée, blocs), soit un bloc de message rapide (présent uniquement pendant le
+     * temps d'attente/la victoire, voir QuickMessage) — dans les deux cas, ni drop ni
+     * déplacement dans l'inventaire ne doivent être possibles.
+     */
+    private boolean isProtectedItem(ItemStack item) {
+        return KitManager.isProtectedKitItem(item) || QuickMessage.fromItem(item) != null;
     }
 
     @EventHandler(priority = EventPriority.HIGH)
@@ -57,10 +70,11 @@ public class PlayerItemListener implements Listener {
             }
         }
         
-        // En jeu : empêcher de lâcher les items du kit, sous aucun prétexte
-        if (gm.getState() == GameState.PLAYING || gm.getState() == GameState.ROUND_RESET || 
-            gm.getState() == GameState.COUNTDOWN || gm.getState() == GameState.STARTING) {
-            if (KitManager.isProtectedKitItem(item)) {
+        // En jeu (kit normal OU blocs de message rapide) : empêcher de lâcher, sous aucun prétexte
+        if (gm.getState() == GameState.PLAYING || gm.getState() == GameState.ROUND_RESET ||
+            gm.getState() == GameState.COUNTDOWN || gm.getState() == GameState.STARTING
+            || gm.getState() == GameState.ENDING) {
+            if (isProtectedItem(item)) {
                 event.setCancelled(true);
             }
         }
@@ -94,24 +108,25 @@ public class PlayerItemListener implements Listener {
             return;
         }
         
-        // En jeu : empêcher de déplacer les items du kit, sous aucun prétexte.
-        // On vérifie l'item du slot cliqué, l'item déjà sur le curseur (au cas où),
-        // et, pour un clic "touche numéro" ou "échange offhand", l'item du slot
-        // réellement impliqué dans l'échange (qui n'est pas forcément getCurrentItem()).
-        if (gm.getState() == GameState.PLAYING || gm.getState() == GameState.ROUND_RESET || 
-            gm.getState() == GameState.COUNTDOWN || gm.getState() == GameState.STARTING) {
+        // En jeu (kit normal OU blocs de message rapide) : empêcher de déplacer, sous
+        // aucun prétexte. On vérifie l'item du slot cliqué, l'item déjà sur le curseur
+        // (au cas où), et, pour un clic "touche numéro" ou "échange offhand", l'item du
+        // slot réellement impliqué dans l'échange (qui n'est pas forcément getCurrentItem()).
+        if (gm.getState() == GameState.PLAYING || gm.getState() == GameState.ROUND_RESET ||
+            gm.getState() == GameState.COUNTDOWN || gm.getState() == GameState.STARTING
+            || gm.getState() == GameState.ENDING) {
 
-            boolean touchesProtectedItem = KitManager.isProtectedKitItem(item)
-                || KitManager.isProtectedKitItem(event.getCursor());
+            boolean touchesProtectedItem = isProtectedItem(item)
+                || isProtectedItem(event.getCursor());
 
             if (!touchesProtectedItem && event.getClick() == ClickType.NUMBER_KEY) {
                 ItemStack hotbarItem = player.getInventory().getItem(event.getHotbarButton());
-                touchesProtectedItem = KitManager.isProtectedKitItem(hotbarItem);
+                touchesProtectedItem = isProtectedItem(hotbarItem);
             }
 
             if (!touchesProtectedItem && event.getClick() == ClickType.SWAP_OFFHAND) {
                 ItemStack offhandItem = player.getInventory().getItemInOffHand();
-                touchesProtectedItem = KitManager.isProtectedKitItem(offhandItem);
+                touchesProtectedItem = isProtectedItem(offhandItem);
             }
 
             if (touchesProtectedItem) {
@@ -128,13 +143,14 @@ public class PlayerItemListener implements Listener {
         if (gm == null) return;
 
         if (gm.getState() != GameState.PLAYING && gm.getState() != GameState.ROUND_RESET
-            && gm.getState() != GameState.COUNTDOWN && gm.getState() != GameState.STARTING) {
+            && gm.getState() != GameState.COUNTDOWN && gm.getState() != GameState.STARTING
+            && gm.getState() != GameState.ENDING) {
             return;
         }
 
-        // Empêche de faire glisser un item du kit (épée, pioche, pomme, blocs) vers
-        // un autre slot, y compris en répartissant la pile sur plusieurs cases.
-        if (KitManager.isProtectedKitItem(event.getOldCursor())) {
+        // Empêche de faire glisser un item protégé (kit ou message rapide) vers un autre
+        // slot, y compris en répartissant la pile sur plusieurs cases.
+        if (isProtectedItem(event.getOldCursor())) {
             event.setCancelled(true);
         }
     }
@@ -148,7 +164,7 @@ public class PlayerItemListener implements Listener {
         
         if (gm.getState() == GameState.WAITING || gm.getState() == GameState.PLAYING || 
             gm.getState() == GameState.ROUND_RESET || gm.getState() == GameState.COUNTDOWN
-            || gm.getState() == GameState.STARTING) {
+            || gm.getState() == GameState.STARTING || gm.getState() == GameState.ENDING) {
             event.setCancelled(true);
         }
     }

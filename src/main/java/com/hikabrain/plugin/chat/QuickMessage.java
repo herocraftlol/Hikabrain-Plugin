@@ -137,16 +137,44 @@ public enum QuickMessage {
     /**
      * Crée l'ItemStack représentant ce message (bloc de couleur nommé), à placer dans
      * la hotbar pendant le temps d'attente (voir GameManager#giveQuickChatItems).
+     *
+     * Le NOM affiché et le texte d'aide (lore) sont traduits dans la langue du joueur qui
+     * va VOIR cet item dans SON PROPRE inventaire (même logique que {@link #getTextFor}) :
+     * chaque joueur voit donc "Bien joué !" écrit dans sa propre langue directement sur le
+     * bloc, avant même de cliquer dessus, et sait ainsi ce que chaque message veut dire.
      */
-    public ItemStack createItem() {
+    public ItemStack createItem(Player viewer) {
         ItemStack item = new ItemStack(material);
         ItemMeta meta = item.getItemMeta();
         if (meta != null) {
-            meta.setDisplayName(color + "" + ChatColor.BOLD + frenchText);
-            meta.setLore(java.util.List.of(ChatColor.GRAY + "Clique pour envoyer ce message", ChatColor.GRAY + "dans le chat de l'arène !"));
+            meta.setDisplayName(color + "" + ChatColor.BOLD + getTextFor(viewer));
+            meta.setLore(java.util.List.of(ChatColor.GRAY + getHintFor(viewer)));
             item.setItemMeta(meta);
         }
         return item;
+    }
+
+    /** Traductions du petit texte d'aide affiché sous chaque bloc (identique pour les 4 messages). */
+    private static final Map<String, String> HINT_TRANSLATIONS = Map.ofEntries(
+            Map.entry("en", "Click to send this message in the arena chat!"),
+            Map.entry("es", "¡Haz clic para enviar este mensaje en el chat de la arena!"),
+            Map.entry("de", "Klicke, um diese Nachricht im Arena-Chat zu senden!"),
+            Map.entry("pt", "Clique para enviar esta mensagem no chat da arena!"),
+            Map.entry("ru", "Нажми, чтобы отправить это сообщение в чат арены!"),
+            Map.entry("it", "Clicca per inviare questo messaggio nella chat dell'arena!"),
+            Map.entry("nl", "Klik om dit bericht in de arena-chat te sturen!"),
+            Map.entry("pl", "Kliknij, aby wysłać tę wiadomość na czacie areny!"),
+            Map.entry("tr", "Bu mesajı arena sohbetine göndermek için tıkla!"),
+            Map.entry("zh", "点击将此消息发送到竞技场聊天！"),
+            Map.entry("ja", "クリックしてこのメッセージをアリーナチャットに送信！"),
+            Map.entry("ko", "클릭하면 이 메시지가 아레나 채팅에 전송됩니다!")
+    );
+    private static final String HINT_FRENCH = "Clique pour envoyer ce message dans le chat de l'arène !";
+
+    private static String getHintFor(Player viewer) {
+        String language = viewer.locale().getLanguage();
+        if ("fr".equalsIgnoreCase(language)) return HINT_FRENCH;
+        return HINT_TRANSLATIONS.getOrDefault(language.toLowerCase(), HINT_TRANSLATIONS.get("en"));
     }
 
     /**

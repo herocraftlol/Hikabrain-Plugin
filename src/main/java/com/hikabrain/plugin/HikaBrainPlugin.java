@@ -9,6 +9,7 @@ import com.hikabrain.plugin.gui.TeamSelectGUI;
 import com.hikabrain.plugin.gui.TeamSelectGUIListener;
 import com.hikabrain.plugin.hologram.CategoryLeaderboardManager;
 import com.hikabrain.plugin.levels.LevelManager;
+import com.hikabrain.plugin.music.MusicManager;
 import com.hikabrain.plugin.listeners.ArenaChatListener;
 import com.hikabrain.plugin.listeners.ArenaProtectionListener;
 import com.hikabrain.plugin.listeners.BlockPlaceListener;
@@ -48,6 +49,7 @@ public class HikaBrainPlugin extends JavaPlugin {
     private HeadToHeadManager    headToHeadManager;
     private MatchHistoryManager  matchHistoryManager;
     private LevelManager         levelManager;
+    private MusicManager         musicManager;
     private ArenaGUI             arenaGUI;
     private TeamSelectGUI        teamSelectGUI;
     private CategoryLeaderboardManager leaderboardManager;
@@ -71,6 +73,7 @@ public class HikaBrainPlugin extends JavaPlugin {
         this.headToHeadManager = new HeadToHeadManager(this);
         this.matchHistoryManager = new MatchHistoryManager(this);
         this.levelManager      = new LevelManager(this);
+        this.musicManager      = new MusicManager(this);
         this.leaderboardManager = new CategoryLeaderboardManager(this);
         this.leaderboardExportServer = new LeaderboardExportServer(this);
         this.leaderboardExportServer.start();
@@ -152,6 +155,7 @@ public class HikaBrainPlugin extends JavaPlugin {
     public HeadToHeadManager    getHeadToHeadManager()  { return headToHeadManager; }
     public MatchHistoryManager  getMatchHistoryManager(){ return matchHistoryManager; }
     public LevelManager         getLevelManager()       { return levelManager; }
+    public MusicManager         getMusicManager()       { return musicManager; }
     public CategoryLeaderboardManager getLeaderboardManager() { return leaderboardManager; }
 
     public DuelArenaManager          getDuelArenaManager()          { return duelArenaManager; }
