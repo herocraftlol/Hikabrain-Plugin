@@ -11,7 +11,10 @@ import org.bukkit.scheduler.BukkitTask;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -62,6 +65,18 @@ public class MusicManager {
     private final Map<String, NbsSong> songCache = new HashMap<>();
     private final Map<String, MusicSession> activeSessions = new HashMap<>(); // nom d'arène -> session
     private final Map<String, String> arenaTrackOverride = new HashMap<>();   // nom d'arène -> fichier/"off"/"random"
+
+    /**
+     * File d'attente "mélangée" par arène pour le mode "random" : au lieu d'un tirage
+     * totalement indépendant à chaque partie (qui peut retomber sur la même piste deux
+     * fois de suite), chaque arène pioche dans un ordre aléatoire de TOUTES les pistes
+     * disponibles, sans jamais répéter tant que le cycle n'est pas épuisé. Une fois
+     * toutes les pistes passées, un nouveau mélange est tiré (en évitant que sa première
+     * piste soit la même que la toute dernière du cycle précédent, pour ne jamais avoir
+     * deux fois la même piste d'affilée même à la jonction de deux cycles).
+     */
+    private final Map<String, Deque<String>> shuffleQueues = new HashMap<>();
+    private final Map<String, String> lastPlayedTrack = new HashMap<>();
 
     public MusicManager(HikaBrainPlugin plugin) {
         this.plugin = plugin;
@@ -137,10 +152,43 @@ public class MusicManager {
         }
     }
 
-    private String pickRandomTrack() {
+    /**
+     * Pioche la prochaine piste "aléatoire" pour cette arène, sans jamais répéter la
+     * piste juste précédente (voir {@link #shuffleQueues}). Si toutes les pistes du
+     * cycle en cours ont déjà été jouées, un nouveau cycle mélangé est démarré.
+     */
+    private String pickRandomTrack(String arenaName) {
         List<String> tracks = listAvailableTracks();
         if (tracks.isEmpty()) return null;
-        return tracks.get(random.nextInt(tracks.size()));
+        if (tracks.size() == 1) return tracks.get(0); // une seule piste : rien d'autre à faire tourner
+
+        Deque<String> queue = shuffleQueues.get(arenaName);
+        if (queue == null || queue.isEmpty()) {
+            queue = buildShuffledQueue(tracks, lastPlayedTrack.get(arenaName));
+            shuffleQueues.put(arenaName, queue);
+        }
+
+        String next = queue.poll();
+        lastPlayedTrack.put(arenaName, next);
+        return next;
+    }
+
+    /**
+     * Construit un nouvel ordre aléatoire de toutes les pistes disponibles. Si la
+     * première piste tirée est la même que celle qui vient de terminer le cycle
+     * précédent (avoidRepeat), on l'échange avec une autre pour ne jamais avoir deux
+     * fois la même piste d'affilée, même à la jonction entre deux cycles.
+     */
+    private Deque<String> buildShuffledQueue(List<String> tracks, String avoidRepeat) {
+        List<String> shuffled = new ArrayList<>(tracks);
+        Collections.shuffle(shuffled, random);
+
+        if (avoidRepeat != null && shuffled.size() > 1 && shuffled.get(0).equals(avoidRepeat)) {
+            int swapWith = 1 + random.nextInt(shuffled.size() - 1);
+            Collections.swap(shuffled, 0, swapWith);
+        }
+
+        return new ArrayDeque<>(shuffled);
     }
 
     // ── Lecture par arène ────────────────────────────────────────────────────────
@@ -161,7 +209,7 @@ public class MusicManager {
         String choice = getArenaTrackChoice(arenaName);
         if (choice == null || choice.equalsIgnoreCase("off")) return;
 
-        String fileName = choice.equalsIgnoreCase("random") ? pickRandomTrack() : choice;
+        String fileName = choice.equalsIgnoreCase("random") ? pickRandomTrack(arenaName) : choice;
         if (fileName == null) return; // aucune piste disponible
 
         NbsSong song = loadSong(fileName);

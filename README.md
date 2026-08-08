@@ -48,6 +48,7 @@
 ### 🎵 Système de Musique
 - **Jukebox dans l'Arène** - Contrôle de la musique pendant les parties
 - **Musique d'Ambiance** - Bandes sonores adaptatives selon l'état du jeu
+- **Lecture Aléatoire Intelligente** - Mode « random » par arène : cycle mélangé de toutes les pistes sans répétition tant que le cycle n'est pas épuisé
 - **Commande `/hb music`** - Gestion complète de la musique
 - **Support des fichiers NBS** personnalisés
 
@@ -91,7 +92,30 @@
 | `hikabrain.play` | Jouer au HikaBrain | Tous |
 | `hikabrain.tournament.join` | S'inscrire à un tournoi | Tous |
 
-## 🆕 Dernière Mise à Jour (v1.0.26)
+## 🆕 Dernière Mise à Jour (v1.0.27)
+
+### 🎵 Lecture Aléatoire Intelligente de la Musique
+
+Le mode « random » du jukebox (`/hb music random`) a été entièrement repensé pour offrir une expérience musicale plus variée et moins répétitive :
+
+#### 🔄 Avant
+- À chaque partie, une piste était tirée **totalement au hasard** parmi toutes celles disponibles
+- Conséquence : il était possible de retomber sur **la même piste plusieurs fois d'affilée**
+
+#### ✨ Maintenant
+- Chaque arène dispose de sa propre **file d'attente mélangée** (shuffle queue)
+- Le plugin **cycle dans un ordre aléatoire à travers TOUTES les pistes disponibles**, sans jamais répéter une piste tant que le cycle n'est pas entièrement épuisé
+- Une fois toutes les pistes passées, un **nouveau mélange est tiré** automatiquement
+- À la jonction entre deux cycles, la première piste du nouveau mélange ne peut pas être la même que la dernière du cycle précédent — **aucune répétition consécutive, jamais**
+
+#### 🛠️ Détails techniques
+- `MusicManager#pickRandomTrack(arenaName)` remplace l'ancien tirage purement aléatoire
+- Mémoire par arène : `shuffleQueues` (file en cours) et `lastPlayedTrack` (dernière piste jouée)
+- `buildShuffledQueue()` garantit l'absence de répétition à la jonction des cycles via un échange intelligent
+
+---
+
+## 🆕 Mise à jour précédente (v1.0.26)
 
 ### 📡 Hologrammes de Statistiques Personnelles
 
@@ -234,7 +258,7 @@ mvn clean package
 ## 📝 Auteur
 
 - **Développeur**: herocraftlol
-- **Version**: 1.0.26
+- **Version**: 1.0.27
 
 ## 📄 Licence
 

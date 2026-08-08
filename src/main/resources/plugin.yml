@@ -1,9 +1,9 @@
 name: HikaBrain
-version: 1.0.26
+version: 1.0.27
 main: com.hikabrain.plugin.HikaBrainPlugin
 api-version: 1.21
 author: herocraftlol
-description: Plugin de minijeu Hikabrain - Capture de zone par équipes, tournois automatisés, chat d'arène, leaderboards et hologrammes de statistiques personnelles
+description: Plugin de minijeu Hikabrain - Capture de zone par équipes, tournois automatisés, chat d'arène, leaderboards, hologrammes de statistiques personnelles et jukebox musical à lecture aléatoire intelligente
 
 commands:
   hb:
