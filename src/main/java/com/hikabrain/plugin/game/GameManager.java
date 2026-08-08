@@ -356,6 +356,9 @@ public class GameManager {
         Team team = pickBalancedTeam();
         playerTeams.put(player.getUniqueId(), team);
         sessionStartMillis.put(player.getUniqueId(), System.currentTimeMillis());
+        // Les cosmétiques ne sont visibles que hors des arènes : on les retire dès l'entrée
+        // dans le lobby d'attente (pas seulement en partie).
+        plugin.getCosmeticManager().removeCosmetics(player);
 
         // Sauvegarder la position du joueur avant de le téléporter au lobby
         preLobbyLocations.put(player.getUniqueId(), player.getLocation().clone());
@@ -383,6 +386,8 @@ public class GameManager {
         }
         playerTeams.remove(uuid);
         flushPlaytime(uuid, player.getName());
+        // De retour hors de l'arène : les cosmétiques équipés redeviennent visibles.
+        plugin.getCosmeticManager().applyCosmetics(player);
 
         // Dégeler si besoin
         if (frozenPlayers.remove(uuid)) {
@@ -524,6 +529,8 @@ public class GameManager {
 
         preSpectateLocations.put(player.getUniqueId(), player.getLocation().clone());
         spectators.add(player.getUniqueId());
+        // Le mode spectateur d'une arène compte comme "en arène" : pas de cosmétiques visibles.
+        plugin.getCosmeticManager().removeCosmetics(player);
 
         player.teleport(teleportTo);
         player.setGameMode(GameMode.SPECTATOR);
@@ -550,6 +557,8 @@ public class GameManager {
 
         player.setGameMode(GameMode.SURVIVAL);
         player.getInventory().clear();
+        // De retour hors de l'arène : les cosmétiques équipés redeviennent visibles.
+        plugin.getCosmeticManager().applyCosmetics(player);
 
         // Retirer le scoreboard de spectateur
         plugin.getScoreboardManager().removeScoreboard(player);
@@ -844,7 +853,7 @@ public class GameManager {
         playSoundToAll(Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.5f, 1.2f);
 
         // Musique d'ambiance (facultative, voir MusicManager / config.yml "music")
-        plugin.getMusicManager().startMusicForArena(this);
+        plugin.getMusicManager().startNewMatchMusic(this);
 
         // Avantage cosmétique : nuage de particules "tête" au tout début de la partie
         // (une seule fois par match, pas à chaque round reset).
@@ -1196,8 +1205,8 @@ public class GameManager {
         // blocs de message rapide (voir QuickMessage), le kit normal sera reposé quand le
         // round reprendra réellement (voir plus bas, à la fin du compte à rebours).
         giveQuickChatItemsToAll();
-        // Silence pendant le temps d'attente (la musique reprendra quand le round redémarre)
-        plugin.getMusicManager().stopMusicForArena(this);
+        // Silence pendant le temps d'attente (la musique reprendra pile où elle s'est arrêtée)
+        plugin.getMusicManager().pauseMusicForArena(this);
 
         roundResetSecondsLeft = plugin.getConfig().getInt("round-reset-countdown", 5);
 
@@ -1211,8 +1220,8 @@ public class GameManager {
                 unfreezeAllPlayers();
                 restoreKitForAllPlayers();
                 state = GameState.PLAYING;
-                // Reprise de la musique d'ambiance
-                plugin.getMusicManager().startMusicForArena(this);
+                // Reprise de la musique d'ambiance, exactement là où elle s'était arrêtée
+                plugin.getMusicManager().resumeMusicForArena(this);
                 broadcast("&a&lÀ vous de jouer !");
                 // Son de départ
                 playSoundToAll(Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.5f, 1.2f);

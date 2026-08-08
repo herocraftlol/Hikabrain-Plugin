@@ -9,6 +9,8 @@ import com.hikabrain.plugin.gui.TeamSelectGUI;
 import com.hikabrain.plugin.gui.TeamSelectGUIListener;
 import com.hikabrain.plugin.hologram.CategoryLeaderboardManager;
 import com.hikabrain.plugin.levels.LevelManager;
+import com.hikabrain.plugin.cosmetics.CosmeticManager;
+import com.hikabrain.plugin.cosmetics.CosmeticShopGUI;
 import com.hikabrain.plugin.music.MusicManager;
 import com.hikabrain.plugin.listeners.ArenaChatListener;
 import com.hikabrain.plugin.listeners.ArenaProtectionListener;
@@ -50,6 +52,8 @@ public class HikaBrainPlugin extends JavaPlugin {
     private MatchHistoryManager  matchHistoryManager;
     private LevelManager         levelManager;
     private MusicManager         musicManager;
+    private CosmeticManager      cosmeticManager;
+    private CosmeticShopGUI      cosmeticShopGUI;
     private ArenaGUI             arenaGUI;
     private TeamSelectGUI        teamSelectGUI;
     private CategoryLeaderboardManager leaderboardManager;
@@ -74,6 +78,8 @@ public class HikaBrainPlugin extends JavaPlugin {
         this.matchHistoryManager = new MatchHistoryManager(this);
         this.levelManager      = new LevelManager(this);
         this.musicManager      = new MusicManager(this);
+        this.cosmeticManager   = new CosmeticManager(this);
+        this.cosmeticShopGUI   = new CosmeticShopGUI(this);
         this.leaderboardManager = new CategoryLeaderboardManager(this);
         this.leaderboardExportServer = new LeaderboardExportServer(this);
         this.leaderboardExportServer.start();
@@ -104,6 +110,10 @@ public class HikaBrainPlugin extends JavaPlugin {
             commandExecutor.onCommand(sender, command, label, new String[]{"arenas"});
             return true;
         });
+        getCommand("cosmetics").setExecutor((sender, command, label, args) -> {
+            commandExecutor.onCommand(sender, command, label, new String[]{"cosmetics"});
+            return true;
+        });
 
         TournamentCommand tournamentCommand = new TournamentCommand(this);
         getCommand("tournament").setExecutor(tournamentCommand);
@@ -123,6 +133,8 @@ public class HikaBrainPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new PlayerItemListener(this), this);
         getServer().getPluginManager().registerEvents(new BlockPlaceListener(this), this);
         getServer().getPluginManager().registerEvents(new com.hikabrain.plugin.listeners.QuickChatListener(this), this);
+        getServer().getPluginManager().registerEvents(new com.hikabrain.plugin.listeners.CosmeticShopListener(this), this);
+        getServer().getPluginManager().registerEvents(new com.hikabrain.plugin.listeners.CosmeticVisibilityListener(this), this);
         getServer().getPluginManager().registerEvents(new ArenaGUIListener(this, arenaGUI), this);
         getServer().getPluginManager().registerEvents(new TeamSelectGUIListener(this), this);
         getServer().getPluginManager().registerEvents(new TournamentListener(this), this);
@@ -156,6 +168,8 @@ public class HikaBrainPlugin extends JavaPlugin {
     public MatchHistoryManager  getMatchHistoryManager(){ return matchHistoryManager; }
     public LevelManager         getLevelManager()       { return levelManager; }
     public MusicManager         getMusicManager()       { return musicManager; }
+    public CosmeticManager      getCosmeticManager()    { return cosmeticManager; }
+    public CosmeticShopGUI      getCosmeticShopGUI()    { return cosmeticShopGUI; }
     public CategoryLeaderboardManager getLeaderboardManager() { return leaderboardManager; }
 
     public DuelArenaManager          getDuelArenaManager()          { return duelArenaManager; }

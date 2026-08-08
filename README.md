@@ -1,8 +1,8 @@
 # 🎮 HikaBrain Plugin
 
-> Un plugin Minecraft complet pour Paper 1.21.1 - Système de capture de zone par équipes avec tournoi automatisé, chat d'arène et leaderboards holographiques.
+> Un plugin Minecraft complet pour Paper 1.21.1 — Système de capture de zone par équipes avec tournoi automatisé, boutique de cosmétiques, musique NBS, niveaux & perks, et leaderboards holographiques.
 
-**HikaBrain** est un minije u palpitant où deux équipes (Rouge vs Bleu) s'affrontent pour contrôler une zone centrale. Inspiré par le style Screaming Bedwars, ce plugin offre une expérience compétitive avec des statistiques détaillées, des classements holographiques et un système de tournoi intégré.
+**HikaBrain** est un minijeu palpitant où deux équipes (Rouge vs Bleu) s'affrontent pour contrôler une zone centrale. Inspiré par le style Screaming Bedwars, ce plugin offre une expérience compétitive avec des statistiques détaillées, des classements holographiques, un système de tournoi intégré et désormais une véritable **boutique de cosmétiques** pour récompenser l'investissement des joueurs.
 
 ---
 
@@ -30,11 +30,25 @@
 ### 🎨 Interface Graphique
 - **GUI de Sélection d'Arène** - Interface intuitive pour choisir son arène
 - **Sélection d'Équipe** - Choix Rouge/Bleu via GUI
+- **Boutique de Cosmétiques** - GUI d'achat et d'équipement (`/cosmetics`)
 - **Inventaire Dynamique** - Items adaptés à chaque état du jeu
+
+### 🛍️ Boutique de Cosmétiques (NOUVEAU)
+- **~50 cosmétiques** répartis en 5 catégories : chapeaux, particules, traînées, tags et entrées
+- **4 raretés** : Commun, Rare, Épique et Légendaire
+- **Achat avec points** dépensables (sans jamais baisser le niveau ni le classement)
+- **Niveau minimum requis** pour éviter le « farming » intensif
+- **Purement visuel** — aucun avantage en jeu, et invisibles pendant les parties HikaBrain
 
 ### ⚔️ Système de Kit
 - **Kits Configurables** - Équipement personnalisé par équipe
 - **Attribution Automatique** - Distribution selon les paramètres
+
+### 🎵 Système de Musique
+- **Jukebox dans l'Arène** - Contrôle de la musique pendant les parties
+- **Musique d'Ambiance** - Bandes sonores adaptatives selon l'état du jeu
+- **Commande `/hb music`** - Gestion complète de la musique
+- **Support des fichiers NBS** personnalisés
 
 ---
 
@@ -57,82 +71,57 @@
 | `/hb joinrandom` | Rejoindre une arène aléatoire |
 | `/hb leave` | Quitter la partie |
 | `/hb stats` | Voir les statistiques |
+| `/hb top` | Classement des 10 meilleurs joueurs par niveau |
+| `/hb points` | Voir ses points et son niveau |
+| `/hb perk` | Gérer ses perks équipés |
+| `/hb music` | Gérer la musique de l'arène |
 | `/hb leaderboard` | Afficher le leaderboard |
 | `/arenas` | Ouvrir le GUI de sélection d'arène |
+| `/cosmetics` | Ouvrir la boutique de cosmétiques |
+| `/tournament` | Système de tournoi automatisé |
 
 ## Permissions
 
 | Permission | Description | Défaut |
 |------------|-------------|--------|
-| `hikabrain.admin` | Administration du jeu, hologrammes, setup arènes | OP |
-| `hikabrain.play` | Jouer au Hikabrain | Tous |
+| `hikabrain.admin` | Administration du jeu, hologrammes, setup arènes, tournoi | OP |
+| `hikabrain.play` | Jouer au HikaBrain | Tous |
+| `hikabrain.tournament.join` | S'inscrire à un tournoi | Tous |
 
-## Compilation
+## 🆕 Dernière Mise à Jour (v1.0.25)
 
-- **Java** : 21
-- **API** : Paper 1.21.1
-- **Build** : Maven
+### 🛍️ Boutique de Cosmétiques
 
-```bash
-mvn clean package
-```
+Cette mise à jour majeure introduit un tout nouveau **système de cosmétiques** pour récompenser et personnaliser l'expérience des joueurs les plus assidus.
 
-## Installation
+#### 🎭 Catégories de Cosmétiques
+- **Chapeaux** — Casquettes en cuir teint, têtes de mobs (zombie, squelette, wither, creeper, dragon)
+- **Particules** — Auras visuelles (flammes, cœurs, notes de musique, souffle de dragon, totem divin…)
+- **Traînées** — Effets au déplacement (poussières colorées, portail, feu d'artifice…)
+- **Tags** — Préfixes personnalisés affichés à côté du nom
+- **Entrées** — Effets spectaculaires à la connexion/entrée en arène
 
-1. Téléchargez le JAR depuis la [dernière release](https://github.com/herocraftlol/Hikabrain-Plugin/releases/latest)
-2. Placez le fichier dans le dossier `plugins` de votre serveur Paper 1.21.1
-3. Redémarrez le serveur
+#### 💎 Raretés & Progression
+- **4 raretés** : Commun, Rare, Épique, Légendaire
+- Prix et niveaux requis **progressifs** : les cosmétiques légendaires représentent plusieurs semaines de jeu régulier
+- Achat via un **solde dépensable** distinct du total de points — dépenser ne fait **jamais** baisser le niveau ni le classement
+- **Niveau minimum** requis pour empêcher le farming intensif sur courte période
 
-## Configuration
+#### 🧩 Nouvelles Commandes & GUI
+- **`/cosmetics`** (alias `/cosmetic`, `/hbshop`) — Ouvre la boutique de cosmétiques
+- GUI complet d'achat, d'équipement et de déséquipement par catégorie
+- Cosmétiques **invisibles pendant les parties HikaBrain** pour préserver l'équité
 
-Le fichier `config.yml` permet de configurer :
-- Nombre de joueurs min/max
-- Durée des compte à rebours (lobby et round)
-- Points nécessaires pour gagner
-- Apparence complète du scoreboard (titre, lignes, couleurs)
-- Messages personnalisés avec préfixe
-
-## 🆕 Dernière Mise à Jour (v1.0.23)
-
-### 🎵 Système de Musique
-
-Cette mise à jour majeure ajoute un tout nouveau système de musique pour enrichir l'expérience de jeu :
-
-#### 🎶 Fonctionnalités Musicales
-- **Jukebox dans l'Arène** - Les joueurs peuvent contrôler la musique pendant les parties
-- **Musique d'Ambiance** - Bandes sonores adaptatives selon l'état du jeu
-- **Commande `/hb music`** - Gestion complète de la musique via commande
-- **Playback Controls** - Lecture, pause, changement de piste
-
-#### 🎮 Intégration Gameplay
-- La musique s'adapte automatiquement aux événements du jeu (capture, kills, victoire)
-- Volume configurable par le joueur
-- Support des fichiers audio personnalisés
-
----
-
-### 🔧 Corrections et Améliorations
-
-Cette mise à jour inclut également des corrections de bugs et des améliorations générales du plugin :
-
-#### 🐛 Corrections de Bugs
-- Résolution de problèmes de synchronisation des scores
-- Corrections sur le système de détection de capture de zone
-- Amélioration de la stabilité des listeners d'événements
-
-#### ⚡ Optimisations
-- Optimisation de la gestion de la mémoire
-- Amélioration des performances du scoreboard en temps réel
-- Réduction de la latence dans les calculs de statistiques
-
-#### 🔧 Améliorations Techniques
-- Refactoring du code pour une meilleure maintenabilité
-- Nettoyage des dépendances inutilisées
-- Amélioration de la journalisation (logs) pour le débogage
+#### 🔧 Corrections & Améliorations
+- Intégration du système de cosmétiques avec le gestionnaire de niveaux existant
+- Nettoyage et refactorisation du code pour la maintenabilité
 
 ---
 
 ### 🆕 Fonctionnalités Versions Précédentes
+
+#### 🎵 Système de Musique (v1.0.24)
+- Jukebox dans l'arène, musique d'ambiance adaptative, commande `/hb music`, support NBS
 
 #### 🏆 Système de Classement Amélioré (v1.0.20)
 - HeadToHeadManager pour les affrontements directs
@@ -141,43 +130,10 @@ Cette mise à jour inclut également des corrections de bugs et des amélioratio
 #### 🌐 Module Web API (v1.0.19)
 - LeaderboardExportServer pour exporter les données
 
----
-
-### 🌟 Système de Points et Niveaux (v1.0.16)
-
-C'est une grande mise à jour qui ajoute un **système de progression complet** pour récompenser votre investissement dans le jeu :
-
-#### Système de Points
-- **1 point** par coup porté à un adversaire
-- **5 points** par kill
-- **8 points** par but marqué (capture de zone)
-- **15 points** pour une victoire d'équipe
-
-#### Progression par Niveaux
-- Les niveaux sont calculés avec des paliers progressifs (chaque niveau demande plus de points que le précédent)
-- Plus vous jouez, plus vous montez en niveau !
-
-#### Avantages Cosmétiques (100% Équitables)
-Tous les perks sont **purement cosmétiques** — ils ne donnent aucun avantage en jeu pour préserver l'équité :
-
-| Niveau requis | Perk | Description |
-|--------------|------|-------------|
-| 3 | 🌟 Nuage de particules | Un nuage de particules affichant votre tête flotte au-dessus de vous en début de partie |
-| 6 | ✨ Étincelles de victoire | Des étincelles dorées tourbillonnent autour de vous quand votre équipe gagne |
-| 10 | 💎 Étoile de prestige | Une petite étoile colorée apparaît à côté de votre niveau affiché en jeu |
-
-#### Nouvelles Commandes
-- `/hb top` — Affiche le classement des 10 meilleurs joueurs par niveau
-- `/hb points` — Affiche vos points et votre niveau actuel avec progression
-- `/hb perk` — Gérez vos perks équipés (équiper/déséquiper)
-
-### 📊 Améliorations du Scoreboard
-- Scoreboard amélioré avec affichage en temps réel des scores et statistiques
-
-### ⚙️ Configuration
-Le fichier `config.yml` permet désormais de configurer :
-- Les points attribués par action (coup, kill, but, victoire)
-- Le palier de base pour les niveaux
+#### 🌟 Système de Points et Niveaux (v1.0.16)
+- Points par action (coup, kill, but, victoire)
+- Progression par niveaux à paliers progressifs
+- Perks purement cosmétiques (nuage de particules, étincelles, étoile de prestige)
 
 ---
 
@@ -216,7 +172,7 @@ mvn clean package
 ## 📝 Auteur
 
 - **Développeur**: herocraftlol
-- **Version**: 1.0.23
+- **Version**: 1.0.25
 
 ## 📄 Licence
 

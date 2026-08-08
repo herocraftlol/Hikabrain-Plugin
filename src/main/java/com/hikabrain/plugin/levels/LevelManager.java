@@ -57,6 +57,14 @@ public class LevelManager {
     public static class PlayerLevelData {
         public String name;
         public int points;
+        /**
+         * Solde de points DÉPENSABLES (boutique de cosmétiques, voir CosmeticManager).
+         * Augmente exactement comme {@link #points} à chaque partie, mais diminue quand
+         * le joueur achète un cosmétique — CONTRAIREMENT à {@link #points}, qui ne
+         * diminue jamais (c'est lui qui détermine le niveau, qui doit rester un
+         * accomplissement permanent, jamais réduit par un achat).
+         */
+        public int spendableBalance;
         public String equippedPerkId;
 
         public PlayerLevelData(String name) {
@@ -116,6 +124,7 @@ public class LevelManager {
 
                     PlayerLevelData data = new PlayerLevelData(playerSection.getString("name", "?"));
                     data.points = playerSection.getInt("points", 0);
+                    data.spendableBalance = playerSection.getInt("spendable-balance", data.points); // migration : anciens joueurs -> solde = points déjà acquis
                     data.equippedPerkId = playerSection.getString("equipped-perk", null);
                     playerLevels.put(uuid, data);
                 } catch (IllegalArgumentException ignored) {
@@ -131,6 +140,7 @@ public class LevelManager {
             PlayerLevelData data = entry.getValue();
             levelsConfig.set(path + ".name", data.name);
             levelsConfig.set(path + ".points", data.points);
+            levelsConfig.set(path + ".spendable-balance", data.spendableBalance);
             if (data.equippedPerkId != null) {
                 levelsConfig.set(path + ".equipped-perk", data.equippedPerkId);
             }
@@ -219,6 +229,7 @@ public class LevelManager {
         PlayerLevelData data = getOrCreate(uuid, name);
         int oldLevel = getLevelForPoints(data.points);
         data.points += pointsGained;
+        data.spendableBalance += pointsGained; // les points gagnés en partie alimentent aussi la boutique
         int newLevel = getLevelForPoints(data.points);
 
         List<Perk> newlyUnlocked = new ArrayList<>();
@@ -232,6 +243,31 @@ public class LevelManager {
 
         save();
         return new AwardResult(pointsGained, data.points, oldLevel, newLevel, newlyUnlocked);
+    }
+
+    // ── Solde dépensable (boutique de cosmétiques) ──────────────────────────────
+
+    /**
+     * Solde de points actuellement DÉPENSABLES à la boutique de cosmétiques (voir
+     * CosmeticManager) — distinct du total de points {@link #getPoints}, qui lui ne
+     * diminue jamais et détermine le niveau. Dépenser des points n'affecte donc jamais
+     * le niveau ni le classement d'un joueur.
+     */
+    public int getSpendableBalance(UUID uuid) {
+        PlayerLevelData data = playerLevels.get(uuid);
+        return data != null ? data.spendableBalance : 0;
+    }
+
+    /**
+     * Tente de dépenser un montant du solde dépensable d'un joueur. Renvoie false (et ne
+     * change rien) si le solde est insuffisant.
+     */
+    public boolean spendBalance(UUID uuid, String name, int amount) {
+        PlayerLevelData data = getOrCreate(uuid, name);
+        if (data.spendableBalance < amount) return false;
+        data.spendableBalance -= amount;
+        save();
+        return true;
     }
 
     // ── Classement ─────────────────────────────────────────────────────────────

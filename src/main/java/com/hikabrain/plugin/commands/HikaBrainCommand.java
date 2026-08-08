@@ -88,6 +88,7 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
             case "setminplayers" -> handleSetMinPlayers(sender, args);
             case "guislot" -> handleGuiSlot(sender, args);
             case "music" -> handleMusic(sender, args);
+            case "cosmetics", "cosmetic", "shop" -> handleCosmetics(sender, args);
             case "join" -> handleJoin(sender, args);
             case "joinrandom" -> handleJoinRandom(sender);
             case "arenas" -> handleArenasGui(sender);
@@ -637,6 +638,17 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
 
         musicManager.setArenaTrack(arenaName, choice);
         MessageUtil.send(sender, "&aMusique de l'arène '" + arenaName + "' réglée sur : &e" + choice);
+    }
+
+    /**
+     * /hb cosmetics : ouvre le GUI de la boutique de cosmétiques (achat/équipement).
+     */
+    private void handleCosmetics(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player player)) {
+            MessageUtil.send(sender, "&cCette commande doit être exécutée par un joueur.");
+            return;
+        }
+        plugin.getCosmeticShopGUI().openCategories(player);
     }
 
     // ================= JOUEUR =================
@@ -1565,6 +1577,7 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
         MessageUtil.send(sender, "  &7Période optionnelle : &falltime &7(déf.), &ftoday&7, &fweek&7, ou &fcustom <AAAA-MM-JJ> <AAAA-MM-JJ>");
         MessageUtil.send(sender, "&e/hb points [pseudo] &7- Voir tes points, ton niveau et tes avantages débloqués");
         MessageUtil.send(sender, "&e/hb force [pseudo] &7- Voir ton classement de force (qui bat qui) et ta meilleure victoire");
+        MessageUtil.send(sender, "&e/hb cosmetics &7- Ouvrir la boutique de cosmétiques (visibles hors des arènes uniquement)");
         MessageUtil.send(sender, "&e/hb perk [list|none|<id>] &7- Voir/équiper tes avantages cosmétiques débloqués");
         if (sender.hasPermission("hikabrain.admin")) {
             MessageUtil.send(sender, "&c/hb create <nom> &7- Créer une nouvelle arène");
@@ -1599,7 +1612,7 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            List<String> options = new ArrayList<>(List.of("join", "joinrandom", "leave", "spectate", "unspectate", "info", "list", "arenas", "stats", "top", "points", "perk", "force"));
+            List<String> options = new ArrayList<>(List.of("join", "joinrandom", "leave", "spectate", "unspectate", "info", "list", "arenas", "stats", "top", "points", "perk", "force", "cosmetics"));
             if (sender.hasPermission("hikabrain.admin")) {
                 options.addAll(List.of("create", "copy", "delete", "setlobby", "setspectatorspawn", "setspawn", "delspawn", "setcapture", "setgamezone", "setmaxplayers", "setminplayers", "guislot", "music", "start", "stop"));
                 options.addAll(List.of("setsbserver", "setsbgame", "setsbtitle", "setsblines", "reloadsb", "sbinfo"));

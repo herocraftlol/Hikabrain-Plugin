@@ -1,9 +1,9 @@
 name: HikaBrain
-version: 1.0.23
+version: 1.0.25
 main: com.hikabrain.plugin.HikaBrainPlugin
 api-version: 1.21
 author: herocraftlol
-description: Plugin de minijeu Hikabrain - Système de capture de zone par équipes avec tournoi automatisé, chat d'arène et leaderboards holographiques
+description: Minijeu Hikabrain - Capture de zone par équipes avec tournoi automatisé, chat d'arène, boutique de cosmétiques, musique NBS, niveaux & perks, et leaderboards holographiques.
 
 commands:
   hb:
@@ -13,6 +13,10 @@ commands:
     description: Ouvre le GUI de sélection d'arène
     usage: /arenas
     aliases: [arena]
+  cosmetics:
+    description: Ouvre la boutique de cosmétiques HikaBrain
+    usage: /cosmetics
+    aliases: [cosmetic, hbshop]
   tournament:
     description: Commande du système de tournoi automatisé
     usage: /tournament <create|join|leave|start|forcestart|cancel|delete|list|info|bracket|matches|spectate|unspectate|top|history|gui|rooms|arena|sethologram|removehologram>
