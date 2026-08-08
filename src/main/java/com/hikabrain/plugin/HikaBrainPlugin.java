@@ -8,6 +8,7 @@ import com.hikabrain.plugin.gui.ArenaGUIListener;
 import com.hikabrain.plugin.gui.TeamSelectGUI;
 import com.hikabrain.plugin.gui.TeamSelectGUIListener;
 import com.hikabrain.plugin.hologram.CategoryLeaderboardManager;
+import com.hikabrain.plugin.hologram.StatsHologramManager;
 import com.hikabrain.plugin.levels.LevelManager;
 import com.hikabrain.plugin.cosmetics.CosmeticManager;
 import com.hikabrain.plugin.cosmetics.CosmeticShopGUI;
@@ -57,6 +58,7 @@ public class HikaBrainPlugin extends JavaPlugin {
     private ArenaGUI             arenaGUI;
     private TeamSelectGUI        teamSelectGUI;
     private CategoryLeaderboardManager leaderboardManager;
+    private StatsHologramManager       statsHologramManager;
     private LeaderboardExportServer    leaderboardExportServer;
 
     private DuelArenaManager          duelArenaManager;
@@ -81,6 +83,7 @@ public class HikaBrainPlugin extends JavaPlugin {
         this.cosmeticManager   = new CosmeticManager(this);
         this.cosmeticShopGUI   = new CosmeticShopGUI(this);
         this.leaderboardManager = new CategoryLeaderboardManager(this);
+        this.statsHologramManager = new StatsHologramManager(this);
         this.leaderboardExportServer = new LeaderboardExportServer(this);
         this.leaderboardExportServer.start();
         KitManager.init(this);
@@ -151,6 +154,7 @@ public class HikaBrainPlugin extends JavaPlugin {
         if (tournamentHologramManager != null) tournamentHologramManager.shutdown();
         if (duelArenaManager    != null) duelArenaManager.saveAll();
         if (leaderboardManager != null) leaderboardManager.despawnAll();
+        if (statsHologramManager != null) statsHologramManager.despawnAll();
         if (scoreboardManager != null) scoreboardManager.stop();
         if (statsManager      != null) statsManager.saveStats();
         if (headToHeadManager != null) headToHeadManager.save();
@@ -171,6 +175,7 @@ public class HikaBrainPlugin extends JavaPlugin {
     public CosmeticManager      getCosmeticManager()    { return cosmeticManager; }
     public CosmeticShopGUI      getCosmeticShopGUI()    { return cosmeticShopGUI; }
     public CategoryLeaderboardManager getLeaderboardManager() { return leaderboardManager; }
+    public StatsHologramManager       getStatsHologramManager() { return statsHologramManager; }
 
     public DuelArenaManager          getDuelArenaManager()          { return duelArenaManager; }
     public TournamentHistoryManager  getTournamentHistoryManager()  { return tournamentHistoryManager; }

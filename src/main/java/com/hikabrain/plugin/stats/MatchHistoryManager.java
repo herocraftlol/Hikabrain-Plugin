@@ -213,4 +213,22 @@ public class MatchHistoryManager {
         LocalDate t = today();
         return new LocalDate[]{ t.minusDays(6), t };
     }
+
+    /**
+     * Rang (1-based) de ce joueur, classé par points GAGNÉS sur la plage [from, to], parmi
+     * tous les joueurs ayant joué au moins une partie sur cette période. Renvoie 0 si le
+     * joueur n'a lui-même aucune partie enregistrée sur cette période. Utilisé par
+     * l'hologramme de statistiques personnelles (voir hologram.StatsHologramManager).
+     */
+    public int getPointsRankForPeriod(UUID uuid, LocalDate from, LocalDate to) {
+        Map<UUID, AggregatedStats> aggregated = aggregatePlayerStats(from, to);
+        if (!aggregated.containsKey(uuid)) return 0;
+
+        java.util.List<Map.Entry<UUID, AggregatedStats>> sorted = new java.util.ArrayList<>(aggregated.entrySet());
+        sorted.sort((a, b) -> Integer.compare(b.getValue().pointsGained, a.getValue().pointsGained));
+        for (int i = 0; i < sorted.size(); i++) {
+            if (sorted.get(i).getKey().equals(uuid)) return i + 1;
+        }
+        return 0;
+    }
 }

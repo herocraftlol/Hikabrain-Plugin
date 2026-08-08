@@ -17,14 +17,14 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Détecte quand un joueur fait un CLIC GAUCHE en tenant un bloc de couleur "message
- * rapide" pendant le temps d'attente après un point (ou à la victoire finale), et
- * envoie alors le message correspondant dans le chat de l'arène — voir
+ * Détecte quand un joueur fait un CLIC (gauche OU droit) en tenant un bloc de couleur
+ * "message rapide" pendant le temps d'attente après un point (ou à la victoire finale),
+ * et envoie alors le message correspondant dans le chat de l'arène — voir
  * {@link QuickMessage} et {@link GameManager#sendQuickChatMessage}.
  */
 public class QuickChatListener implements Listener {
 
-    /** Anti-spam : évite qu'un clic gauche maintenu déclenche une rafale de messages. */
+    /** Anti-spam : évite qu'un clic maintenu déclenche une rafale de messages. */
     private static final long COOLDOWN_MILLIS = 1500;
 
     private final HikaBrainPlugin plugin;
@@ -37,7 +37,9 @@ public class QuickChatListener implements Listener {
     @EventHandler
     public void onPlayerInteract(PlayerInteractEvent event) {
         Action action = event.getAction();
-        if (action != Action.LEFT_CLICK_AIR && action != Action.LEFT_CLICK_BLOCK) return;
+        boolean isClick = action == Action.LEFT_CLICK_AIR || action == Action.LEFT_CLICK_BLOCK
+                || action == Action.RIGHT_CLICK_AIR || action == Action.RIGHT_CLICK_BLOCK;
+        if (!isClick) return;
 
         Player player = event.getPlayer();
         GameManager gm = plugin.getArenaManager().findArenaOf(player);
@@ -52,8 +54,8 @@ public class QuickChatListener implements Listener {
         QuickMessage message = QuickMessage.fromItem(item);
         if (message == null) return;
 
-        // Empêche le clic gauche de casser un bloc regardé (LEFT_CLICK_BLOCK) ou de
-        // déclencher toute autre interaction pendant que ce bloc sert de message rapide.
+        // Empêche le clic de casser/placer un bloc regardé, ou toute autre interaction
+        // (ex: ouvrir un conteneur) pendant que ce bloc sert de message rapide.
         event.setUseInteractedBlock(Event.Result.DENY);
         event.setUseItemInHand(Event.Result.DENY);
         event.setCancelled(true);

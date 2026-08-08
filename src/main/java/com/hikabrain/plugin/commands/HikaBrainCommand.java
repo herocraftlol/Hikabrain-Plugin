@@ -106,6 +106,7 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
             case "perk" -> handlePerk(sender, args);
             case "resetstats" -> handleResetStats(sender);
             case "leaderboard" -> handleLeaderboard(sender, args);
+            case "statshologram" -> handleStatsHologram(sender, args);
             // Scoreboard commands
             case "setsbserver" -> handleSetSbServer(sender, args);
             case "setsbgame" -> handleSetSbGame(sender, args);
@@ -1530,6 +1531,27 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
         MessageUtil.send(sender, "&aLeaderboard '" + category.key + "' (top 10) spawné à ta position !");
     }
 
+    /**
+     * /hb statshologram              : pose un hologramme de statistiques personnelles à ta position
+     * /hb statshologram remove       : supprime l'hologramme le plus proche de toi
+     */
+    private void handleStatsHologram(CommandSender sender, String[] args) {
+        if (!checkAdminAndPlayer(sender)) return;
+        Player player = (Player) sender;
+
+        if (args.length >= 2 && args[1].equalsIgnoreCase("remove")) {
+            boolean removed = plugin.getStatsHologramManager().removeNearest(player.getLocation());
+            MessageUtil.send(sender, removed
+                    ? "&aHologramme de statistiques personnelles supprimé."
+                    : "&cAucun hologramme de statistiques personnelles à proximité (rayon de 5 blocs).");
+            return;
+        }
+
+        plugin.getStatsHologramManager().spawn(player.getLocation());
+        MessageUtil.send(sender, "&aHologramme de statistiques personnelles posé ! Chaque joueur qui s'approche y verra "
+                + "SES PROPRES stats (niveau, points, K/D, victoires, temps de jeu, classements jour/semaine/total).");
+    }
+
     private void handleResetStats(CommandSender sender) {
         if (!sender.hasPermission("hikabrain.admin")) {
             MessageUtil.send(sender, "&cTu n'as pas la permission.");
@@ -1599,6 +1621,7 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
             MessageUtil.send(sender, "&b/hb leaderboard <victoires|kills|kd|parties> &7- Spawner un leaderboard top 10 à ta position");
             MessageUtil.send(sender, "&b/hb leaderboard <catégorie> remove &7- Supprimer ce leaderboard");
             MessageUtil.send(sender, "&b/hb leaderboard <catégorie> size <taille> &7- Régler la taille de l'hologramme (ex: 1.5)");
+            MessageUtil.send(sender, "&b/hb statshologram [remove] &7- Poser (ou supprimer) un hologramme de stats personnelles à ta position");
             MessageUtil.send(sender, "&8&m----------&r &dScoreboard &8&m----------");
             MessageUtil.send(sender, "&d/hb setsbserver <nom> &7- Définir le nom du serveur");
             MessageUtil.send(sender, "&d/hb setsbgame <nom> &7- Définir le nom du jeu");
@@ -1616,7 +1639,7 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
             if (sender.hasPermission("hikabrain.admin")) {
                 options.addAll(List.of("create", "copy", "delete", "setlobby", "setspectatorspawn", "setspawn", "delspawn", "setcapture", "setgamezone", "setmaxplayers", "setminplayers", "guislot", "music", "start", "stop"));
                 options.addAll(List.of("setsbserver", "setsbgame", "setsbtitle", "setsblines", "reloadsb", "sbinfo"));
-                options.addAll(List.of("resetstats", "leaderboard"));
+                options.addAll(List.of("resetstats", "leaderboard", "statshologram"));
             }
             return filterStartingWith(options, args[0]);
         }
@@ -1706,6 +1729,10 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
 
         if (args.length == 4 && sub.equals("leaderboard") && args[2].equalsIgnoreCase("size")) {
             return filterStartingWith(List.of("0.5", "1.0", "1.5", "2.0", "3.0"), args[3]);
+        }
+
+        if (args.length == 2 && sub.equals("statshologram")) {
+            return filterStartingWith(List.of("remove"), args[1]);
         }
 
         if (args.length == 2 && sub.equals("stats")) {

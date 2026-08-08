@@ -1561,6 +1561,11 @@ public class GameManager {
             Player player = Bukkit.getPlayer(uuid);
             if (player != null) {
                 restorePlayer(player);
+                // De retour hors de l'arène (fin de partie normale) : les cosmétiques
+                // équipés redeviennent visibles. C'était le chemin manquant : removePlayer()
+                // et removeSpectator() le font déjà, mais la fin de partie normale passe
+                // uniquement par ici, pas par removePlayer().
+                plugin.getCosmeticManager().applyCosmetics(player);
                 // Supprimer le scoreboard du joueur
                 plugin.getScoreboardManager().removeScoreboard(player);
                 // Restaurer à la position pré-lobby si configuré, sinon au lobby

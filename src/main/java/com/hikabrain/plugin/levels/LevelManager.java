@@ -278,6 +278,20 @@ public class LevelManager {
         return entries.size() > limit ? entries.subList(0, limit) : entries;
     }
 
+    /**
+     * Rang (1-based) de ce joueur dans le classement des points À VIE. Renvoie 0 si le
+     * joueur n'a encore aucune donnée enregistrée. Utilisé notamment par l'hologramme de
+     * statistiques personnelles (voir com.hikabrain.plugin.hologram.StatsHologramManager).
+     */
+    public int getPointsRank(UUID uuid) {
+        List<Map.Entry<UUID, PlayerLevelData>> sorted = new ArrayList<>(playerLevels.entrySet());
+        sorted.sort((a, b) -> Integer.compare(b.getValue().points, a.getValue().points));
+        for (int i = 0; i < sorted.size(); i++) {
+            if (sorted.get(i).getKey().equals(uuid)) return i + 1;
+        }
+        return 0;
+    }
+
     // ── Avantages cosmétiques ───────────────────────────────────────────────────
 
     public boolean isPerkUnlocked(UUID uuid, Perk perk) {

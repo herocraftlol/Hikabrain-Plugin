@@ -1,8 +1,8 @@
 # 🎮 HikaBrain Plugin
 
-> Un plugin Minecraft complet pour Paper 1.21.1 — Système de capture de zone par équipes avec tournoi automatisé, boutique de cosmétiques, musique NBS, niveaux & perks, et leaderboards holographiques.
+> Un plugin Minecraft complet pour Paper 1.21.1 — Capture de zone par équipes, tournois automatisés, boutique de cosmétiques, musique NBS, niveaux & perks, leaderboards holographiques et **hologrammes de statistiques personnelles**.
 
-**HikaBrain** est un minijeu palpitant où deux équipes (Rouge vs Bleu) s'affrontent pour contrôler une zone centrale. Inspiré par le style Screaming Bedwars, ce plugin offre une expérience compétitive avec des statistiques détaillées, des classements holographiques, un système de tournoi intégré et désormais une véritable **boutique de cosmétiques** pour récompenser l'investissement des joueurs.
+**HikaBrain** est un minijeu palpitant où deux équipes (Rouge vs Bleu) s'affrontent pour contrôler une zone centrale. Inspiré par le style Screaming Bedwars, ce plugin offre une expérience compétitive avec des statistiques détaillées, des classements holographiques, des **hologrammes de statistiques personnelles** (chaque joueur voit ses propres stats en s'approchant), un système de tournoi intégré et une véritable **boutique de cosmétiques** pour récompenser l'investissement des joueurs.
 
 ---
 
@@ -25,6 +25,7 @@
 - **Statistiques K/D** - Par équipe et par joueur
 - **Leaderboards par Catégorie** - K/D, Victoires, Kills totaux
 - **Hologrammes 3D** - Classements visibles dans le monde Minecraft
+- **Hologrammes de Statistiques Personnelles** - Posez un hologramme via `/hb statshologram` : chaque joueur qui s'approche y voit **ses propres** stats (niveau, points, K/D, victoires, parties, temps de jeu, classements jour / semaine / total)
 - **Persistance YAML** - Données sauvegardées automatiquement
 
 ### 🎨 Interface Graphique
@@ -76,6 +77,8 @@
 | `/hb perk` | Gérer ses perks équipés |
 | `/hb music` | Gérer la musique de l'arène |
 | `/hb leaderboard` | Afficher le leaderboard |
+| `/hb statshologram` | Poser un hologramme de statistiques personnelles |
+| `/hb statshologram remove` | Supprimer l'hologramme le plus proche |
 | `/arenas` | Ouvrir le GUI de sélection d'arène |
 | `/cosmetics` | Ouvrir la boutique de cosmétiques |
 | `/tournament` | Système de tournoi automatisé |
@@ -88,7 +91,66 @@
 | `hikabrain.play` | Jouer au HikaBrain | Tous |
 | `hikabrain.tournament.join` | S'inscrire à un tournoi | Tous |
 
-## 🆕 Dernière Mise à Jour (v1.0.25)
+## 🆕 Dernière Mise à Jour (v1.0.26)
+
+### 📡 Hologrammes de Statistiques Personnelles
+
+Cette mise à jour introduit un tout nouveau type d'hologramme, distinct du leaderboard classique : les **hologrammes de statistiques personnelles**. Contrairement au leaderboard (qui affiche le même top 10 à tout le monde), chaque hologramme affiche dynamiquement **les statistiques du joueur le plus proche** — chacun y voit donc *ses propres* données en s'approchant.
+
+#### 🎯 Nouvelle commande `/hb statshologram`
+- `/hb statshologram` — Pose un hologramme de statistiques personnelles à votre position
+- `/hb statshologram remove` — Supprime l'hologramme le plus proche (rayon de 5 blocs)
+- Vous pouvez en poser **plusieurs** (au spawn, dans le hub, à côté des arènes…)
+
+#### 🖥️ Contenu affiché (par joueur)
+Chaque hologramme se rafraîchit automatiquement toutes les 2 secondes et affiche :
+- ✦ **Statistiques HikaBrain** ✦
+- Pseudo du joueur détecté
+- **Niveau X** · **Y points**
+- ⚔ **K/D** (kills / morts)
+- 🏆 Victoires · 🎮 Parties jouées
+- ⏱ Temps de jeu total
+- 📅 Classement du **jour** · 🗓 de la **semaine** · 🕰 **total** (à vie)
+
+#### 🛠️ Détails techniques
+- Nouvelles méthodes de classement : `LevelManager#getPointsRank` (classement à vie) et `MatchHistoryManager#getPointsRankForPeriod` (classement sur une période jour / semaine)
+- Hologramme basé sur des ArmorStands invisibles, une ligne fixe par entrée — le texte est mis à jour en place (jamais respawné) pour rester fluide et **sans scintillement**
+- Détection du joueur le plus proche dans un rayon de 5 blocs
+- Persistance des positions dans `personal-holograms.yml`
+
+---
+
+### 💬 Amélioration du Chat Rapide d'Arène
+
+Le système de **messages rapides** (blocs colorés à cliquer pendant l'attente entre deux points ou à la victoire) a été étendu :
+
+- **Clic gauche ET clic droit** déclenchent désormais l'envoi du message (auparavant seul le clic gauche fonctionnait)
+- L'anti-spam empêche toujours une rafale lors d'un clic maintenu
+- Le clic est aussi neutralisé pour éviter de casser/placer un bloc ou d'ouvrir un conteneur pendant l'utilisation du bloc-message
+
+---
+
+### 🎨 Visibilité des Cosmétiques en Fin de Partie
+
+Correction d'un chemin manquant dans le cycle de vie des cosmétiques : à la **fin normale d'une partie** (quand les joueurs sont téléportés hors de l'arène), les cosmétiques équipés redeviennent désormais **correctement visibles**. Auparavant, seuls `removePlayer()` et `removeSpectator()` réappliquaient les cosmétiques — la fin de partie passait à côté. Le `GameManager` réapplique maintenant explicitement les cosmétiques à ce moment.
+
+---
+
+### 📋 Résumé des changements
+| Fichier | Changement |
+|---------|------------|
+| `StatsHologramManager` | Refonte complète : hologrammes de statistiques personnelles dynamiques |
+| `HikaBrainPlugin` | Instanciation & cycle de vie du `StatsHologramManager` |
+| `HikaBrainCommand` | Nouvelle sous-commande `/hb statshologram [remove]` + autocomplétion |
+| `LevelManager` | `getPointsRank()` — rang à vie du joueur |
+| `MatchHistoryManager` | `getPointsRankForPeriod()` — rang sur une période |
+| `QuickChatListener` | Clic gauche **et** droit pour les messages rapides |
+| `GameManager` | Réapplication des cosmétiques en fin de partie normale |
+| `plugin.yml` | Version → `1.0.26` + description mise à jour |
+
+---
+
+## 🆕 Mise à jour précédente (v1.0.25)
 
 ### 🛍️ Boutique de Cosmétiques
 
@@ -172,7 +234,7 @@ mvn clean package
 ## 📝 Auteur
 
 - **Développeur**: herocraftlol
-- **Version**: 1.0.25
+- **Version**: 1.0.26
 
 ## 📄 Licence
 
