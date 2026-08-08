@@ -844,7 +844,7 @@ public class GameManager {
         playSoundToAll(Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.5f, 1.2f);
 
         // Musique d'ambiance (facultative, voir MusicManager / config.yml "music")
-        plugin.getMusicManager().startMusicForArena(this);
+        plugin.getMusicManager().startNewMatchMusic(this);
 
         // Avantage cosmétique : nuage de particules "tête" au tout début de la partie
         // (une seule fois par match, pas à chaque round reset).
@@ -1196,8 +1196,8 @@ public class GameManager {
         // blocs de message rapide (voir QuickMessage), le kit normal sera reposé quand le
         // round reprendra réellement (voir plus bas, à la fin du compte à rebours).
         giveQuickChatItemsToAll();
-        // Silence pendant le temps d'attente (la musique reprendra quand le round redémarre)
-        plugin.getMusicManager().stopMusicForArena(this);
+        // Silence pendant le temps d'attente (la musique reprendra pile où elle s'est arrêtée)
+        plugin.getMusicManager().pauseMusicForArena(this);
 
         roundResetSecondsLeft = plugin.getConfig().getInt("round-reset-countdown", 5);
 
@@ -1211,8 +1211,8 @@ public class GameManager {
                 unfreezeAllPlayers();
                 restoreKitForAllPlayers();
                 state = GameState.PLAYING;
-                // Reprise de la musique d'ambiance
-                plugin.getMusicManager().startMusicForArena(this);
+                // Reprise de la musique d'ambiance, exactement là où elle s'était arrêtée
+                plugin.getMusicManager().resumeMusicForArena(this);
                 broadcast("&a&lÀ vous de jouer !");
                 // Son de départ
                 playSoundToAll(Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.5f, 1.2f);

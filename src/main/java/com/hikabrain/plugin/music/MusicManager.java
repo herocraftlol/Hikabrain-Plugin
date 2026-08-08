@@ -24,6 +24,11 @@ import java.util.stream.Collectors;
  * externe requis) pendant les parties HikaBrain : une piste par défaut configurable
  * globalement, ou une piste différente par arène.
  *
+ * La musique est mise en PAUSE (pas arrêtée) pendant chaque temps d'attente après un
+ * point marqué, et REPREND exactement là où elle s'était interrompue quand le round
+ * redémarre — elle ne recommence du début qu'au tout début d'une nouvelle partie (voir
+ * {@link #startNewMatchMusic}, {@link #pauseMusicForArena}, {@link #resumeMusicForArena}).
+ *
  * Les fichiers .nbs doivent être placés dans plugins/HikaBrain/music/. Voir
  * {@link NbsParser} pour le détail du format lu, et {@link #INSTRUMENT_SOUNDS} pour la
  * correspondance entre les 10 instruments vanilla du format NBS et les sons Minecraft.
@@ -141,12 +146,13 @@ public class MusicManager {
     // ── Lecture par arène ────────────────────────────────────────────────────────
 
     /**
-     * Démarre la musique pour cette arène (si activée en config), selon la piste choisie
-     * pour cette arène ou, à défaut, la piste par défaut globale. Appelé à chaque fois
-     * que la phase de jeu active (re)commence — début de partie ET reprise après chaque
-     * temps d'attente (voir GameManager#startRoundReset).
+     * Démarre une TOUTE NOUVELLE musique pour cette arène, depuis le début (choisit une
+     * piste — au hasard si configuré ainsi — et repart de zéro). À appeler UNIQUEMENT au
+     * tout début d'une partie (voir GameManager#beginPlayPhase), jamais à la reprise
+     * après un temps d'attente : sinon un réglage "random" changerait de chanson à
+     * chaque point marqué, et "reprendre où on s'est arrêté" n'aurait plus de sens.
      */
-    public void startMusicForArena(GameManager gm) {
+    public void startNewMatchMusic(GameManager gm) {
         if (!plugin.getConfig().getBoolean("music.enabled", false)) return;
 
         String arenaName = gm.getName();
@@ -163,12 +169,34 @@ public class MusicManager {
 
         MusicSession session = new MusicSession(gm, song);
         activeSessions.put(arenaName, session);
-        session.start();
+        session.playFromStart();
     }
 
     /**
-     * Arrête la musique de cette arène (silence pendant le temps d'attente/chat rapide,
-     * et à la fin de la partie).
+     * Met la musique de cette arène EN PAUSE (silence pendant le temps d'attente après un
+     * point marqué), en retenant sa position exacte pour la reprise — voir
+     * {@link #resumeMusicForArena}. Contrairement à {@link #stopMusicForArena}, la
+     * session n'est PAS oubliée.
+     */
+    public void pauseMusicForArena(GameManager gm) {
+        MusicSession session = activeSessions.get(gm.getName());
+        if (session != null) session.pause();
+    }
+
+    /**
+     * Reprend la musique de cette arène exactement là où elle avait été mise en pause
+     * (voir {@link #pauseMusicForArena}). Ne fait rien s'il n'y a pas de session en
+     * cours pour cette arène (musique désactivée, ou partie qui vient de se terminer).
+     */
+    public void resumeMusicForArena(GameManager gm) {
+        MusicSession session = activeSessions.get(gm.getName());
+        if (session != null) session.resume();
+    }
+
+    /**
+     * Arrête complètement la musique de cette arène et oublie sa position (fin de
+     * partie, ou filet de sécurité en cas d'arrêt brutal) : la prochaine partie
+     * repartira forcément d'une chanson toute neuve, pas d'une reprise.
      */
     public void stopMusicForArena(GameManager gm) {
         MusicSession session = activeSessions.remove(gm.getName());
@@ -180,49 +208,86 @@ public class MusicManager {
     }
 
     /**
-     * Une "session" de lecture : programme toutes les notes d'une chanson pour les
-     * joueurs d'une arène, et reboucle automatiquement si configuré (music.loop).
-     * Toutes les tâches programmées sont annulables via {@link #stop()}, pour ne jamais
-     * laisser de notes sonner après la fin du temps de jeu actif.
+     * Une "session" de lecture pour une arène : programme les notes d'une chanson à
+     * partir d'une position donnée (en ticks Minecraft écoulés depuis le début de la
+     * chanson), et sait se mettre en pause en retenant cette position pour la reprendre
+     * plus tard au même endroit. Reboucle automatiquement à la fin si configuré.
      */
     private class MusicSession {
         private final GameManager gm;
         private final NbsSong song;
+
+        /** Position de lecture en ticks Minecraft depuis le début de la chanson (0 = tout début). */
+        private long positionTicks = 0;
+        /** Horodatage (ms) du début du segment de lecture EN COURS, pour calculer la position à la pause. */
+        private long segmentStartMillis;
+        private boolean playing = false;
+
         private final List<BukkitTask> noteTasks = new ArrayList<>();
-        private BukkitTask loopTask;
+        private BukkitTask endOfSongTask;
 
         MusicSession(GameManager gm, NbsSong song) {
             this.gm = gm;
             this.song = song;
         }
 
-        void start() {
-            scheduleAllNotes();
-            if (plugin.getConfig().getBoolean("music.loop", true)) {
-                long lengthTicks = Math.max(20L, song.getLengthInMinecraftTicks());
-                loopTask = Bukkit.getScheduler().runTaskLater(plugin, this::loopRestart, lengthTicks + 20L);
-            }
+        void playFromStart() {
+            positionTicks = 0;
+            resume();
         }
 
-        private void loopRestart() {
-            scheduleAllNotes();
-            long lengthTicks = Math.max(20L, song.getLengthInMinecraftTicks());
-            loopTask = Bukkit.getScheduler().runTaskLater(plugin, this::loopRestart, lengthTicks + 20L);
+        /** Reprend la lecture depuis {@link #positionTicks} (là où on s'était arrêté). */
+        void resume() {
+            if (playing) return;
+            playing = true;
+            segmentStartMillis = System.currentTimeMillis();
+            scheduleNotesFrom(positionTicks);
         }
 
-        private void scheduleAllNotes() {
+        /** Met en pause : annule les notes programmées, mémorise la position atteinte. */
+        void pause() {
+            if (!playing) return;
+            long elapsedSinceResume = Math.round((System.currentTimeMillis() - segmentStartMillis) / 50.0); // 1 tick = 50ms
+            positionTicks += Math.max(0, elapsedSinceResume);
+            cancelTasks();
+            playing = false;
+        }
+
+        /** Arrêt définitif (fin de partie) : comme pause(), mais la position n'a plus d'importance. */
+        void stop() {
+            cancelTasks();
+            playing = false;
+        }
+
+        private void scheduleNotesFrom(long startTick) {
             double volumeConfig = plugin.getConfig().getDouble("music.volume", 1.0);
             double tempo = song.getTempo();
 
             for (NbsSong.NbsNote note : song.getNotes()) {
+                long noteMcTick = Math.round(note.tick * (20.0 / tempo));
+                if (noteMcTick < startTick) continue; // déjà joué avant la pause, on ne le rejoue pas
+
                 Sound sound = INSTRUMENT_SOUNDS.get(note.instrument);
-                if (sound == null) continue; // instrument personnalisé (résource pack) : pas supporté, on l'ignore
+                if (sound == null) continue; // instrument personnalisé (resource pack) : pas supporté, on l'ignore
 
-                long delay = Math.round(note.tick * (20.0 / tempo));
-
+                long delay = noteMcTick - startTick;
                 BukkitTask task = Bukkit.getScheduler().runTaskLater(plugin,
                         () -> playNoteToArena(note, sound, volumeConfig), delay);
                 noteTasks.add(task);
+            }
+
+            long totalLengthTicks = Math.max(20L, song.getLengthInMinecraftTicks());
+            long remaining = Math.max(1L, totalLengthTicks - startTick);
+            endOfSongTask = Bukkit.getScheduler().runTaskLater(plugin, this::onSongFinished, remaining);
+        }
+
+        private void onSongFinished() {
+            if (plugin.getConfig().getBoolean("music.loop", true)) {
+                playing = false; // pour permettre à resume() de reprogrammer proprement
+                positionTicks = 0;
+                resume();
+            } else {
+                playing = false;
             }
         }
 
@@ -240,12 +305,12 @@ public class MusicManager {
             }
         }
 
-        void stop() {
+        private void cancelTasks() {
             for (BukkitTask task : noteTasks) task.cancel();
             noteTasks.clear();
-            if (loopTask != null) {
-                loopTask.cancel();
-                loopTask = null;
+            if (endOfSongTask != null) {
+                endOfSongTask.cancel();
+                endOfSongTask = null;
             }
         }
     }

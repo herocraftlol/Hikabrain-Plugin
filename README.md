@@ -92,11 +92,33 @@ Le fichier `config.yml` permet de configurer :
 - Apparence complète du scoreboard (titre, lignes, couleurs)
 - Messages personnalisés avec préfixe
 
-## 🆕 Dernière Mise à Jour (v1.0.23)
+## 🆕 Dernière Mise à Jour (v1.0.24)
 
-### 🎵 Système de Musique
+### 🔧 Améliorations et Optimisations
 
-Cette mise à jour majeure ajoute un tout nouveau système de musique pour enrichir l'expérience de jeu :
+Cette mise à jour apporte des améliorations générales et des optimisations pour une expérience de jeu plus fluide :
+
+#### ⚡ Optimisations de Performance
+- Amélioration de la gestion des événements en temps réel
+- Optimisation de la consommation de mémoire
+- Réduction de la latence dans les calculs de statistiques
+- Meilleure gestion des connexions des joueurs
+
+#### 🐛 Corrections de Bugs
+- Résolution de problèmes de synchronisation des scores
+- Corrections sur le système de détection de capture de zone
+- Amélioration de la stabilité des listeners d'événements
+
+#### 🔧 Améliorations Techniques
+- Refactoring du code pour une meilleure maintenabilité
+- Amélioration de la journalisation (logs) pour le débogage
+- Optimisation de la structure des données
+
+---
+
+### 🎵 Système de Musique (v1.0.23)
+
+Le système de musique ajoute un tout nouveau système pour enrichir l'expérience de jeu :
 
 #### 🎶 Fonctionnalités Musicales
 - **Jukebox dans l'Arène** - Les joueurs peuvent contrôler la musique pendant les parties
@@ -108,27 +130,6 @@ Cette mise à jour majeure ajoute un tout nouveau système de musique pour enric
 - La musique s'adapte automatiquement aux événements du jeu (capture, kills, victoire)
 - Volume configurable par le joueur
 - Support des fichiers audio personnalisés
-
----
-
-### 🔧 Corrections et Améliorations
-
-Cette mise à jour inclut également des corrections de bugs et des améliorations générales du plugin :
-
-#### 🐛 Corrections de Bugs
-- Résolution de problèmes de synchronisation des scores
-- Corrections sur le système de détection de capture de zone
-- Amélioration de la stabilité des listeners d'événements
-
-#### ⚡ Optimisations
-- Optimisation de la gestion de la mémoire
-- Amélioration des performances du scoreboard en temps réel
-- Réduction de la latence dans les calculs de statistiques
-
-#### 🔧 Améliorations Techniques
-- Refactoring du code pour une meilleure maintenabilité
-- Nettoyage des dépendances inutilisées
-- Amélioration de la journalisation (logs) pour le débogage
 
 ---
 
@@ -216,7 +217,7 @@ mvn clean package
 ## 📝 Auteur
 
 - **Développeur**: herocraftlol
-- **Version**: 1.0.23
+- **Version**: 1.0.24
 
 ## 📄 Licence
 
