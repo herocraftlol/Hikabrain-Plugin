@@ -274,6 +274,33 @@ public class ArenaManager {
     }
 
     /**
+     * Trouve la meilleure arène pour "rejouer" en fin de partie : même FORMAT D'ÉQUIPE
+     * (même 1v1/2v2/3v3...) que celle qu'on vient de quitter, en préférant une arène qui
+     * a déjà des joueurs dedans (pour rejouer vite, sans attendre seul), sinon n'importe
+     * quelle arène vide de ce format. Renvoie null si aucune arène de ce format précis
+     * n'est disponible (l'appelant peut alors retomber sur {@link #findBestArenaForRandomJoin}).
+     */
+    public GameManager findBestArenaForRematch(int teamSize) {
+        List<GameManager> sameFormat = new ArrayList<>();
+        for (GameManager gm : arenas.values()) {
+            if (!isJoinable(gm)) continue;
+            if (gm.getMaxPlayers() / 2 != teamSize) continue;
+            sameFormat.add(gm);
+        }
+        if (sameFormat.isEmpty()) {
+            return null;
+        }
+
+        List<GameManager> withPlayers = new ArrayList<>();
+        for (GameManager gm : sameFormat) {
+            if (gm.getPlayerCount() > 0) withPlayers.add(gm);
+        }
+
+        List<GameManager> candidates = withPlayers.isEmpty() ? sameFormat : withPlayers;
+        return candidates.get(ThreadLocalRandom.current().nextInt(candidates.size()));
+    }
+
+    /**
      * Une arène est "joignable" pour la jointure aléatoire si elle est correctement
      * configurée et si elle n'est pas déjà en train de jouer/de se terminer/pleine.
      */

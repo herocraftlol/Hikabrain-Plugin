@@ -251,10 +251,6 @@ public class MusicManager {
         if (session != null) session.stop();
     }
 
-    private static int clamp(int value, int min, int max) {
-        return Math.max(min, Math.min(max, value));
-    }
-
     /**
      * Une "session" de lecture pour une arène : programme les notes d'une chanson à
      * partir d'une position donnée (en ticks Minecraft écoulés depuis le début de la
@@ -315,8 +311,12 @@ public class MusicManager {
                 long noteMcTick = Math.round(note.tick * (20.0 / tempo));
                 if (noteMcTick < startTick) continue; // déjà joué avant la pause, on ne le rejoue pas
 
-                Sound sound = INSTRUMENT_SOUNDS.get(note.instrument);
-                if (sound == null) continue; // instrument personnalisé (resource pack) : pas supporté, on l'ignore
+                // Instrument NBS "vanilla" (0-9) → son correspondant ; au-delà (instrument
+                // personnalisé, très courant dans les morceaux composés avec des packs
+                // d'instruments étendus), on retombe sur le Harp plutôt que d'ignorer la
+                // note entièrement — jouer la bonne hauteur avec le mauvais timbre reste
+                // bien plus fidèle que de la faire disparaître complètement.
+                Sound sound = INSTRUMENT_SOUNDS.getOrDefault(note.instrument, Sound.BLOCK_NOTE_BLOCK_HARP);
 
                 long delay = noteMcTick - startTick;
                 BukkitTask task = Bukkit.getScheduler().runTaskLater(plugin,
@@ -340,9 +340,20 @@ public class MusicManager {
         }
 
         private void playNoteToArena(NbsSong.NbsNote note, Sound sound, double volumeConfig) {
-            int clicks = clamp(note.key - 33, 0, 24); // touche NBS -> clic de bloc de notes vanilla (0-24)
+            // Minecraft limite VRAIMENT le pitch d'un son à [0.5 ; 2.0] (2 octaves), quelle
+            // que soit la méthode utilisée pour le jouer — c'est une limite du moteur audio
+            // lui-même, impossible à contourner. Une note dont la hauteur NBS sort de cette
+            // plage est donc transposée d'octaves entières (÷2 ou ×2 sur le pitch) jusqu'à
+            // retomber dans la plage jouable, plutôt que d'être purement écrêtée à l'extrême
+            // : elle garde ainsi sa vraie note (do, ré, mi...), juste sur une octave voisine,
+            // au lieu de sonner strictement identique à toutes les autres notes extrêmes.
+            int clicks = note.key - 33; // touche NBS -> clic de bloc de notes (peut sortir de [0;24])
+            while (clicks < 0) clicks += 12;
+            while (clicks > 24) clicks -= 12;
+
             double semitoneOffset = (clicks - 12) + (note.pitchFine / 100.0);
             float pitch = (float) Math.pow(2.0, semitoneOffset / 12.0);
+            pitch = Math.max(0.5f, Math.min(2.0f, pitch)); // garde-fou final (le fin réglage pitchFine pourrait déborder de justesse)
             float volume = (float) Math.max(0.0, Math.min(1.0, (note.velocity / 100.0) * volumeConfig));
 
             for (UUID uuid : gm.getPlayerTeams().keySet()) {

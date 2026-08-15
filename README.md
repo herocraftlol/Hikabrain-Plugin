@@ -1,8 +1,12 @@
 # 🎮 HikaBrain Plugin
 
-> Un plugin Minecraft complet pour Paper 1.21.1 — Capture de zone par équipes, tournois automatisés, boutique de cosmétiques, musique NBS, niveaux & perks, leaderboards holographiques et **hologrammes de statistiques personnelles**.
+![Version](https://img.shields.io/badge/version-1.0.28-blue)
+![Paper](https://img.shields.io/badge/Paper-1.21.1-orange)
+![Java](https://img.shields.io/badge/Java-21-red)
 
-**HikaBrain** est un minijeu palpitant où deux équipes (Rouge vs Bleu) s'affrontent pour contrôler une zone centrale. Inspiré par le style Screaming Bedwars, ce plugin offre une expérience compétitive avec des statistiques détaillées, des classements holographiques, des **hologrammes de statistiques personnelles** (chaque joueur voit ses propres stats en s'approchant), un système de tournoi intégré et une véritable **boutique de cosmétiques** pour récompenser l'investissement des joueurs.
+> Un plugin Minecraft complet pour Paper 1.21.1 — Capture de zone par équipes, tournois automatisés, boutique de cosmétiques, musique NBS, niveaux & perks, leaderboards holographiques, **hologrammes de statistiques personnelles** et **rematch en un clic en fin de partie**.
+
+**HikaBrain** est un minijeu palpitant où deux équipes (Rouge vs Bleu) s'affrontent pour contrôler une zone centrale. Inspiré par le style Screaming Bedwars, ce plugin offre une expérience compétitive avec des statistiques détaillées, des classements holographiques, des **hologrammes de statistiques personnelles** (chaque joueur voit ses propres stats en s'approchant), un système de tournoi intégré, une véritable **boutique de cosmétiques** pour récompenser l'investissement des joueurs, et un **bouton « Rejouer »** qui relance instantanément une partie du même format à la fin de chaque match.
 
 ---
 
@@ -14,6 +18,7 @@
 - **Scoreboard en Temps Réel** - Scores, kills, deaths, K/D et victoires
 - **Compte à Rebours Configurable** - Lobby avec freeze des joueurs
 - **Items de Jeu** - Bouton forcer le démarrage 🔵 et quitter la partie 🔴
+- **Rematch en un Clic** - À la fin de chaque partie, deux boutons cliquables dans le chat : « ▶ REJOUER » (relance une partie du même format 1v1/2v2/3v3…) et « ✖ QUITTER » (rester au lobby)
 
 ### 🏆 Système de Tournoi
 - **Tournois Automatisés** - Créez et gérez des tournois compétitifs
@@ -80,6 +85,8 @@
 | `/hb leaderboard` | Afficher le leaderboard |
 | `/hb statshologram` | Poser un hologramme de statistiques personnelles |
 | `/hb statshologram remove` | Supprimer l'hologramme le plus proche |
+| `/hb rematch <teamSize>` | Rejoindre une nouvelle partie du même format (déclenché par le bouton « ▶ REJOUER ») |
+| `/hb rematchcancel` | Rester au lobby (déclenché par le bouton « ✖ QUITTER ») |
 | `/arenas` | Ouvrir le GUI de sélection d'arène |
 | `/cosmetics` | Ouvrir la boutique de cosmétiques |
 | `/tournament` | Système de tournoi automatisé |
@@ -92,7 +99,60 @@
 | `hikabrain.play` | Jouer au HikaBrain | Tous |
 | `hikabrain.tournament.join` | S'inscrire à un tournoi | Tous |
 
-## 🆕 Dernière Mise à Jour (v1.0.27)
+## 🆕 Dernière Mise à Jour (v1.0.28)
+
+Cette version apporte deux améliorations qui rendent l'expérience de jeu plus fluide et la musique plus fidèle : un **rematch en un clic** en fin de partie, et un **moteur musical NBS plus précis**.
+
+---
+
+### 🔁 Rematch en un Clic en Fin de Partie
+
+Jusqu'à présent, à la fin d'une partie, les joueurs devaient rouvrir manuellement le GUI `/arenas` pour relancer une partie. C'est désormais chose du passé : dès l'écran de fin, chaque joueur reçoit **deux boutons cliquables directement dans le chat**.
+
+#### 🎮 Les deux boutons
+- **▶ REJOUER** (vert, gras) — Relance immédiatement une nouvelle partie, **du même format** que celle qu'on vient de jouer (1v1, 2v2, 3v3…).
+- **✖ QUITTER** (rouge, gras) — Garde le joueur au lobby, tout simplement.
+
+#### 🧠 Logique de sélection intelligente
+Le bouton « REJOUER » ne se contente pas de renvoyer vers une arène au hasard :
+1. Il recherche en priorité une arène **du même format exact** (même `teamSize`).
+2. Parmi celles-ci, il préfère une arène qui **a déjà des joueurs dedans** — pour rejouer vite, sans attendre seul dans un lobby vide.
+3. S'il n'y a aucune arène du bon format, il retombe sur la recherche d'arène aléatoire classique (`findBestArenaForRandomJoin`) plutôt que de laisser le joueur sans rien.
+
+#### 🛠️ Détails techniques
+- Nouvelles sous-commandes : `/hb rematch <teamSize>` et `/hb rematchcancel`
+- `GameManager#sendRematchPrompt(player, teamSize)` génère les deux `Component` Adventure avec `ClickEvent.runCommand` et `HoverEvent.showText`
+- `ArenaManager#findBestArenaForRematch(teamSize)` filtre les arènes joignables par format, puis trie par présence de joueurs
+- Le `teamSize` est calculé à la fin de la partie et passé dans le résumé de fin de jeu
+
+---
+
+### 🎵 Moteur Musical NBS Plus Fidèle
+
+Le lecteur de fichiers `.nbs` (Note Block Studio) gagne en précision pour restituer fidèlement les morceaux composés avec des packs d'instruments étendus.
+
+#### 🎹 Instruments personnalisés
+- **Avant** : les instruments NBS au-delà de la plage vanilla (0–9) étaient purement **ignorés** — les notes disparaissaient du morceau.
+- **Maintenant** : un instrument non reconnu retombe sur le **Harp** (bloc de notes par défaut). La note garde ainsi sa **vraie hauteur**, avec un timbre approximatif — bien plus fidèle qu'une note entièrement absente.
+
+#### 🎚️ Transposition par octaves (au lieu de l'écrêtage)
+Minecraft limite le pitch d'un son à une plage de **[0.5 ; 2.0]** (deux octaves), quelle que soit la méthode utilisée — c'est une limite du moteur audio lui-même, impossible à contourner.
+- **Avant** : une note dont la hauteur NBS sortait de la plage jouable était **écrêtée** (clampée à 0 ou 24 clics) — toutes les notes extrêmes sonnaient alors identiques.
+- **Maintenant** : la note est **transposée d'octaves entières** (±12 clics) jusqu'à retomber dans la plage jouable. Elle conserve ainsi sa **vraie note** (do, ré, mi…), juste sur une octave voisine, au lieu d'être écrasée vers l'extrême.
+- Un **garde-fou final** (`Math.max(0.5, Math.min(2.0, pitch))`) sécurise le réglage fin du pitch au cas où il déborderait de justesse.
+
+#### 📋 Résumé des changements
+| Fichier | Changement |
+|---------|------------|
+| `HikaBrainCommand` | Nouvelles sous-commandes `/hb rematch` & `/hb rematchcancel` |
+| `ArenaManager` | `findBestArenaForRematch(teamSize)` — recherche par format + priorité joueurs présents |
+| `GameManager` | `sendRematchPrompt()` — boutons cliquables « ▶ REJOUER » / « ✖ QUITTER » en fin de partie |
+| `MusicManager` | Instruments personnalisés → Harp (au lieu d'ignorer) + transposition par octaves (au lieu de l'écrêtage) |
+| `plugin.yml` | Version → `1.0.28` + description mise à jour + sous-commandes rematch dans l'usage |
+
+---
+
+## 🆕 Mise à jour précédente (v1.0.27)
 
 ### 🎵 Lecture Aléatoire Intelligente de la Musique
 
@@ -258,7 +318,7 @@ mvn clean package
 ## 📝 Auteur
 
 - **Développeur**: herocraftlol
-- **Version**: 1.0.27
+- **Version**: 1.0.28
 
 ## 📄 Licence
 

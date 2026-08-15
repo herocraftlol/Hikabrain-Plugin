@@ -1357,7 +1357,7 @@ public class GameManager {
         // Récapitulatif de fin de partie : vainqueurs + meilleurs performeurs + points de
         // chaque joueur, le tout tenant sur un minimum de lignes pour rester visible sans
         // avoir à remonter le chat.
-        announceEndGameSummary(winner, redPlayers, bluePlayers);
+        announceEndGameSummary(winner, redPlayers, bluePlayers, teamSize);
 
         int delay = plugin.getConfig().getInt("restart-delay", 5);
 
@@ -1419,7 +1419,7 @@ public class GameManager {
      * son de niveau supérieur (et le nom du nouvel avantage débloqué, le cas échéant), plutôt
      * que des lignes de chat supplémentaires.
      */
-    private void announceEndGameSummary(Team winner, List<String> redPlayers, List<String> bluePlayers) {
+    private void announceEndGameSummary(Team winner, List<String> redPlayers, List<String> bluePlayers, int teamSize) {
         LevelManager levelManager = plugin.getLevelManager();
 
         String redList = redPlayers.isEmpty() ? "&8(aucun)" : "&f" + String.join("&7, &f", redPlayers);
@@ -1464,7 +1464,44 @@ public class GameManager {
             if (result.leveledUp()) {
                 playLevelUpEffect(player, result);
             }
+
+            sendRematchPrompt(player, teamSize);
         }
+    }
+
+    /**
+     * Envoie deux boutons cliquables dans le chat : "▶ REJOUER" (vert) qui renvoie
+     * directement vers une arène de MÊME FORMAT (même 1v1/2v2/3v3...), en priorité une
+     * qui a déjà des joueurs dedans pour rejouer vite sans attendre seul — et
+     * "✖ QUITTER" (rouge) pour rester simplement au lobby. Évite d'avoir à rouvrir le
+     * GUI /arenas à chaque fin de partie.
+     */
+    private void sendRematchPrompt(Player player, int teamSize) {
+        net.kyori.adventure.text.Component replay = net.kyori.adventure.text.Component
+                .text("▶ REJOUER")
+                .color(net.kyori.adventure.text.format.NamedTextColor.GREEN)
+                .decorate(net.kyori.adventure.text.format.TextDecoration.BOLD)
+                .hoverEvent(net.kyori.adventure.text.event.HoverEvent.showText(
+                        net.kyori.adventure.text.Component.text("Rejoindre une nouvelle partie " + teamSize + "v" + teamSize)
+                                .color(net.kyori.adventure.text.format.NamedTextColor.GRAY)))
+                .clickEvent(net.kyori.adventure.text.event.ClickEvent.runCommand("/hb rematch " + teamSize));
+
+        net.kyori.adventure.text.Component quit = net.kyori.adventure.text.Component
+                .text("✖ QUITTER")
+                .color(net.kyori.adventure.text.format.NamedTextColor.RED)
+                .decorate(net.kyori.adventure.text.format.TextDecoration.BOLD)
+                .hoverEvent(net.kyori.adventure.text.event.HoverEvent.showText(
+                        net.kyori.adventure.text.Component.text("Rester au lobby")
+                                .color(net.kyori.adventure.text.format.NamedTextColor.GRAY)))
+                .clickEvent(net.kyori.adventure.text.event.ClickEvent.runCommand("/hb rematchcancel"));
+
+        net.kyori.adventure.text.Component prompt = net.kyori.adventure.text.Component
+                .text("  ")
+                .append(replay)
+                .append(net.kyori.adventure.text.Component.text("     ").color(net.kyori.adventure.text.format.NamedTextColor.DARK_GRAY))
+                .append(quit);
+
+        player.sendMessage(prompt);
     }
 
     /**

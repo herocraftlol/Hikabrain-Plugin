@@ -89,6 +89,8 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
             case "guislot" -> handleGuiSlot(sender, args);
             case "music" -> handleMusic(sender, args);
             case "cosmetics", "cosmetic", "shop" -> handleCosmetics(sender, args);
+            case "rematch" -> handleRematch(sender, args);
+            case "rematchcancel" -> handleRematchCancel(sender);
             case "join" -> handleJoin(sender, args);
             case "joinrandom" -> handleJoinRandom(sender);
             case "arenas" -> handleArenasGui(sender);
@@ -718,6 +720,60 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
         }
 
         gm.addPlayer(player);
+    }
+
+    /**
+     * /hb rematch <teamSize> : déclenché par le bouton "▶ REJOUER" cliquable en fin de
+     * partie (voir GameManager#sendRematchPrompt). Cherche une arène du MÊME format
+     * (même 1v1/2v2/3v3...), en priorité une qui a déjà des joueurs, et y renvoie
+     * directement le joueur — sans avoir à repasser par le GUI /arenas.
+     */
+    private void handleRematch(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player player)) {
+            MessageUtil.send(sender, "&cCette commande doit être exécutée par un joueur.");
+            return;
+        }
+
+        ArenaManager am = plugin.getArenaManager();
+        if (am.findArenaOf(player) != null) {
+            MessageUtil.send(sender, "&cTu es déjà dans une partie.");
+            return;
+        }
+        if (am.findSpectatorArenaOf(player) != null) {
+            MessageUtil.send(sender, "&cTu es en mode spectateur. Fais /hb unspectate d'abord.");
+            return;
+        }
+
+        int teamSize;
+        try {
+            teamSize = args.length >= 2 ? Integer.parseInt(args[1]) : 1;
+        } catch (NumberFormatException e) {
+            teamSize = 1;
+        }
+        if (teamSize < 1) teamSize = 1;
+
+        // Priorité au même format exact (1v1/2v2/3v3...) ; à défaut, n'importe quelle
+        // arène disponible plutôt que de laisser le joueur sans rien.
+        GameManager target = am.findBestArenaForRematch(teamSize);
+        if (target == null) {
+            target = am.findBestArenaForRandomJoin();
+        }
+        if (target == null) {
+            MessageUtil.send(sender, "&cAucune arène disponible pour le moment. Réessaie dans quelques instants, ou utilise /arenas.");
+            return;
+        }
+
+        target.addPlayer(player);
+        MessageUtil.send(sender, "&aC'est reparti !");
+    }
+
+    /**
+     * /hb rematchcancel : déclenché par le bouton "✖ QUITTER" cliquable en fin de partie.
+     * Le joueur est déjà revenu au lobby à ce stade (voir GameManager#resetToLobby) : il
+     * n'y a rien de plus à faire, juste une petite confirmation.
+     */
+    private void handleRematchCancel(CommandSender sender) {
+        MessageUtil.send(sender, "&7À bientôt sur HikaBrain !");
     }
 
     private void handleArenasGui(CommandSender sender) {
