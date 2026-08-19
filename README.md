@@ -1,12 +1,12 @@
 # 🎮 HikaBrain Plugin
 
-![Version](https://img.shields.io/badge/version-1.0.28-blue)
+![Version](https://img.shields.io/badge/version-1.0.29-blue)
 ![Paper](https://img.shields.io/badge/Paper-1.21.1-orange)
 ![Java](https://img.shields.io/badge/Java-21-red)
 
-> Un plugin Minecraft complet pour Paper 1.21.1 — Capture de zone par équipes, tournois automatisés, boutique de cosmétiques, musique NBS, niveaux & perks, leaderboards holographiques, **hologrammes de statistiques personnelles** et **rematch en un clic en fin de partie**.
+> Un plugin Minecraft complet pour Paper 1.21.1 — Capture de zone par équipes, tournois automatisés, boutique de cosmétiques, musique NBS, niveaux & perks, **leaderboards holographiques par format (1v1/2v2/3v3/4v4)**, **hologrammes de statistiques personnelles au style entièrement configurable et sans scintillement**, et **rematch en un clic en fin de partie**.
 
-**HikaBrain** est un minijeu palpitant où deux équipes (Rouge vs Bleu) s'affrontent pour contrôler une zone centrale. Inspiré par le style Screaming Bedwars, ce plugin offre une expérience compétitive avec des statistiques détaillées, des classements holographiques, des **hologrammes de statistiques personnelles** (chaque joueur voit ses propres stats en s'approchant), un système de tournoi intégré, une véritable **boutique de cosmétiques** pour récompenser l'investissement des joueurs, et un **bouton « Rejouer »** qui relance instantanément une partie du même format à la fin de chaque match.
+**HikaBrain** est un minijeu palpitant où deux équipes (Rouge vs Bleu) s'affrontent pour contrôler une zone centrale. Inspiré par le style Screaming Bedwars, ce plugin offre une expérience compétitive avec des statistiques détaillées, des classements holographiques (globaux **et par format d'équipe**), des **hologrammes de statistiques personnelles** (chaque joueur voit ses propres stats en s'approchant) construits sur les **TextDisplay natifs** — une seule entité, aucun scintillement, apparence configurable —, un système de tournoi intégré, une véritable **boutique de cosmétiques** pour récompenser l'investissement des joueurs, et un **bouton « Rejouer »** qui relance instantanément une partie du même format à la fin de chaque match.
 
 ---
 
@@ -28,9 +28,10 @@
 
 ### 📊 Statistiques & Classements
 - **Statistiques K/D** - Par équipe et par joueur
-- **Leaderboards par Catégorie** - K/D, Victoires, Kills totaux
-- **Hologrammes 3D** - Classements visibles dans le monde Minecraft
-- **Hologrammes de Statistiques Personnelles** - Posez un hologramme via `/hb statshologram` : chaque joueur qui s'approche y voit **ses propres** stats (niveau, points, K/D, victoires, parties, temps de jeu, classements jour / semaine / total)
+- **Leaderboards par Catégorie** - K/D, Victoires, Kills, Parties jouées…
+- **Leaderboards par Format** - Tops 1v1, 2v2, 3v3 et 4v4 (par victoires dans chaque format)
+- **Hologrammes 3D sans scintillement** - Une seule entité `TextDisplay` par hologramme, mise à jour en place, apparence configurable (`hologram-style` dans config.yml)
+- **Hologrammes de Statistiques Personnelles** - Posez un hologramme via `/hb statshologram` : chaque joueur qui s'approche y voit **ses propres** stats (niveau, points, K/D, victoires, parties, temps de jeu, classements jour / semaine / total), et redimensionnez-le avec `/hb statshologram size <taille>`
 - **Persistance YAML** - Données sauvegardées automatiquement
 
 ### 🎨 Interface Graphique
@@ -82,9 +83,11 @@
 | `/hb points` | Voir ses points et son niveau |
 | `/hb perk` | Gérer ses perks équipés |
 | `/hb music` | Gérer la musique de l'arène |
-| `/hb leaderboard` | Afficher le leaderboard |
+| `/hb leaderboard <victoires\|kills\|kd\|parties\|1v1\|2v2\|3v3\|4v4>` | Poser un leaderboard top 10 à votre position |
+| `/hb leaderboard <catégorie> [remove\|size <taille>]` | Supprimer ou redimensionner le leaderboard le plus proche |
 | `/hb statshologram` | Poser un hologramme de statistiques personnelles |
 | `/hb statshologram remove` | Supprimer l'hologramme le plus proche |
+| `/hb statshologram size <taille>` | Redimensionner l'hologramme de stats le plus proche (ex: 1.5) |
 | `/hb rematch <teamSize>` | Rejoindre une nouvelle partie du même format (déclenché par le bouton « ▶ REJOUER ») |
 | `/hb rematchcancel` | Rester au lobby (déclenché par le bouton « ✖ QUITTER ») |
 | `/arenas` | Ouvrir le GUI de sélection d'arène |
@@ -99,7 +102,67 @@
 | `hikabrain.play` | Jouer au HikaBrain | Tous |
 | `hikabrain.tournament.join` | S'inscrire à un tournoi | Tous |
 
-## 🆕 Dernière Mise à Jour (v1.0.28)
+## 🆕 Dernière Mise à Jour (v1.0.29)
+
+Cette version est entièrement dédiée aux **hologrammes** : ils passent tous au `TextDisplay` natif (une seule entité, **zéro scintillement**), leur apparence devient **entièrement configurable**, et le système de leaderboards s'enrichit de **quatre nouvelles catégories par format d'équipe**.
+
+---
+
+### ✨ Hologrammes Repensés : TextDisplay Natif & Zéro Scintillement
+
+Jusqu'ici, les hologrammes de statistiques personnelles empilaient **8 ArmorStands invisibles** (un par ligne) et les leaderboards supprimaient puis recréaient toutes leurs lignes à chaque rafraîchissement — ce qui pouvait causer un **clignotement visible** et des désynchronisations.
+
+- **Maintenant** : chaque hologramme (stats personnelles **et** leaderboards) est **une seule entité `TextDisplay`** — le vrai type « hologramme » natif de Minecraft depuis la 1.19.4, multi-lignes en une seule entité.
+- L'entité n'est **jamais respawnée** : à chaque rafraîchissement automatique, seul son texte est mis à jour en place. L'affichage reste **fluide, permanent et sans aucun scintillement**.
+
+### 🎨 Apparence Entièrement Configurable (`hologram-style`)
+
+Une nouvelle section `hologram-style` dans le `config.yml` contrôle l'apparence de **tous** les hologrammes du plugin, pour une identité visuelle cohérente :
+
+| Option | Rôle |
+|--------|------|
+| `background` | Fond du texte : `default` (vanilla), `none` (transparent) ou couleur ARGB `#AARRGGBB` |
+| `see-through` | Voir le texte à travers les blocs (`true`/`false`) |
+| `shadow` | Ombre portée sous le texte pour la lisibilité |
+| `billboard` | Orientation : `CENTER` (face au joueur), `VERTICAL`, `HORIZONTAL` ou `FIXED` |
+| `line-width` | Largeur de ligne avant retour automatique (pixels) |
+| `scale` | Taille par défaut des hologrammes |
+
+### 📏 Redimensionnement des Hologrammes de Stats
+
+Nouvelle sous-commande **`/hb statshologram size <taille>`** (ex: `/hb statshologram size 1.5`) qui règle la taille de l'hologramme de statistiques personnelles le plus proche (rayon de 5 blocs), avec autocomplétion des valeurs courantes (0.5 à 3.0). L'échelle est **persistée** et rechargée au démarrage.
+
+### 🏅 Leaderboards par Format d'Équipe (1v1 / 2v2 / 3v3 / 4v4)
+
+Les leaderboards top 10 ne se limitent plus aux classements globaux : quatre nouvelles catégories classent les joueurs **par victoires dans un format précis** :
+
+```bash
+/hb leaderboard 1v1    # Top 10 des victoires en 1v1
+/hb leaderboard 2v2    # Top 10 des victoires en 2v2
+/hb leaderboard 3v3    # Top 10 des victoires en 3v3
+/hb leaderboard 4v4    # Top 10 des victoires en 4v4
+```
+
+Chacune fonctionne comme les catégories existantes (`remove`, `size <taille>`, rafraîchissement automatique toutes les 10 secondes).
+
+### 🌐 Export Web Enrichi
+
+L'export JSON du classement web (`LeaderboardExportServer`) inclut désormais, pour chaque joueur, le **détail de ses performances par format** : victoires, kills, parties jouées et K/D en 1v1, 2v2, 3v3 et 4v4 (classement « depuis toujours »).
+
+### 📋 Résumé des changements
+| Fichier | Changement |
+|---------|------------|
+| `HologramStyle` | **Nouveau** — apparence partagée et configurable de tous les hologrammes (fond, ombre, orientation, échelle…) |
+| `StatsHologramManager` | Refonte : un seul `TextDisplay` par hologramme (au lieu de 8 ArmorStands), échelle individuelle persistée, rechargement du style |
+| `CategoryLeaderboardManager` | Refonte : `TextDisplay` unique mis à jour en place (plus de clignotement) + 4 nouvelles catégories 1v1/2v2/3v3/4v4 |
+| `HikaBrainCommand` | `/hb statshologram size <taille>` + catégories par format dans `/hb leaderboard` + autocomplétions |
+| `LeaderboardExportServer` | Export JSON du détail par format (wins/kills/parties/K-D en 1v1 à 4v4) |
+| `config.yml` | Nouvelle section `hologram-style` entièrement documentée |
+| `plugin.yml` | Version → `1.0.29` + description mise à jour |
+
+---
+
+## 🆕 Mise à jour précédente (v1.0.28)
 
 Cette version apporte deux améliorations qui rendent l'expérience de jeu plus fluide et la musique plus fidèle : un **rematch en un clic** en fin de partie, et un **moteur musical NBS plus précis**.
 
@@ -297,6 +360,7 @@ Le fichier `config.yml` permet de personnaliser :
 - Durée des comptes à rebours (lobby et round)
 - Points nécessaires pour gagner
 - Apparence complète du scoreboard (titre, lignes, couleurs)
+- **Apparence des hologrammes** (section `hologram-style` : fond, ombre, orientation, échelle…)
 - Messages personnalisés avec préfixe
 
 ## 🛠️ Compilation
@@ -318,7 +382,7 @@ mvn clean package
 ## 📝 Auteur
 
 - **Développeur**: herocraftlol
-- **Version**: 1.0.28
+- **Version**: 1.0.29
 
 ## 📄 Licence
 

@@ -115,6 +115,38 @@ music:
   loop: true
 
 # ===========================================
+#      Apparence des hologrammes (partagée)
+# ===========================================
+# S'applique à TOUS les hologrammes du plugin (statistiques personnelles ET classements
+# top 10) : une seule apparence cohérente et configurable, plutôt qu'une config séparée
+# par type. Techniquement, chaque hologramme est une seule entité TextDisplay (le vrai
+# type "hologramme" natif de Minecraft depuis 1.19.4) — plus aucun scintillement lié à
+# un ré-affichage périodique de plusieurs entités empilées.
+hologram-style:
+  # Fond derrière le texte : "default" (fond noir semi-transparent vanilla, comme un
+  # panneau de texte flottant classique), "none" (totalement transparent, texte "nu"),
+  # ou une couleur ARGB au format hexadécimal "#AARRGGBB" (ex: "#80202020" = gris foncé
+  # à 50% d'opacité).
+  background: "default"
+
+  # Voir le texte à travers les blocs (true) ou seulement en vue directe (false)
+  see-through: false
+
+  # Légère ombre portée sous le texte, améliore la lisibilité sur fond clair
+  shadow: true
+
+  # Le texte fait-il toujours face au joueur qui le regarde ? CENTER (oui, dans toutes
+  # les directions - recommandé), VERTICAL, HORIZONTAL, ou FIXED (jamais, orientation figée)
+  billboard: "CENTER"
+
+  # Largeur de ligne avant retour à la ligne automatique (en pixels de texte)
+  line-width: 200
+
+  # Échelle par défaut (multiplicateur de taille). Peut être surchargée individuellement
+  # pour un leaderboard via /hb leaderboard <catégorie> size <taille>.
+  scale: 1.0
+
+# ===========================================
 #         Configuration Scoreboard
 # ===========================================
 scoreboard:

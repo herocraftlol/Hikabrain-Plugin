@@ -5,6 +5,7 @@ import com.hikabrain.plugin.levels.LevelManager;
 import com.hikabrain.plugin.stats.MatchHistoryManager;
 import com.hikabrain.plugin.stats.StatsManager;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.JoinConfiguration;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Bukkit;
@@ -15,10 +16,10 @@ import org.bukkit.World;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
-import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.TextDisplay;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.BoundingBox;
@@ -40,24 +41,18 @@ import java.util.UUID;
  * /hb statshologram. Chacun se met à jour tout seul toutes les 2 secondes, en cherchant
  * le joueur le plus proche dans un petit rayon.
  *
- * ── Contenu affiché ────────────────────────────────────────────────────────────
- *   ✦ Statistiques HikaBrain ✦
- *   <Pseudo>
- *   Niveau X  |  Y points
- *   ⚔ K/D: Z  (K kills / D morts)
- *   🏆 W victoires  -  🎮 P parties
- *   ⏱ Temps de jeu total
- *   ─────────────
- *   📅 Jour #.. 🗓 Semaine #.. 🕰 Total #..
- *
- * Techniquement : un ArmorStand invisible par ligne (nombre de lignes FIXE, seul le
- * texte change à chaque rafraîchissement) — jamais respawné, juste mis à jour en place,
- * pour rester fluide et ne jamais scintiller.
+ * ── Technique (important) ─────────────────────────────────────────────────────────
+ * UNE SEULE entité {@link TextDisplay} par hologramme (le vrai type "hologramme" natif
+ * de Minecraft depuis 1.19.4, multi-lignes en une seule entité), JAMAIS respawnée : à
+ * chaque rafraîchissement, on met juste à jour son texte en place (display.text(...)).
+ * L'ancienne version utilisait 8 ArmorStand empilés (un par ligne) qui pouvaient se
+ * désynchroniser ou clignoter ; un TextDisplay unique élimine complètement ce problème
+ * et reste affiché en permanence, sans jamais disparaître entre deux rafraîchissements.
+ * L'apparence (fond, ombre, orientation...) est partagée avec les autres hologrammes du
+ * plugin, configurable via config.yml "hologram-style" — voir {@link HologramStyle}.
  */
 public class StatsHologramManager {
 
-    private static final double LINE_GAP = 0.27;
-    private static final int LINE_COUNT = 8;
     private static final double DETECTION_RADIUS = 5.0;
     private static final long REFRESH_INTERVAL_TICKS = 40L; // 2 secondes
     private static final String HOLOGRAMS_FILE = "personal-holograms.yml";
@@ -66,22 +61,36 @@ public class StatsHologramManager {
     private final HikaBrainPlugin plugin;
     private final File dataFile;
     private final NamespacedKey pdcKey;
+    private HologramStyle style;
 
     private final List<HologramInstance> instances = new ArrayList<>();
     private BukkitTask refreshTask;
 
     private static class HologramInstance {
         Location location;
-        final List<UUID> lineEntityIds = new ArrayList<>();
-        UUID currentlyShown; // joueur actuellement affiché, pour éviter de re-render inutilement
+        UUID entityId;
+        double scale;
+        UUID currentlyShown; // joueur actuellement affiché, pour savoir quand re-render en placeholder
     }
 
     public StatsHologramManager(HikaBrainPlugin plugin) {
         this.plugin = plugin;
         this.dataFile = new File(plugin.getDataFolder(), HOLOGRAMS_FILE);
         this.pdcKey = new NamespacedKey(plugin, "personal_stats_hologram");
+        this.style = HologramStyle.load(plugin);
         load();
         startRefreshTask();
+    }
+
+    /** Recharge le style partagé depuis config.yml et le réapplique à tous les hologrammes existants. */
+    public void reloadStyle() {
+        this.style = HologramStyle.load(plugin);
+        for (HologramInstance instance : instances) {
+            Entity entity = Bukkit.getEntity(instance.entityId);
+            if (entity instanceof TextDisplay display) {
+                style.apply(display, instance.scale);
+            }
+        }
     }
 
     // ── Persistance ────────────────────────────────────────────────────────────
@@ -101,7 +110,8 @@ public class StatsHologramManager {
                 continue;
             }
             Location loc = new Location(world, section.getDouble("x"), section.getDouble("y"), section.getDouble("z"));
-            spawnInternal(loc);
+            double scale = section.getDouble("scale", style.getDefaultScale());
+            spawnInternal(loc, scale);
         }
     }
 
@@ -114,6 +124,7 @@ public class StatsHologramManager {
             map.put("x", instance.location.getX());
             map.put("y", instance.location.getY());
             map.put("z", instance.location.getZ());
+            map.put("scale", instance.scale);
             list.add(map);
         }
         config.set("locations", list);
@@ -126,10 +137,27 @@ public class StatsHologramManager {
 
     // ── API publique ───────────────────────────────────────────────────────────
 
-    /** Pose un nouvel hologramme de stats personnelles à cet endroit. */
+    /** Pose un nouvel hologramme de stats personnelles à cet endroit, à l'échelle par défaut. */
     public void spawn(Location location) {
-        spawnInternal(location);
+        spawnInternal(location, style.getDefaultScale());
         save();
+    }
+
+    /**
+     * Change l'échelle de l'hologramme le plus proche de cet endroit (rayon de détection).
+     * Renvoie false s'il n'y en a pas à proximité.
+     */
+    public boolean setNearestScale(Location location, double scale) {
+        HologramInstance instance = findNearestInstance(location);
+        if (instance == null) return false;
+
+        instance.scale = scale;
+        Entity entity = Bukkit.getEntity(instance.entityId);
+        if (entity instanceof TextDisplay display) {
+            style.apply(display, scale);
+        }
+        save();
+        return true;
     }
 
     /**
@@ -137,9 +165,18 @@ public class StatsHologramManager {
      * de {@link #DETECTION_RADIUS} blocs. Renvoie true si un hologramme a été supprimé.
      */
     public boolean removeNearest(Location location) {
+        HologramInstance closest = findNearestInstance(location);
+        if (closest == null) return false;
+
+        despawnInstance(closest);
+        instances.remove(closest);
+        save();
+        return true;
+    }
+
+    private HologramInstance findNearestInstance(Location location) {
         HologramInstance closest = null;
         double closestDistSq = DETECTION_RADIUS * DETECTION_RADIUS;
-
         for (HologramInstance instance : instances) {
             if (!instance.location.getWorld().equals(location.getWorld())) continue;
             double distSq = instance.location.distanceSquared(location);
@@ -148,13 +185,7 @@ public class StatsHologramManager {
                 closest = instance;
             }
         }
-
-        if (closest == null) return false;
-
-        despawnInstance(closest);
-        instances.remove(closest);
-        save();
-        return true;
+        return closest;
     }
 
     public void despawnAll() {
@@ -174,55 +205,37 @@ public class StatsHologramManager {
 
     // ── Construction / suppression des entités ───────────────────────────────────
 
-    private void spawnInternal(Location location) {
+    private void spawnInternal(Location location, double scale) {
         HologramInstance instance = new HologramInstance();
         instance.location = location.clone();
+        instance.scale = scale;
 
         World world = location.getWorld();
         Chunk chunk = world.getChunkAt(location);
         world.addPluginChunkTicket(chunk.getX(), chunk.getZ(), plugin);
 
-        double topY = location.getY() + (LINE_COUNT - 1) * LINE_GAP;
-        for (int i = 0; i < LINE_COUNT; i++) {
-            Location lineLoc = location.clone();
-            lineLoc.setY(topY - i * LINE_GAP);
-            ArmorStand stand = spawnLine(world, lineLoc, Component.empty());
-            instance.lineEntityIds.add(stand.getUniqueId());
-        }
+        TextDisplay display = (TextDisplay) world.spawnEntity(location, EntityType.TEXT_DISPLAY);
+        style.apply(display, scale);
+        display.getPersistentDataContainer().set(pdcKey, PersistentDataType.STRING, PDC_VALUE);
+        instance.entityId = display.getUniqueId();
 
         instances.add(instance);
         renderPlaceholder(instance); // contenu initial en attendant le premier rafraîchissement
     }
 
     private void despawnInstance(HologramInstance instance) {
-        for (UUID id : instance.lineEntityIds) {
-            Entity entity = Bukkit.getEntity(id);
-            if (entity != null) entity.remove();
-        }
+        Entity entity = Bukkit.getEntity(instance.entityId);
+        if (entity != null) entity.remove();
         Chunk chunk = instance.location.getWorld().getChunkAt(instance.location);
         instance.location.getWorld().removePluginChunkTicket(chunk.getX(), chunk.getZ(), plugin);
     }
 
-    private ArmorStand spawnLine(World world, Location loc, Component name) {
-        ArmorStand stand = (ArmorStand) world.spawnEntity(loc, EntityType.ARMOR_STAND);
-        stand.customName(name);
-        stand.setCustomNameVisible(true);
-        stand.setInvisible(true);
-        stand.setGravity(false);
-        stand.setInvulnerable(true);
-        stand.setSmall(true);
-        stand.setCollidable(false);
-        stand.setMarker(true);
-        stand.getPersistentDataContainer().set(pdcKey, PersistentDataType.STRING, PDC_VALUE);
-        return stand;
-    }
-
-    /** Retire tout ArmorStand orphelin (ex: après un crash serveur laissant des restes). */
+    /** Retire tout TextDisplay orphelin (ex: après un crash serveur laissant des restes). */
     public void purgeOrphans(World world) {
         for (Entity entity : world.getEntities()) {
-            if (entity instanceof ArmorStand stand) {
-                String value = stand.getPersistentDataContainer().get(pdcKey, PersistentDataType.STRING);
-                if (PDC_VALUE.equals(value)) stand.remove();
+            if (entity instanceof TextDisplay display) {
+                String value = display.getPersistentDataContainer().get(pdcKey, PersistentDataType.STRING);
+                if (PDC_VALUE.equals(value)) display.remove();
             }
         }
     }
@@ -273,8 +286,7 @@ public class StatsHologramManager {
         List<Component> lines = new ArrayList<>();
         lines.add(title());
         lines.add(Component.text("En attente d'un joueur...").color(NamedTextColor.GRAY).decorate(TextDecoration.ITALIC));
-        for (int i = 2; i < LINE_COUNT; i++) lines.add(Component.empty());
-        applyLines(instance, lines);
+        setText(instance, lines);
     }
 
     private void renderPlayerStats(HologramInstance instance, Player player) {
@@ -314,7 +326,7 @@ public class StatsHologramManager {
         lines.add(Component.text("─────────────").color(NamedTextColor.DARK_GRAY));
         lines.add(rankLine(rankToday, rankWeek, rankAllTime));
 
-        applyLines(instance, lines);
+        setText(instance, lines);
     }
 
     private Component title() {
@@ -342,12 +354,11 @@ public class StatsHologramManager {
         return totalSeconds + " s";
     }
 
-    private void applyLines(HologramInstance instance, List<Component> lines) {
-        for (int i = 0; i < instance.lineEntityIds.size() && i < lines.size(); i++) {
-            Entity entity = Bukkit.getEntity(instance.lineEntityIds.get(i));
-            if (entity instanceof ArmorStand stand) {
-                stand.customName(lines.get(i));
-            }
+    /** Assemble les lignes en un seul Component multi-lignes et le pousse sur l'entité (jamais de respawn). */
+    private void setText(HologramInstance instance, List<Component> lines) {
+        Entity entity = Bukkit.getEntity(instance.entityId);
+        if (entity instanceof TextDisplay display) {
+            display.text(Component.join(JoinConfiguration.separator(Component.newline()), lines));
         }
     }
 }

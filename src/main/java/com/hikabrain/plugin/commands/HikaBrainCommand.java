@@ -1532,13 +1532,13 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
             return;
         }
         if (args.length < 2) {
-            MessageUtil.send(sender, "&cUsage: /hb leaderboard <victoires|kills|kd|parties> [remove|size <taille>]");
+            MessageUtil.send(sender, "&cUsage: /hb leaderboard <victoires|kills|kd|parties|1v1|2v2|3v3|4v4> [remove|size <taille>]");
             return;
         }
 
         CategoryLeaderboardManager.Category category = CategoryLeaderboardManager.Category.fromKey(args[1]);
         if (category == null) {
-            MessageUtil.send(sender, "&cCatégorie inconnue. Utilise: victoires, kills, kd ou parties.");
+            MessageUtil.send(sender, "&cCatégorie inconnue. Utilise: victoires, kills, kd, parties, 1v1, 2v2, 3v3 ou 4v4.");
             return;
         }
 
@@ -1590,6 +1590,7 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
     /**
      * /hb statshologram              : pose un hologramme de statistiques personnelles à ta position
      * /hb statshologram remove       : supprime l'hologramme le plus proche de toi
+     * /hb statshologram size <taille>: règle la taille de l'hologramme le plus proche (ex: 1.5)
      */
     private void handleStatsHologram(CommandSender sender, String[] args) {
         if (!checkAdminAndPlayer(sender)) return;
@@ -1599,6 +1600,21 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
             boolean removed = plugin.getStatsHologramManager().removeNearest(player.getLocation());
             MessageUtil.send(sender, removed
                     ? "&aHologramme de statistiques personnelles supprimé."
+                    : "&cAucun hologramme de statistiques personnelles à proximité (rayon de 5 blocs).");
+            return;
+        }
+
+        if (args.length >= 3 && args[1].equalsIgnoreCase("size")) {
+            double scale;
+            try {
+                scale = Double.parseDouble(args[2]);
+            } catch (NumberFormatException e) {
+                MessageUtil.send(sender, "&cTaille invalide. Utilise un nombre, ex: /hb statshologram size 1.5");
+                return;
+            }
+            boolean resized = plugin.getStatsHologramManager().setNearestScale(player.getLocation(), scale);
+            MessageUtil.send(sender, resized
+                    ? "&aTaille de l'hologramme réglée sur &e" + scale + "&a."
                     : "&cAucun hologramme de statistiques personnelles à proximité (rayon de 5 blocs).");
             return;
         }
@@ -1674,10 +1690,10 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
             MessageUtil.send(sender, "&c/hb start <nom> &7- Forcer le démarrage");
             MessageUtil.send(sender, "&c/hb stop <nom> &7- Forcer l'arrêt");
             MessageUtil.send(sender, "&c/hb resetstats &7- Réinitialiser les statistiques");
-            MessageUtil.send(sender, "&b/hb leaderboard <victoires|kills|kd|parties> &7- Spawner un leaderboard top 10 à ta position");
+            MessageUtil.send(sender, "&b/hb leaderboard <victoires|kills|kd|parties|1v1|2v2|3v3|4v4> &7- Spawner un leaderboard top 10 à ta position");
             MessageUtil.send(sender, "&b/hb leaderboard <catégorie> remove &7- Supprimer ce leaderboard");
             MessageUtil.send(sender, "&b/hb leaderboard <catégorie> size <taille> &7- Régler la taille de l'hologramme (ex: 1.5)");
-            MessageUtil.send(sender, "&b/hb statshologram [remove] &7- Poser (ou supprimer) un hologramme de stats personnelles à ta position");
+            MessageUtil.send(sender, "&b/hb statshologram [remove|size <taille>] &7- Poser/supprimer/redimensionner un hologramme de stats personnelles à ta position");
             MessageUtil.send(sender, "&8&m----------&r &dScoreboard &8&m----------");
             MessageUtil.send(sender, "&d/hb setsbserver <nom> &7- Définir le nom du serveur");
             MessageUtil.send(sender, "&d/hb setsbgame <nom> &7- Définir le nom du jeu");
@@ -1776,7 +1792,7 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
         }
 
         if (args.length == 2 && sub.equals("leaderboard")) {
-            return filterStartingWith(List.of("victoires", "kills", "kd", "parties"), args[1]);
+            return filterStartingWith(List.of("victoires", "kills", "kd", "parties", "1v1", "2v2", "3v3", "4v4"), args[1]);
         }
 
         if (args.length == 3 && sub.equals("leaderboard")) {
@@ -1788,7 +1804,11 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
         }
 
         if (args.length == 2 && sub.equals("statshologram")) {
-            return filterStartingWith(List.of("remove"), args[1]);
+            return filterStartingWith(List.of("remove", "size"), args[1]);
+        }
+
+        if (args.length == 3 && sub.equals("statshologram") && args[1].equalsIgnoreCase("size")) {
+            return filterStartingWith(List.of("0.5", "1.0", "1.5", "2.0", "3.0"), args[2]);
         }
 
         if (args.length == 2 && sub.equals("stats")) {

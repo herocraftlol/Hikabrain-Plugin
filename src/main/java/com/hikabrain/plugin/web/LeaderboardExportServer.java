@@ -97,8 +97,30 @@ public class LeaderboardExportServer {
                 int kills, int deaths, double kd, int wins, int gamesPlayed,
                 int hitsGiven, int hitsReceived, int goalsScored,
                 Long playtimeSeconds, int level, int points,
-                double force, Integer forceRank, int forceWins, int forceLosses, int forceOpponents, String bestWinOpponent
+                double force, Integer forceRank, int forceWins, int forceLosses, int forceOpponents, String bestWinOpponent,
+                String formatsJson
         ) {
+        }
+
+        /**
+         * Fragment JSON (objet déjà valide, pas besoin d'échappement) avec le détail par
+         * FORMAT D'ÉQUIPE (1v1/2v2/3v3/4v4) : victoires, kills, parties jouées et K/D
+         * dans ce format précis — voir StatsManager.GameMode. Uniquement disponible pour
+         * le classement "depuis toujours" (pas de suivi par format sur une plage de temps
+         * précise, contrairement aux stats globales) : renvoie "{}" pour une plage de dates.
+         */
+        private String buildFormatsJson(StatsManager.PlayerStats stats) {
+            if (stats == null) return "{}";
+            List<String> parts = new ArrayList<>();
+            for (StatsManager.GameMode m : StatsManager.GameMode.values()) {
+                parts.add("\"" + m.getLabel() + "\":{"
+                        + "\"wins\":" + stats.getWins(m) + ","
+                        + "\"kills\":" + stats.getKills(m) + ","
+                        + "\"gamesPlayed\":" + stats.getGamesPlayed(m) + ","
+                        + "\"kd\":" + stats.getKD(m)
+                        + "}");
+            }
+            return "{" + String.join(",", parts) + "}";
         }
 
         @Override
@@ -180,7 +202,8 @@ public class LeaderboardExportServer {
                         power != null ? power.totalWins : 0,
                         power != null ? power.totalLosses : 0,
                         power != null ? power.distinctOpponents : 0,
-                        power != null ? power.bestWinOpponentName : null
+                        power != null ? power.bestWinOpponentName : null,
+                        buildFormatsJson(stats)
                 ));
             }
             return rows;
@@ -227,7 +250,8 @@ public class LeaderboardExportServer {
                         power != null ? power.totalWins : 0,
                         power != null ? power.totalLosses : 0,
                         power != null ? power.distinctOpponents : 0,
-                        power != null ? power.bestWinOpponentName : null
+                        power != null ? power.bestWinOpponentName : null,
+                        "{}" // détail par format non suivi sur une plage de temps précise, seulement à vie
                 ));
             }
             return rows;
@@ -254,7 +278,8 @@ public class LeaderboardExportServer {
                     + "\"forceWins\":" + r.forceWins() + ","
                     + "\"forceLosses\":" + r.forceLosses() + ","
                     + "\"forceOpponents\":" + r.forceOpponents() + ","
-                    + "\"bestWinOpponent\":" + (r.bestWinOpponent() != null ? ("\"" + escape(r.bestWinOpponent()) + "\"") : "null")
+                    + "\"bestWinOpponent\":" + (r.bestWinOpponent() != null ? ("\"" + escape(r.bestWinOpponent()) + "\"") : "null") + ","
+                    + "\"formats\":" + r.formatsJson()
                     + "}";
         }
 

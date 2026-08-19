@@ -4,21 +4,20 @@ import com.hikabrain.plugin.HikaBrainPlugin;
 import com.hikabrain.plugin.stats.StatsManager;
 import com.hikabrain.plugin.stats.StatsManager.PlayerStats;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.JoinConfiguration;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
+import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
 import org.bukkit.NamespacedKey;
 import org.bukkit.World;
-import org.bukkit.attribute.Attribute;
-import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
-import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
-import org.bukkit.entity.LivingEntity;
+import org.bukkit.entity.TextDisplay;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.scheduler.BukkitTask;
 
@@ -27,42 +26,56 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumMap;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
 /**
- * Gère 4 hologrammes de leaderboard INDÉPENDANTS, un par catégorie :
- *   - VICTOIRES : top 10 par victoires
- *   - KILLS     : top 10 par kills
- *   - KD        : top 10 par ratio K/D
- *   - PARTIES   : top 10 par parties jouées
+ * Gère des hologrammes de leaderboard INDÉPENDANTS, un par catégorie :
+ *   - VICTOIRES / KILLS / KD / PARTIES : top 10 toutes parties confondues
+ *   - 1v1 / 2v2 / 3v3 / 4v4 : top 10 par VICTOIRES dans ce format précis
  *
  * Chaque catégorie peut être spawnée/déspawnée séparément, à un endroit
  * différent, via /hb leaderboard <catégorie> [remove|size <taille>].
  *
- * La taille (échelle) de chaque hologramme peut être réglée précisément via
- * /hb leaderboard <catégorie> size <taille> (ex: 1.5 = 1,5x plus grand).
+ * ── Technique (important) ─────────────────────────────────────────────────────────
+ * UNE SEULE entité {@link TextDisplay} par catégorie spawnée (multi-lignes en une seule
+ * entité), JAMAIS respawnée : le rafraîchissement automatique (toutes les 10 secondes)
+ * met juste à jour son texte en place. L'ancienne version supprimait puis recréait
+ * toutes les lignes (des ArmorStand empilés) à CHAQUE rafraîchissement, ce qui causait
+ * un clignotement visible ; ce n'est plus le cas. L'apparence (fond, ombre,
+ * orientation...) est partagée avec les autres hologrammes du plugin, configurable via
+ * config.yml "hologram-style" — voir {@link HologramStyle}.
  */
 public class CategoryLeaderboardManager {
 
     // ── Catégories ─────────────────────────────────────────────────────────────
 
     public enum Category {
-        VICTOIRES("victoires", "🏆 TOP VICTOIRES", NamedTextColor.GOLD),
-        KILLS("kills", "⚔ TOP KILLS", NamedTextColor.RED),
-        KD("kd", "💀 TOP K/D", NamedTextColor.LIGHT_PURPLE),
-        PARTIES("parties", "🎮 TOP PARTIES JOUÉES", NamedTextColor.AQUA);
+        VICTOIRES("victoires", "\uD83C\uDFC6 TOP VICTOIRES", NamedTextColor.GOLD, null),
+        KILLS("kills", "\u2694 TOP KILLS", NamedTextColor.RED, null),
+        KD("kd", "\uD83D\uDC80 TOP K/D", NamedTextColor.LIGHT_PURPLE, null),
+        PARTIES("parties", "\uD83C\uDFAE TOP PARTIES JOUÉES", NamedTextColor.AQUA, null),
+        V1V1("1v1", "\u2694 TOP 1v1", NamedTextColor.WHITE, StatsManager.GameMode.V1),
+        V2V2("2v2", "\u2694 TOP 2v2", NamedTextColor.WHITE, StatsManager.GameMode.V2),
+        V3V3("3v3", "\u2694 TOP 3v3", NamedTextColor.WHITE, StatsManager.GameMode.V3),
+        V4V4("4v4", "\u2694 TOP 4v4", NamedTextColor.WHITE, StatsManager.GameMode.V4);
 
         public final String        key;
         public final String        title;
         public final NamedTextColor color;
+        /** null pour les 4 catégories globales, non-null pour les 4 catégories par format (1v1/2v2/3v3/4v4). */
+        public final StatsManager.GameMode mode;
 
-        Category(String key, String title, NamedTextColor color) {
+        Category(String key, String title, NamedTextColor color, StatsManager.GameMode mode) {
             this.key   = key;
             this.title = title;
             this.color = color;
+            this.mode  = mode;
+        }
+
+        public boolean isFormatCategory() {
+            return mode != null;
         }
 
         public static Category fromKey(String key) {
@@ -73,11 +86,8 @@ public class CategoryLeaderboardManager {
         }
     }
 
-    private static final double LINE_GAP               = 0.27;
     private static final String HOLOGRAM_FILE           = "leaderboards.yml";
     private static final int    TOP_SIZE                = 10;
-    /** Échelle par défaut d'un hologramme (taille normale). */
-    private static final double DEFAULT_SCALE           = 1.0;
     /** Rafraîchissement automatique : toutes les 10 secondes. */
     private static final long   REFRESH_INTERVAL_TICKS  = 20L * 10;
 
@@ -85,19 +95,31 @@ public class CategoryLeaderboardManager {
     private final File             cfgFile;
     private FileConfiguration      cfg;
     private final NamespacedKey    pdcKey;
+    private HologramStyle          style;
 
     // Données par catégorie active
-    private final Map<Category, Location>     locations    = new EnumMap<>(Category.class);
-    private final Map<Category, List<UUID>>   lineEntities = new EnumMap<>(Category.class);
-    private final Map<Category, Double>       scales       = new EnumMap<>(Category.class);
+    private final Map<Category, Location> locations = new EnumMap<>(Category.class);
+    private final Map<Category, UUID>     entities  = new EnumMap<>(Category.class);
+    private final Map<Category, Double>   scales    = new EnumMap<>(Category.class);
     private BukkitTask refreshTask = null;
 
     public CategoryLeaderboardManager(HikaBrainPlugin plugin) {
         this.plugin  = plugin;
         this.cfgFile = new File(plugin.getDataFolder(), HOLOGRAM_FILE);
         this.pdcKey  = new NamespacedKey(plugin, "category_leaderboard");
-        for (Category c : Category.values()) lineEntities.put(c, new ArrayList<>());
+        this.style   = HologramStyle.load(plugin);
         loadConfig();
+    }
+
+    /** Recharge le style partagé depuis config.yml et le réapplique à tous les leaderboards existants. */
+    public void reloadStyle() {
+        this.style = HologramStyle.load(plugin);
+        for (Category c : locations.keySet()) {
+            Entity entity = Bukkit.getEntity(entities.get(c));
+            if (entity instanceof TextDisplay display) {
+                style.apply(display, scales.getOrDefault(c, style.getDefaultScale()));
+            }
+        }
     }
 
     // ── Persistance ────────────────────────────────────────────────────────────
@@ -120,14 +142,14 @@ public class CategoryLeaderboardManager {
             }
             Location loc = new Location(world, s.getDouble("x"), s.getDouble("y"), s.getDouble("z"));
             locations.put(c, loc);
-            scales.put(c, s.getDouble("scale", DEFAULT_SCALE));
+            scales.put(c, s.getDouble("scale", style.getDefaultScale()));
             Chunk chunk = world.getChunkAt(loc);
             world.addPluginChunkTicket(chunk.getX(), chunk.getZ(), plugin);
         }
 
         if (!locations.isEmpty()) {
-            purgeOrphanArmorStands();
-            for (Category c : locations.keySet()) buildLines(c);
+            purgeOrphans();
+            for (Category c : locations.keySet()) spawnEntity(c);
             startRefreshTask();
         }
     }
@@ -142,7 +164,7 @@ public class CategoryLeaderboardManager {
             cfg.set(path + ".x", loc.getX());
             cfg.set(path + ".y", loc.getY());
             cfg.set(path + ".z", loc.getZ());
-            cfg.set(path + ".scale", scales.getOrDefault(e.getKey(), DEFAULT_SCALE));
+            cfg.set(path + ".scale", scales.getOrDefault(e.getKey(), style.getDefaultScale()));
         }
         try {
             cfgFile.getParentFile().mkdirs();
@@ -156,25 +178,28 @@ public class CategoryLeaderboardManager {
 
     /** Spawne (ou déplace) le leaderboard d'une catégorie à la position donnée. */
     public void spawn(Category category, Location loc) {
-        despawnEntities(category);
+        despawnEntity(category);
         locations.put(category, loc.clone());
-        scales.putIfAbsent(category, DEFAULT_SCALE);
+        scales.putIfAbsent(category, style.getDefaultScale());
         Chunk chunk = loc.getWorld().getChunkAt(loc);
         loc.getWorld().addPluginChunkTicket(chunk.getX(), chunk.getZ(), plugin);
-        buildLines(category);
+        spawnEntity(category);
         startRefreshTask();
         saveConfig();
     }
 
     /**
-     * Modifie la taille (échelle) de l'hologramme d'une catégorie déjà spawnée
-     * et reconstruit immédiatement ses lignes avec la nouvelle taille.
+     * Modifie la taille (échelle) de l'hologramme d'une catégorie déjà spawnée, en place
+     * (pas besoin de reconstruire quoi que ce soit).
      * @param scale multiplicateur de taille (1.0 = taille normale).
      */
     public void setScale(Category category, double scale) {
         if (!locations.containsKey(category)) return;
         scales.put(category, scale);
-        refresh(category);
+        Entity entity = Bukkit.getEntity(entities.get(category));
+        if (entity instanceof TextDisplay display) {
+            style.apply(display, scale);
+        }
         saveConfig();
     }
 
@@ -184,7 +209,7 @@ public class CategoryLeaderboardManager {
         if (loc == null) return false;
         Chunk chunk = loc.getWorld().getChunkAt(loc);
         loc.getWorld().removePluginChunkTicket(chunk.getX(), chunk.getZ(), plugin);
-        despawnEntities(category);
+        despawnEntity(category);
         locations.remove(category);
         scales.remove(category);
         saveConfig();
@@ -195,23 +220,16 @@ public class CategoryLeaderboardManager {
     /** Supprime tous les leaderboards (appelé à l'arrêt du plugin). */
     public void despawnAll() {
         stopRefreshTask();
-        for (Category c : Category.values()) despawnEntities(c);
+        for (Category c : Category.values()) despawnEntity(c);
         locations.clear();
         scales.clear();
     }
 
     public boolean isSpawned(Category category) { return locations.containsKey(category); }
 
-    /** Rafraîchit manuellement toutes les catégories spawnées (relit la DB). */
+    /** Rafraîchit manuellement toutes les catégories spawnées (relit la DB), en place. */
     public void refreshAll() {
-        for (Category c : new ArrayList<>(locations.keySet())) refresh(c);
-    }
-
-    private void refresh(Category category) {
-        Location loc = locations.get(category);
-        if (loc == null) return;
-        despawnEntities(category);
-        buildLines(category);
+        for (Category c : new ArrayList<>(locations.keySet())) refreshText(c);
     }
 
     // ── Tâche de rafraîchissement automatique ──────────────────────────────────
@@ -231,26 +249,31 @@ public class CategoryLeaderboardManager {
         refreshTask = null;
     }
 
-    // ── Construction des lignes ────────────────────────────────────────────────
+    // ── Construction du contenu ────────────────────────────────────────────────
 
-    private void buildLines(Category category) {
+    private void spawnEntity(Category category) {
         Location loc = locations.get(category);
         if (loc == null) return;
-        World w = loc.getWorld();
-        StatsManager sm = plugin.getStatsManager();
 
+        TextDisplay display = (TextDisplay) loc.getWorld().spawnEntity(loc, EntityType.TEXT_DISPLAY);
+        double scale = scales.getOrDefault(category, style.getDefaultScale());
+        style.apply(display, scale);
+        display.getPersistentDataContainer().set(pdcKey, PersistentDataType.STRING, "leaderboard");
+        entities.put(category, display.getUniqueId());
+
+        refreshText(category);
+    }
+
+    private void refreshText(Category category) {
+        Entity entity = Bukkit.getEntity(entities.get(category));
+        if (!(entity instanceof TextDisplay display)) return;
+
+        StatsManager sm = plugin.getStatsManager();
         List<Component> lines = new ArrayList<>();
         lines.add(Component.text(category.title).color(category.color).decorate(TextDecoration.BOLD));
         lines.add(sep());
 
-        Comparator<PlayerStats> comparator = switch (category) {
-            case VICTOIRES -> Comparator.comparingInt(s -> s.gamesWon);
-            case KILLS     -> Comparator.comparingInt(s -> s.kills);
-            case KD        -> Comparator.comparingDouble(PlayerStats::getKD);
-            case PARTIES   -> Comparator.comparingInt(s -> s.gamesPlayed);
-        };
-
-        List<Map.Entry<UUID, PlayerStats>> top = sm.getTopPlayers(TOP_SIZE, comparator);
+        List<Map.Entry<UUID, PlayerStats>> top = fetchTop(sm, category);
 
         if (top.isEmpty()) {
             lines.add(gray("  Aucune donnée."));
@@ -262,21 +285,36 @@ public class CategoryLeaderboardManager {
             }
         }
 
-        double scale = scales.getOrDefault(category, DEFAULT_SCALE);
-        double lineGap = LINE_GAP * scale;
-        double topY = loc.getY() + (lines.size() - 1) * lineGap;
-        List<UUID> entities = lineEntities.get(category);
-        for (int i = 0; i < lines.size(); i++) {
-            Location lineLoc = loc.clone();
-            lineLoc.setY(topY - i * lineGap);
-            ArmorStand as = spawnStand(w, lineLoc, lines.get(i), scale);
-            entities.add(as.getUniqueId());
+        display.text(Component.join(JoinConfiguration.separator(Component.newline()), lines));
+    }
+
+    private List<Map.Entry<UUID, PlayerStats>> fetchTop(StatsManager sm, Category category) {
+        if (category.isFormatCategory()) {
+            Comparator<PlayerStats> comparator = Comparator.comparingInt(s -> s.getWins(category.mode));
+            return sm.getTopPlayersByMode(TOP_SIZE, category.mode, comparator);
         }
+        Comparator<PlayerStats> comparator = switch (category) {
+            case VICTOIRES -> Comparator.comparingInt(s -> s.gamesWon);
+            case KILLS     -> Comparator.comparingInt(s -> s.kills);
+            case KD        -> Comparator.comparingDouble(PlayerStats::getKD);
+            case PARTIES   -> Comparator.comparingInt(s -> s.gamesPlayed);
+            default        -> Comparator.comparingInt(s -> s.gamesWon); // inatteignable (catégories de format déjà filtrées ci-dessus)
+        };
+        return sm.getTopPlayers(TOP_SIZE, comparator);
     }
 
     private Component buildLine(Category category, int rank, PlayerStats ps) {
         Component prefix = rankPrefix(rank)
                 .append(Component.text(ps.name + "  ").color(NamedTextColor.WHITE));
+
+        if (category.isFormatCategory()) {
+            StatsManager.GameMode m = category.mode;
+            return prefix
+                    .append(Component.text(ps.getWins(m) + " wins").color(NamedTextColor.YELLOW))
+                    .append(gray("  K/D: "))
+                    .append(Component.text(String.valueOf(ps.getKD(m))).color(NamedTextColor.GREEN))
+                    .append(gray("  (" + ps.getGamesPlayed(m) + " parties)"));
+        }
 
         return switch (category) {
             case VICTOIRES -> prefix
@@ -298,6 +336,7 @@ public class CategoryLeaderboardManager {
                         .append(Component.text(ps.gamesPlayed + " parties").color(NamedTextColor.AQUA))
                         .append(gray("  WR: " + wr + "%"));
             }
+            default -> prefix; // inatteignable (catégories de format déjà gérées au-dessus)
         };
     }
 
@@ -321,55 +360,23 @@ public class CategoryLeaderboardManager {
         return Component.text(text).color(NamedTextColor.GRAY);
     }
 
-    // ── Spawn / despawn des armor stands ───────────────────────────────────────
+    // ── Spawn / despawn ────────────────────────────────────────────────────────
 
-    private ArmorStand spawnStand(World world, Location loc, Component name, double scale) {
-        ArmorStand as = (ArmorStand) world.spawnEntity(loc, EntityType.ARMOR_STAND);
-        as.customName(name);
-        as.setCustomNameVisible(true);
-        as.setInvisible(true);
-        as.setGravity(false);
-        as.setInvulnerable(true);
-        as.setSmall(true);
-        as.setCollidable(false);
-        as.setMarker(true);
-        as.getPersistentDataContainer().set(pdcKey, PersistentDataType.STRING, "leaderboard");
-        applyScale(as, scale);
-        return as;
+    private void despawnEntity(Category category) {
+        UUID id = entities.remove(category);
+        if (id == null) return;
+        Entity e = plugin.getServer().getEntity(id);
+        if (e != null) e.remove();
     }
 
-    /**
-     * Applique une échelle précise à l'entité via l'attribut générique SCALE
-     * (disponible depuis Minecraft 1.20.5+ / Paper 1.20.5+), ce qui permet une
-     * taille continue (ex: 0.5, 1.75, 3.0) au lieu du simple "petit/grand" de
-     * {@link ArmorStand#setSmall(boolean)}.
-     */
-    private void applyScale(Entity entity, double scale) {
-        if (entity instanceof LivingEntity living) {
-            AttributeInstance attr = living.getAttribute(Attribute.GENERIC_SCALE);
-            if (attr != null) {
-                attr.setBaseValue(scale);
-            }
-        }
-    }
-
-    private void despawnEntities(Category category) {
-        List<UUID> entities = lineEntities.get(category);
-        for (UUID id : entities) {
-            Entity e = plugin.getServer().getEntity(id);
-            if (e != null) e.remove();
-        }
-        entities.clear();
-    }
-
-    private void purgeOrphanArmorStands() {
-        Map<String, World> worlds = new HashMap<>();
+    private void purgeOrphans() {
+        Map<String, World> worlds = new java.util.HashMap<>();
         for (Location loc : locations.values()) worlds.put(loc.getWorld().getName(), loc.getWorld());
         for (World world : worlds.values()) {
             for (Entity e : world.getEntities()) {
-                if (e instanceof ArmorStand as) {
-                    String val = as.getPersistentDataContainer().get(pdcKey, PersistentDataType.STRING);
-                    if ("leaderboard".equals(val)) as.remove();
+                if (e instanceof TextDisplay display) {
+                    String val = display.getPersistentDataContainer().get(pdcKey, PersistentDataType.STRING);
+                    if ("leaderboard".equals(val)) display.remove();
                 }
             }
         }
