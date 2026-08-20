@@ -1,10 +1,10 @@
 # 🎮 HikaBrain Plugin
 
-![Version](https://img.shields.io/badge/version-1.0.29-blue)
+![Version](https://img.shields.io/badge/version-1.0.30-blue)
 ![Paper](https://img.shields.io/badge/Paper-1.21.1-orange)
 ![Java](https://img.shields.io/badge/Java-21-red)
 
-> Un plugin Minecraft complet pour Paper 1.21.1 — Capture de zone par équipes, tournois automatisés, boutique de cosmétiques, musique NBS, niveaux & perks, **leaderboards holographiques par format (1v1/2v2/3v3/4v4)**, **hologrammes de statistiques personnelles au style entièrement configurable et sans scintillement**, et **rematch en un clic en fin de partie**.
+> Un plugin Minecraft complet pour Paper 1.21.1 — Capture de zone par équipes, tournois automatisés, boutique de cosmétiques, musique NBS, niveaux & perks, **leaderboards holographiques par format (1v1/2v2/3v3/4v4)**, **hologrammes de statistiques personnelles au style entièrement configurable et personnalisés pour chaque joueur**, et **rematch en un clic en fin de partie**.
 
 **HikaBrain** est un minijeu palpitant où deux équipes (Rouge vs Bleu) s'affrontent pour contrôler une zone centrale. Inspiré par le style Screaming Bedwars, ce plugin offre une expérience compétitive avec des statistiques détaillées, des classements holographiques (globaux **et par format d'équipe**), des **hologrammes de statistiques personnelles** (chaque joueur voit ses propres stats en s'approchant) construits sur les **TextDisplay natifs** — une seule entité, aucun scintillement, apparence configurable —, un système de tournoi intégré, une véritable **boutique de cosmétiques** pour récompenser l'investissement des joueurs, et un **bouton « Rejouer »** qui relance instantanément une partie du même format à la fin de chaque match.
 
@@ -31,7 +31,7 @@
 - **Leaderboards par Catégorie** - K/D, Victoires, Kills, Parties jouées…
 - **Leaderboards par Format** - Tops 1v1, 2v2, 3v3 et 4v4 (par victoires dans chaque format)
 - **Hologrammes 3D sans scintillement** - Une seule entité `TextDisplay` par hologramme, mise à jour en place, apparence configurable (`hologram-style` dans config.yml)
-- **Hologrammes de Statistiques Personnelles** - Posez un hologramme via `/hb statshologram` : chaque joueur qui s'approche y voit **ses propres** stats (niveau, points, K/D, victoires, parties, temps de jeu, classements jour / semaine / total), et redimensionnez-le avec `/hb statshologram size <taille>`
+- **Hologrammes de Statistiques Personnelles** - Posez un hologramme via `/hb statshologram` : chaque joueur qui s'approche y voit **ses propres** stats (niveau, points, K/D, victoires, parties, temps de jeu, classements jour / semaine / total) — **simultanément, même à plusieurs joueurs près du même hologramme** (une entité cachée par joueur, montrée uniquement à lui) — et redimensionnez-le avec `/hb statshologram size <taille>`
 - **Persistance YAML** - Données sauvegardées automatiquement
 
 ### 🎨 Interface Graphique
@@ -102,7 +102,43 @@
 | `hikabrain.play` | Jouer au HikaBrain | Tous |
 | `hikabrain.tournament.join` | S'inscrire à un tournoi | Tous |
 
-## 🆕 Dernière Mise à Jour (v1.0.29)
+## 🆕 Dernière Mise à Jour (v1.0.30)
+
+Cette version perfectionne les **hologrammes de statistiques personnelles** : lorsque plusieurs joueurs s'approchent du même hologramme, **chacun voit désormais ses propres statistiques en même temps**, et plus seulement celles du joueur le plus proche.
+
+---
+
+### 👥 Hologrammes de Stats Réellement Personnalisés, Joueur par Joueur
+
+#### 🚫 Avant
+
+L'hologramme personnel n'affichait que les stats du **joueur le plus proche** : avec plusieurs joueurs autour, un seul voyait les siennes, les autres n'avaient qu'un texte « En attente d'un joueur... » — ou pire, elles se mélangeaient pour tout le monde.
+
+#### ✨ Maintenant
+
+Dès qu'un joueur s'approche, une **entité `TextDisplay` dédiée** est créée pour lui : **cachée à tout le monde par défaut** (`setVisibleByDefault(false)`), puis **montrée uniquement à ce joueur** (`Player#showEntity`) — la méthode officiellement recommandée par Paper pour afficher un contenu différent à chaque joueur sur une même position.
+
+- **Simultanéité totale** : cinq joueurs autour du même hologramme voient chacun leurs propres stats en même temps, sans jamais se marcher dessus
+- **Toujours à jour** : tant qu'un joueur reste à portée (rayon de 5 blocs), son entité personnelle est **rafraîchie en continu**, toutes les 2 secondes — jamais de placeholder « en attente » pour lui
+- **Zéro résidu** : l'entité personnelle est **créée à l'arrivée** du joueur et **supprimée** dès qu'il s'éloigne ou se déconnecte
+- **Style partagé** : toute l'apparence configurable de la v1.0.29 (fond, ombre, orientation, échelle…) s'applique aussi à chaque entité personnelle, et sa mise à jour se répercute sur tous les hologrammes existants
+
+#### 🛠️ Détails techniques
+
+- Création à la volée d'un `TextDisplay` par joueur à portée, avec suppression automatique à la sortie du rayon de détection (5 blocs)
+- `Player#showEntity` / `Entity#setVisibleByDefault(false)` : rendu côté client strictement filtré par joueur — aucun risque qu'un joueur voie les stats d'un autre
+- Mise à jour du texte **en place** (jamais de respawn), conservant l'approche « zéro scintillement » introduite en v1.0.29
+- Persistance inchangée (`personal-holograms.yml`) : seuls les emplacements et échelles sont sauvegardés ; les entités personnelles sont recréées dynamiquement
+
+### 📋 Résumé des changements
+| Fichier | Changement |
+|---------|------------|
+| `StatsHologramManager` | Refonte : une entité `TextDisplay` personnelle par joueur à portée (montrée uniquement à lui), au lieu d'une seule entité limitée au joueur le plus proche |
+| `plugin.yml` | Version → `1.0.30` + description mise à jour |
+
+---
+
+## 🆕 Mise à jour précédente (v1.0.29)
 
 Cette version est entièrement dédiée aux **hologrammes** : ils passent tous au `TextDisplay` natif (une seule entité, **zéro scintillement**), leur apparence devient **entièrement configurable**, et le système de leaderboards s'enrichit de **quatre nouvelles catégories par format d'équipe**.
 
@@ -382,7 +418,7 @@ mvn clean package
 ## 📝 Auteur
 
 - **Développeur**: herocraftlol
-- **Version**: 1.0.29
+- **Version**: 1.0.30
 
 ## 📄 Licence
 

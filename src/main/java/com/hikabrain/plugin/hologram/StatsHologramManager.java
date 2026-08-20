@@ -28,28 +28,34 @@ import java.io.File;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
  * Hologrammes de STATISTIQUES PERSONNELLES : contrairement au leaderboard (voir
  * {@link CategoryLeaderboardManager}, qui affiche le même top 10 à tout le monde), ces
- * hologrammes affichent les stats du joueur actuellement le plus proche — chaque joueur
- * qui s'approche voit donc SES PROPRES statistiques.
+ * hologrammes affichent VRAIMENT les stats propres à CHAQUE joueur qui s'approche —
+ * simultanément, chacun voit uniquement les siennes, jamais celles d'un autre joueur qui
+ * serait aussi à proximité.
  *
  * On peut en poser plusieurs (un peu partout dans le hub, au spawn, etc.) via
- * /hb statshologram. Chacun se met à jour tout seul toutes les 2 secondes, en cherchant
- * le joueur le plus proche dans un petit rayon.
+ * /hb statshologram.
  *
  * ── Technique (important) ─────────────────────────────────────────────────────────
- * UNE SEULE entité {@link TextDisplay} par hologramme (le vrai type "hologramme" natif
- * de Minecraft depuis 1.19.4, multi-lignes en une seule entité), JAMAIS respawnée : à
- * chaque rafraîchissement, on met juste à jour son texte en place (display.text(...)).
- * L'ancienne version utilisait 8 ArmorStand empilés (un par ligne) qui pouvaient se
- * désynchroniser ou clignoter ; un TextDisplay unique élimine complètement ce problème
- * et reste affiché en permanence, sans jamais disparaître entre deux rafraîchissements.
- * L'apparence (fond, ombre, orientation...) est partagée avec les autres hologrammes du
- * plugin, configurable via config.yml "hologram-style" — voir {@link HologramStyle}.
+ * Une entité {@link TextDisplay} EST créée séparément POUR CHAQUE JOUEUR qui s'approche
+ * (rendue invisible à tout le monde par défaut via {@link Entity#setVisibleByDefault},
+ * puis montrée UNIQUEMENT à ce joueur via {@link Player#showEntity}) — c'est la méthode
+ * officiellement documentée par Paper pour afficher un contenu différent à chaque joueur
+ * sur une même position. Plusieurs joueurs peuvent donc se tenir au même endroit et
+ * voir chacun ses propres statistiques en même temps, sans jamais se marcher dessus.
+ *
+ * Tant qu'un joueur reste à portée, SON entité reste affichée et à jour en continu (mise
+ * à jour de son texte en place toutes les 2 secondes, jamais de placeholder "en attente"
+ * pour lui) — elle n'est retirée que lorsqu'il s'éloigne ou se déconnecte.
  */
 public class StatsHologramManager {
 
@@ -68,9 +74,9 @@ public class StatsHologramManager {
 
     private static class HologramInstance {
         Location location;
-        UUID entityId;
         double scale;
-        UUID currentlyShown; // joueur actuellement affiché, pour savoir quand re-render en placeholder
+        /** Joueur -> SON entité TextDisplay personnelle et cachée à cet endroit précis. */
+        final Map<UUID, UUID> playerDisplays = new HashMap<>();
     }
 
     public StatsHologramManager(HikaBrainPlugin plugin) {
@@ -82,13 +88,15 @@ public class StatsHologramManager {
         startRefreshTask();
     }
 
-    /** Recharge le style partagé depuis config.yml et le réapplique à tous les hologrammes existants. */
+    /** Recharge le style partagé depuis config.yml et le réapplique à tous les hologrammes existants (toutes entités personnelles comprises). */
     public void reloadStyle() {
         this.style = HologramStyle.load(plugin);
         for (HologramInstance instance : instances) {
-            Entity entity = Bukkit.getEntity(instance.entityId);
-            if (entity instanceof TextDisplay display) {
-                style.apply(display, instance.scale);
+            for (UUID entityId : instance.playerDisplays.values()) {
+                Entity entity = Bukkit.getEntity(entityId);
+                if (entity instanceof TextDisplay display) {
+                    style.apply(display, instance.scale);
+                }
             }
         }
     }
@@ -111,7 +119,7 @@ public class StatsHologramManager {
             }
             Location loc = new Location(world, section.getDouble("x"), section.getDouble("y"), section.getDouble("z"));
             double scale = section.getDouble("scale", style.getDefaultScale());
-            spawnInternal(loc, scale);
+            registerInstance(loc, scale);
         }
     }
 
@@ -139,7 +147,7 @@ public class StatsHologramManager {
 
     /** Pose un nouvel hologramme de stats personnelles à cet endroit, à l'échelle par défaut. */
     public void spawn(Location location) {
-        spawnInternal(location, style.getDefaultScale());
+        registerInstance(location, style.getDefaultScale());
         save();
     }
 
@@ -152,9 +160,11 @@ public class StatsHologramManager {
         if (instance == null) return false;
 
         instance.scale = scale;
-        Entity entity = Bukkit.getEntity(instance.entityId);
-        if (entity instanceof TextDisplay display) {
-            style.apply(display, scale);
+        for (UUID entityId : instance.playerDisplays.values()) {
+            Entity entity = Bukkit.getEntity(entityId);
+            if (entity instanceof TextDisplay display) {
+                style.apply(display, scale);
+            }
         }
         save();
         return true;
@@ -203,9 +213,9 @@ public class StatsHologramManager {
         return instances.size();
     }
 
-    // ── Construction / suppression des entités ───────────────────────────────────
+    // ── Enregistrement d'un emplacement (aucune entité tant qu'aucun joueur n'est à proximité) ──
 
-    private void spawnInternal(Location location, double scale) {
+    private void registerInstance(Location location, double scale) {
         HologramInstance instance = new HologramInstance();
         instance.location = location.clone();
         instance.scale = scale;
@@ -214,18 +224,15 @@ public class StatsHologramManager {
         Chunk chunk = world.getChunkAt(location);
         world.addPluginChunkTicket(chunk.getX(), chunk.getZ(), plugin);
 
-        TextDisplay display = (TextDisplay) world.spawnEntity(location, EntityType.TEXT_DISPLAY);
-        style.apply(display, scale);
-        display.getPersistentDataContainer().set(pdcKey, PersistentDataType.STRING, PDC_VALUE);
-        instance.entityId = display.getUniqueId();
-
         instances.add(instance);
-        renderPlaceholder(instance); // contenu initial en attendant le premier rafraîchissement
     }
 
     private void despawnInstance(HologramInstance instance) {
-        Entity entity = Bukkit.getEntity(instance.entityId);
-        if (entity != null) entity.remove();
+        for (UUID entityId : instance.playerDisplays.values()) {
+            Entity entity = Bukkit.getEntity(entityId);
+            if (entity != null) entity.remove();
+        }
+        instance.playerDisplays.clear();
         Chunk chunk = instance.location.getWorld().getChunkAt(instance.location);
         instance.location.getWorld().removePluginChunkTicket(chunk.getX(), chunk.getZ(), plugin);
     }
@@ -248,48 +255,73 @@ public class StatsHologramManager {
 
     private void refreshAll() {
         for (HologramInstance instance : instances) {
-            Player nearest = findNearestPlayer(instance.location);
-            if (nearest == null) {
-                if (instance.currentlyShown != null) {
-                    renderPlaceholder(instance);
-                    instance.currentlyShown = null;
+            Set<UUID> nowInRange = new HashSet<>();
+
+            for (Player player : findPlayersInRange(instance.location)) {
+                UUID uuid = player.getUniqueId();
+                nowInRange.add(uuid);
+
+                TextDisplay display = getOrCreatePersonalDisplay(instance, player);
+                if (display != null) {
+                    renderPlayerStats(display, player);
                 }
-                continue;
             }
-            // On peut se permettre de re-render à chaque cycle même si c'est le même
-            // joueur : ses stats peuvent avoir changé (partie terminée entre-temps).
-            renderPlayerStats(instance, nearest);
-            instance.currentlyShown = nearest.getUniqueId();
+
+            // Retire l'entité personnelle de tout joueur qui n'est plus à proximité
+            // (ou qui s'est déconnecté) : plus aucune trace pour lui à cet endroit.
+            java.util.Iterator<Map.Entry<UUID, UUID>> it = instance.playerDisplays.entrySet().iterator();
+            while (it.hasNext()) {
+                Map.Entry<UUID, UUID> entry = it.next();
+                if (!nowInRange.contains(entry.getKey())) {
+                    Entity entity = Bukkit.getEntity(entry.getValue());
+                    if (entity != null) entity.remove();
+                    it.remove();
+                }
+            }
         }
     }
 
-    private Player findNearestPlayer(Location location) {
-        if (location.getWorld() == null) return null;
-        BoundingBox box = BoundingBox.of(location, DETECTION_RADIUS, DETECTION_RADIUS, DETECTION_RADIUS);
-        Player nearest = null;
-        double nearestDistSq = Double.MAX_VALUE;
-        for (Entity entity : location.getWorld().getNearbyEntities(box)) {
-            if (entity instanceof Player player) {
-                double distSq = player.getLocation().distanceSquared(location);
-                if (distSq < nearestDistSq) {
-                    nearestDistSq = distSq;
-                    nearest = player;
-                }
-            }
+    /**
+     * Récupère l'entité TextDisplay personnelle déjà créée pour ce joueur à cet endroit,
+     * ou en crée une nouvelle (cachée à tout le monde, montrée uniquement à lui) s'il
+     * vient d'arriver à portée.
+     */
+    private TextDisplay getOrCreatePersonalDisplay(HologramInstance instance, Player player) {
+        UUID existingId = instance.playerDisplays.get(player.getUniqueId());
+        if (existingId != null) {
+            Entity existing = Bukkit.getEntity(existingId);
+            if (existing instanceof TextDisplay display) return display;
+            instance.playerDisplays.remove(player.getUniqueId()); // entité disparue entre-temps, on la recrée
         }
-        return nearest;
+
+        World world = instance.location.getWorld();
+        TextDisplay display = (TextDisplay) world.spawnEntity(instance.location, EntityType.TEXT_DISPLAY);
+        style.apply(display, instance.scale);
+        display.getPersistentDataContainer().set(pdcKey, PersistentDataType.STRING, PDC_VALUE);
+
+        // Le cœur de la personnalisation par joueur : cachée par défaut à tout le monde,
+        // montrée UNIQUEMENT à ce joueur précis (méthode officiellement recommandée par
+        // Paper pour afficher un contenu différent à chaque joueur sur une même position).
+        display.setVisibleByDefault(false);
+        player.showEntity(plugin, display);
+
+        instance.playerDisplays.put(player.getUniqueId(), display.getUniqueId());
+        return display;
+    }
+
+    private List<Player> findPlayersInRange(Location location) {
+        List<Player> players = new ArrayList<>();
+        if (location.getWorld() == null) return players;
+        BoundingBox box = BoundingBox.of(location, DETECTION_RADIUS, DETECTION_RADIUS, DETECTION_RADIUS);
+        for (Entity entity : location.getWorld().getNearbyEntities(box)) {
+            if (entity instanceof Player player) players.add(player);
+        }
+        return players;
     }
 
     // ── Construction du contenu ────────────────────────────────────────────────
 
-    private void renderPlaceholder(HologramInstance instance) {
-        List<Component> lines = new ArrayList<>();
-        lines.add(title());
-        lines.add(Component.text("En attente d'un joueur...").color(NamedTextColor.GRAY).decorate(TextDecoration.ITALIC));
-        setText(instance, lines);
-    }
-
-    private void renderPlayerStats(HologramInstance instance, Player player) {
+    private void renderPlayerStats(TextDisplay display, Player player) {
         UUID uuid = player.getUniqueId();
         StatsManager statsManager = plugin.getStatsManager();
         LevelManager levelManager = plugin.getLevelManager();
@@ -326,7 +358,7 @@ public class StatsHologramManager {
         lines.add(Component.text("─────────────").color(NamedTextColor.DARK_GRAY));
         lines.add(rankLine(rankToday, rankWeek, rankAllTime));
 
-        setText(instance, lines);
+        display.text(Component.join(JoinConfiguration.separator(Component.newline()), lines));
     }
 
     private Component title() {
@@ -352,13 +384,5 @@ public class StatsHologramManager {
         if (hours > 0) return hours + "h" + (minutes < 10 ? "0" : "") + minutes;
         if (minutes > 0) return minutes + " min";
         return totalSeconds + " s";
-    }
-
-    /** Assemble les lignes en un seul Component multi-lignes et le pousse sur l'entité (jamais de respawn). */
-    private void setText(HologramInstance instance, List<Component> lines) {
-        Entity entity = Bukkit.getEntity(instance.entityId);
-        if (entity instanceof TextDisplay display) {
-            display.text(Component.join(JoinConfiguration.separator(Component.newline()), lines));
-        }
     }
 }
