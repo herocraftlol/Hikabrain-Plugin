@@ -1,6 +1,6 @@
 # 🎮 HikaBrain Plugin
 
-![Version](https://img.shields.io/badge/version-1.0.30-blue)
+![Version](https://img.shields.io/badge/version-1.0.31-blue)
 ![Paper](https://img.shields.io/badge/Paper-1.21.1-orange)
 ![Java](https://img.shields.io/badge/Java-21-red)
 
@@ -102,7 +102,33 @@
 | `hikabrain.play` | Jouer au HikaBrain | Tous |
 | `hikabrain.tournament.join` | S'inscrire à un tournoi | Tous |
 
-## 🆕 Dernière Mise à Jour (v1.0.30)
+## 🆕 Dernière Mise à Jour (v1.0.31)
+
+Cette version corrige définitivement le **clignotement des hologrammes de statistiques personnelles** : certains joueurs voyaient leur hologramme disparaître puis réapparaître en boucle, surtout lorsqu'ils se tenaient à la limite du rayon de détection.
+
+---
+
+### ✨ Hologrammes personnels désormais stables et plus réactifs
+
+#### 🚫 Avant
+- **Rayon de détection très court (5 blocs)** : l'hologramme personnel n'apparaissait qu'au tout dernier moment
+- Un joueur **pile à la limite du rayon** voyait son hologramme **supprimé puis recréé à chaque micro-mouvement** (léger regard, tremblement de position…) — un va-et-vient permanent qui donnait l'impression d'un clignotement constant
+- Si le client Minecraft cessait de « suivre » l'entité (limite de distance de rendu, changement de chunk…), l'hologramme pouvait **rester invisible** jusqu'à sa recréation complète
+
+#### ✨ Maintenant
+- **Rayon de détection porté à 20 blocs** : l'hologramme personnel apparaît bien plus tôt quand un joueur s'approche
+- **Hystérésis anti-va-et-vient** : l'hologramme n'est retiré qu'au-delà d'un **rayon de sortie plus large (23 blocs)** que le rayon de détection — cette marge de 3 blocs empêche tout cycle supprimer/recréer pour un joueur qui bouge à la limite
+- **Visibilité ré-affirmée en continu** : à chaque cycle de rafraîchissement (toutes les 2 secondes), le plugin redit au client « cet hologramme est visible pour toi » (`Player#showEntity`, sans coût si déjà visible) — fini les disparitions après un changement de chunk ou un dépassement de distance de rendu
+- **Suppression propre** : l'entité personnelle n'est retirée qu'en cas de **déconnexion** ou de **véritable sortie** du rayon de sortie
+
+#### 🛠️ Détails techniques
+| Fichier | Changement |
+|---------|------------|
+| `StatsHologramManager` | `DETECTION_RADIUS` 5.0 → 20.0, nouveau `REMOVAL_RADIUS` (détection + 3 blocs) avec hystérésis, ré-affirmation de la visibilité à chaque rafraîchissement, suppression uniquement sur déconnexion ou sortie réelle |
+
+---
+
+## 🆕 Mise à jour précédente (v1.0.30)
 
 Cette version perfectionne les **hologrammes de statistiques personnelles** : lorsque plusieurs joueurs s'approchent du même hologramme, **chacun voit désormais ses propres statistiques en même temps**, et plus seulement celles du joueur le plus proche.
 
@@ -418,7 +444,7 @@ mvn clean package
 ## 📝 Auteur
 
 - **Développeur**: herocraftlol
-- **Version**: 1.0.30
+- **Version**: 1.0.31
 
 ## 📄 Licence
 
