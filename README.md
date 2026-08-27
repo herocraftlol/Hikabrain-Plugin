@@ -1,6 +1,6 @@
 # 🎮 HikaBrain Plugin
 
-![Version](https://img.shields.io/badge/version-1.0.31-blue)
+![Version](https://img.shields.io/badge/version-1.0.32-blue)
 ![Paper](https://img.shields.io/badge/Paper-1.21.1-orange)
 ![Java](https://img.shields.io/badge/Java-21-red)
 
@@ -46,6 +46,7 @@
 - **Achat avec points** dépensables (sans jamais baisser le niveau ni le classement)
 - **Niveau minimum requis** pour éviter le « farming » intensif
 - **Purement visuel** — aucun avantage en jeu, et invisibles pendant les parties HikaBrain
+- **Titres (TAG) affichés dans le chat** — le titre équipé s'affiche à côté de votre pseudo à chaque message
 
 ### ⚔️ Système de Kit
 - **Kits Configurables** - Équipement personnalisé par équipe
@@ -102,7 +103,36 @@
 | `hikabrain.play` | Jouer au HikaBrain | Tous |
 | `hikabrain.tournament.join` | S'inscrire à un tournoi | Tous |
 
-## 🆕 Dernière Mise à Jour (v1.0.31)
+## 🆕 Dernière Mise à Jour (v1.0.32)
+
+Cette version donne enfin vie aux **cosmétiques de type « TAG »** : le titre acheté et équipé s'affiche désormais **à côté de votre pseudo dans le chat**. Il s'agissait d'un bug : le titre existait bien en boutique (achat et équipement fonctionnaient), mais il n'était **jamais réellement affiché** nulle part en jeu. C'est maintenant corrigé.
+
+---
+
+### ✨ Nouveautés de la v1.0.32
+
+#### 🏷️ Titres cosmétiques affichés dans le chat
+- Le **titre (TAG)** que vous équipez dans la boutique (`/cosmetics`) s'affiche désormais **à côté de votre pseudo à chaque message** envoyé dans le chat, pour tous les destinataires.
+- Comme pour tous les cosmétiques, il ne s'affiche **que quand il est actif pour vous** — donc jamais pendant une partie HikaBrain (il est automatiquement masqué en arène).
+- Les titres supportent les **codes couleurs** (`&c`, `&l`…) grâce à la nouvelle conversion Adventure.
+
+#### ℹ️ Descriptions d'effet dans la boutique
+- Chaque cosmétique de la boutique affiche maintenant une **description claire de son effet** dans son lore — vous savez exactement ce que vous achetez avant de dépenser vos points (ex : « Fait tourbillonner un halo de particules au-dessus de ta tête », « Affiche ce titre à côté de ton pseudo »…).
+- Le texte est automatiquement **découpé en plusieurs lignes** pour rester lisible, sans couper un mot.
+
+#### 🛠️ Détails techniques
+| Fichier | Changement |
+|---------|------------|
+| `CosmeticChatListener` | **Nouveau** — affiche le titre TAG équipé après le pseudo de l'expéditeur dans le chat (`AsyncChatEvent` + rendu Adventure) |
+| `Cosmetic` | Nouvelle méthode `getEffectDescription()` : décrit en une phrase l'effet de chaque cosmétique |
+| `CosmeticShopGUI` | Affiche la description d'effet dans le lore de chaque item + `wrapLore()` pour un découpage lisible |
+| `MessageUtil` | Nouvelle conversion legacy → `Component` Adventure (`formatComponent`) |
+| `HikaBrainPlugin` | Enregistre le nouveau listener `CosmeticChatListener` |
+| `plugin.yml` / `pom.xml` | Version → **1.0.32** |
+
+---
+
+## 🆕 Mise à jour précédente (v1.0.31)
 
 Cette version corrige définitivement le **clignotement des hologrammes de statistiques personnelles** : certains joueurs voyaient leur hologramme disparaître puis réapparaître en boucle, surtout lorsqu'ils se tenaient à la limite du rayon de détection.
 
@@ -444,7 +474,7 @@ mvn clean package
 ## 📝 Auteur
 
 - **Développeur**: herocraftlol
-- **Version**: 1.0.31
+- **Version**: 1.0.32
 
 ## 📄 Licence
 
