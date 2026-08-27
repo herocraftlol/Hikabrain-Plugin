@@ -138,6 +138,7 @@ public class HikaBrainPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new com.hikabrain.plugin.listeners.QuickChatListener(this), this);
         getServer().getPluginManager().registerEvents(new com.hikabrain.plugin.listeners.CosmeticShopListener(this), this);
         getServer().getPluginManager().registerEvents(new com.hikabrain.plugin.listeners.CosmeticVisibilityListener(this), this);
+        getServer().getPluginManager().registerEvents(new com.hikabrain.plugin.listeners.CosmeticChatListener(this), this);
         getServer().getPluginManager().registerEvents(new ArenaGUIListener(this, arenaGUI), this);
         getServer().getPluginManager().registerEvents(new TeamSelectGUIListener(this), this);
         getServer().getPluginManager().registerEvents(new TournamentListener(this), this);

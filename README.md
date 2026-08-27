@@ -1,6 +1,6 @@
 # 🎮 HikaBrain Plugin
 
-![Version](https://img.shields.io/badge/version-1.0.30-blue)
+![Version](https://img.shields.io/badge/version-1.0.32-blue)
 ![Paper](https://img.shields.io/badge/Paper-1.21.1-orange)
 ![Java](https://img.shields.io/badge/Java-21-red)
 
@@ -46,6 +46,7 @@
 - **Achat avec points** dépensables (sans jamais baisser le niveau ni le classement)
 - **Niveau minimum requis** pour éviter le « farming » intensif
 - **Purement visuel** — aucun avantage en jeu, et invisibles pendant les parties HikaBrain
+- **Titres (TAG) affichés dans le chat** — le titre équipé s'affiche à côté de votre pseudo à chaque message
 
 ### ⚔️ Système de Kit
 - **Kits Configurables** - Équipement personnalisé par équipe
@@ -102,7 +103,62 @@
 | `hikabrain.play` | Jouer au HikaBrain | Tous |
 | `hikabrain.tournament.join` | S'inscrire à un tournoi | Tous |
 
-## 🆕 Dernière Mise à Jour (v1.0.30)
+## 🆕 Dernière Mise à Jour (v1.0.32)
+
+Cette version donne enfin vie aux **cosmétiques de type « TAG »** : le titre acheté et équipé s'affiche désormais **à côté de votre pseudo dans le chat**. Il s'agissait d'un bug : le titre existait bien en boutique (achat et équipement fonctionnaient), mais il n'était **jamais réellement affiché** nulle part en jeu. C'est maintenant corrigé.
+
+---
+
+### ✨ Nouveautés de la v1.0.32
+
+#### 🏷️ Titres cosmétiques affichés dans le chat
+- Le **titre (TAG)** que vous équipez dans la boutique (`/cosmetics`) s'affiche désormais **à côté de votre pseudo à chaque message** envoyé dans le chat, pour tous les destinataires.
+- Comme pour tous les cosmétiques, il ne s'affiche **que quand il est actif pour vous** — donc jamais pendant une partie HikaBrain (il est automatiquement masqué en arène).
+- Les titres supportent les **codes couleurs** (`&c`, `&l`…) grâce à la nouvelle conversion Adventure.
+
+#### ℹ️ Descriptions d'effet dans la boutique
+- Chaque cosmétique de la boutique affiche maintenant une **description claire de son effet** dans son lore — vous savez exactement ce que vous achetez avant de dépenser vos points (ex : « Fait tourbillonner un halo de particules au-dessus de ta tête », « Affiche ce titre à côté de ton pseudo »…).
+- Le texte est automatiquement **découpé en plusieurs lignes** pour rester lisible, sans couper un mot.
+
+#### 🛠️ Détails techniques
+| Fichier | Changement |
+|---------|------------|
+| `CosmeticChatListener` | **Nouveau** — affiche le titre TAG équipé après le pseudo de l'expéditeur dans le chat (`AsyncChatEvent` + rendu Adventure) |
+| `Cosmetic` | Nouvelle méthode `getEffectDescription()` : décrit en une phrase l'effet de chaque cosmétique |
+| `CosmeticShopGUI` | Affiche la description d'effet dans le lore de chaque item + `wrapLore()` pour un découpage lisible |
+| `MessageUtil` | Nouvelle conversion legacy → `Component` Adventure (`formatComponent`) |
+| `HikaBrainPlugin` | Enregistre le nouveau listener `CosmeticChatListener` |
+| `plugin.yml` / `pom.xml` | Version → **1.0.32** |
+
+---
+
+## 🆕 Mise à jour précédente (v1.0.31)
+
+Cette version corrige définitivement le **clignotement des hologrammes de statistiques personnelles** : certains joueurs voyaient leur hologramme disparaître puis réapparaître en boucle, surtout lorsqu'ils se tenaient à la limite du rayon de détection.
+
+---
+
+### ✨ Hologrammes personnels désormais stables et plus réactifs
+
+#### 🚫 Avant
+- **Rayon de détection très court (5 blocs)** : l'hologramme personnel n'apparaissait qu'au tout dernier moment
+- Un joueur **pile à la limite du rayon** voyait son hologramme **supprimé puis recréé à chaque micro-mouvement** (léger regard, tremblement de position…) — un va-et-vient permanent qui donnait l'impression d'un clignotement constant
+- Si le client Minecraft cessait de « suivre » l'entité (limite de distance de rendu, changement de chunk…), l'hologramme pouvait **rester invisible** jusqu'à sa recréation complète
+
+#### ✨ Maintenant
+- **Rayon de détection porté à 20 blocs** : l'hologramme personnel apparaît bien plus tôt quand un joueur s'approche
+- **Hystérésis anti-va-et-vient** : l'hologramme n'est retiré qu'au-delà d'un **rayon de sortie plus large (23 blocs)** que le rayon de détection — cette marge de 3 blocs empêche tout cycle supprimer/recréer pour un joueur qui bouge à la limite
+- **Visibilité ré-affirmée en continu** : à chaque cycle de rafraîchissement (toutes les 2 secondes), le plugin redit au client « cet hologramme est visible pour toi » (`Player#showEntity`, sans coût si déjà visible) — fini les disparitions après un changement de chunk ou un dépassement de distance de rendu
+- **Suppression propre** : l'entité personnelle n'est retirée qu'en cas de **déconnexion** ou de **véritable sortie** du rayon de sortie
+
+#### 🛠️ Détails techniques
+| Fichier | Changement |
+|---------|------------|
+| `StatsHologramManager` | `DETECTION_RADIUS` 5.0 → 20.0, nouveau `REMOVAL_RADIUS` (détection + 3 blocs) avec hystérésis, ré-affirmation de la visibilité à chaque rafraîchissement, suppression uniquement sur déconnexion ou sortie réelle |
+
+---
+
+## 🆕 Mise à jour précédente (v1.0.30)
 
 Cette version perfectionne les **hologrammes de statistiques personnelles** : lorsque plusieurs joueurs s'approchent du même hologramme, **chacun voit désormais ses propres statistiques en même temps**, et plus seulement celles du joueur le plus proche.
 
@@ -418,7 +474,7 @@ mvn clean package
 ## 📝 Auteur
 
 - **Développeur**: herocraftlol
-- **Version**: 1.0.30
+- **Version**: 1.0.32
 
 ## 📄 Licence
 
