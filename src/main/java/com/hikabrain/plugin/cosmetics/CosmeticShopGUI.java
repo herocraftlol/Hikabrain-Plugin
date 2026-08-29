@@ -155,6 +155,10 @@ public class CosmeticShopGUI {
             lore.add("");
             lore.add(cosmetic.getRarity().getColor() + "\u2726 " + cosmetic.getRarity().getLabel());
             lore.add("");
+            for (String line : wrapLore(cosmetic.getEffectDescription(), 34)) {
+                lore.add(ChatColor.GRAY + "" + ChatColor.ITALIC + line);
+            }
+            lore.add("");
             if (equipped) {
                 lore.add(ChatColor.GREEN + "\u2714 Équipé");
                 lore.add(ChatColor.GRAY + "Cliquer pour déséquiper");
@@ -182,6 +186,22 @@ public class CosmeticShopGUI {
             item.setItemMeta(meta);
         }
         return item;
+    }
+
+    /** Découpe un texte en plusieurs lignes de lore, sans couper un mot en deux. */
+    private static List<String> wrapLore(String text, int maxWidth) {
+        List<String> lines = new ArrayList<>();
+        StringBuilder current = new StringBuilder();
+        for (String word : text.split(" ")) {
+            if (current.length() > 0 && current.length() + 1 + word.length() > maxWidth) {
+                lines.add(current.toString());
+                current = new StringBuilder();
+            }
+            if (current.length() > 0) current.append(' ');
+            current.append(word);
+        }
+        if (current.length() > 0) lines.add(current.toString());
+        return lines;
     }
 
     // ── Identification depuis le titre (pour le listener) ────────────────────────

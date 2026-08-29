@@ -18,12 +18,19 @@ import org.bukkit.util.BoundingBox;
 /**
  * Protège la zone de jeu façon WorldGuard maison, pour chaque arène configurée :
  * - Les blocs déjà présents lors de la configuration (capturés dans le snapshot) ne peuvent
- *   jamais être cassés tant qu'ils sont dans leur état d'origine.
+ *   jamais être cassés tant qu'ils sont dans leur état d'origine — SAUF si leur matériau a
+ *   été explicitement autorisé via /hb breakable (voir Arena#getBreakableMaterials), ce qui
+ *   permet par exemple de creuser sous ses pieds dans de la terre/pierre "de carte" sans pour
+ *   autant permettre de casser toute la structure de l'arène.
  * - Les joueurs peuvent poser des blocs librement dans la zone de jeu (aucune restriction
  *   n'est appliquée à BlockPlaceEvent).
  * - Les blocs posés par un joueur peuvent être cassés normalement (ils ne correspondent
  *   plus à l'état d'origine du snapshot).
  * - En dehors de toute zone de jeu (ou si aucune zone n'est configurée), aucune restriction.
+ * - Qu'ils aient été cassés (bloc "de carte" autorisé) ou posés par un joueur, TOUS les blocs
+ *   modifiés réapparaissent/disparaissent normalement à chaque round reset et à chaque début
+ *   de partie, puisque la restauration du snapshot (ArenaSnapshot#restore) remet absolument
+ *   tout dans son état d'origine, sans distinction.
  *
  * - AUCUN item ne doit jamais traîner au sol dans la zone de jeu d'une arène active (kit
  *   cassé accidentellement, bloc du kit détruit par une explosion, etc.) : on annule la
@@ -59,7 +66,8 @@ public class ArenaProtectionListener implements Listener {
             }
 
             ArenaSnapshot snapshot = gameManager.getArenaSnapshot();
-            if (snapshot.isUnmodifiedOriginalBlock(event.getBlock())) {
+            if (snapshot.isUnmodifiedOriginalBlock(event.getBlock())
+                    && !arena.isBreakableMaterial(event.getBlock().getType())) {
                 event.setCancelled(true);
             }
             return;

@@ -88,6 +88,7 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
             case "setminplayers" -> handleSetMinPlayers(sender, args);
             case "guislot" -> handleGuiSlot(sender, args);
             case "music" -> handleMusic(sender, args);
+            case "breakable" -> handleBreakable(sender, args);
             case "cosmetics", "cosmetic", "shop" -> handleCosmetics(sender, args);
             case "rematch" -> handleRematch(sender, args);
             case "rematchcancel" -> handleRematchCancel(sender);
@@ -641,6 +642,89 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
 
         musicManager.setArenaTrack(arenaName, choice);
         MessageUtil.send(sender, "&aMusique de l'arène '" + arenaName + "' réglée sur : &e" + choice);
+    }
+
+    /**
+     * /hb breakable <arène> add <matériau>    : autorise ce matériau de bloc "de carte" à être cassé
+     * /hb breakable <arène> remove <matériau> : retire l'autorisation
+     * /hb breakable <arène> list              : liste les matériaux actuellement autorisés
+     * /hb breakable <arène> clear             : retire tous les matériaux autorisés
+     *
+     * Les blocs "de carte" (déjà présents lors de la capture de la zone de jeu) sont
+     * normalement protégés et incassables. Ajouter un matériau ici permet de les casser
+     * quand même (ex: DIRT pour pouvoir creuser sous ses pieds) — ils réapparaissent comme
+     * n'importe quel autre bloc de la map à chaque round reset/début de partie.
+     */
+    private void handleBreakable(CommandSender sender, String[] args) {
+        if (!sender.hasPermission("hikabrain.admin")) {
+            MessageUtil.send(sender, "&cTu n'as pas la permission.");
+            return;
+        }
+        if (args.length < 3) {
+            MessageUtil.send(sender, "&cUsage: /hb breakable <arène> <add|remove|list|clear> [matériau]");
+            return;
+        }
+
+        GameManager gm = resolveArena(sender, args, 1);
+        if (gm == null) return;
+        Arena arena = gm.getArena();
+
+        String action = args[2].toLowerCase(Locale.ROOT);
+
+        if (action.equals("list")) {
+            var materials = arena.getBreakableMaterials();
+            if (materials.isEmpty()) {
+                MessageUtil.send(sender, "&7Aucun bloc de base cassable configuré pour '" + gm.getName() + "'.");
+            } else {
+                MessageUtil.send(sender, "&aBlocs de base cassables pour '" + gm.getName() + "' &7(&e"
+                        + materials.size() + "&7): &f" + materials.stream().map(Enum::name)
+                        .sorted().reduce((a, b) -> a + ", " + b).orElse(""));
+            }
+            return;
+        }
+
+        if (action.equals("clear")) {
+            int count = arena.getBreakableMaterials().size();
+            new java.util.ArrayList<>(arena.getBreakableMaterials()).forEach(arena::removeBreakableMaterial);
+            gm.saveArenaConfig();
+            MessageUtil.send(sender, "&a" + count + " matériau(x) retiré(s) de la liste cassable pour '" + gm.getName() + "'.");
+            return;
+        }
+
+        if (args.length < 4) {
+            MessageUtil.send(sender, "&cUsage: /hb breakable <arène> " + action + " <matériau>");
+            return;
+        }
+
+        org.bukkit.Material material;
+        try {
+            material = org.bukkit.Material.valueOf(args[3].toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            MessageUtil.send(sender, "&cMatériau inconnu: '" + args[3] + "'. Utilise le nom exact du matériau Minecraft (ex: DIRT, STONE, GRASS_BLOCK).");
+            return;
+        }
+        if (!material.isBlock()) {
+            MessageUtil.send(sender, "&c'" + material.name() + "' n'est pas un bloc.");
+            return;
+        }
+
+        switch (action) {
+            case "add" -> {
+                boolean added = arena.addBreakableMaterial(material);
+                gm.saveArenaConfig();
+                MessageUtil.send(sender, added
+                        ? "&a" + material.name() + " peut maintenant être cassé dans '" + gm.getName() + "' (réapparaît à chaque round)."
+                        : "&7" + material.name() + " était déjà autorisé pour '" + gm.getName() + "'.");
+            }
+            case "remove" -> {
+                boolean removed = arena.removeBreakableMaterial(material);
+                gm.saveArenaConfig();
+                MessageUtil.send(sender, removed
+                        ? "&a" + material.name() + " n'est plus cassable dans '" + gm.getName() + "'."
+                        : "&7" + material.name() + " n'était pas dans la liste cassable de '" + gm.getName() + "'.");
+            }
+            default -> MessageUtil.send(sender, "&cAction inconnue. Utilise: add, remove, list ou clear.");
+        }
     }
 
     /**
@@ -1687,6 +1771,7 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
             MessageUtil.send(sender, "&c/hb setminplayers <nom> <nombre> &7- Définir le nombre min de joueurs de l'arène (0 = global)");
             MessageUtil.send(sender, "&c/hb guislot <page> <emplacement 1-45> <arène|clear> &7- Placer une arène à un emplacement précis d'une page du menu /arenas");
             MessageUtil.send(sender, "&c/hb music [arène] [fichier.nbs|random|off|reset] &7- Régler la musique d'ambiance d'une arène");
+            MessageUtil.send(sender, "&c/hb breakable <arène> <add|remove|list|clear> [matériau] &7- Rendre certains blocs de base cassables (ex: DIRT)");
             MessageUtil.send(sender, "&c/hb start <nom> &7- Forcer le démarrage");
             MessageUtil.send(sender, "&c/hb stop <nom> &7- Forcer l'arrêt");
             MessageUtil.send(sender, "&c/hb resetstats &7- Réinitialiser les statistiques");
@@ -1709,7 +1794,7 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
         if (args.length == 1) {
             List<String> options = new ArrayList<>(List.of("join", "joinrandom", "leave", "spectate", "unspectate", "info", "list", "arenas", "stats", "top", "points", "perk", "force", "cosmetics"));
             if (sender.hasPermission("hikabrain.admin")) {
-                options.addAll(List.of("create", "copy", "delete", "setlobby", "setspectatorspawn", "setspawn", "delspawn", "setcapture", "setgamezone", "setmaxplayers", "setminplayers", "guislot", "music", "start", "stop"));
+                options.addAll(List.of("create", "copy", "delete", "setlobby", "setspectatorspawn", "setspawn", "delspawn", "setcapture", "setgamezone", "setmaxplayers", "setminplayers", "guislot", "music", "breakable", "start", "stop"));
                 options.addAll(List.of("setsbserver", "setsbgame", "setsbtitle", "setsblines", "reloadsb", "sbinfo"));
                 options.addAll(List.of("resetstats", "leaderboard", "statshologram"));
             }
@@ -1775,6 +1860,20 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
             List<String> options = new ArrayList<>(List.of("random", "off", "reset"));
             options.addAll(plugin.getMusicManager().listAvailableTracks());
             return filterStartingWith(options, args[2]);
+        }
+
+        if (args.length == 2 && sub.equals("breakable")) {
+            return filterStartingWith(new ArrayList<>(plugin.getArenaManager().getNames()), args[1]);
+        }
+
+        if (args.length == 3 && sub.equals("breakable")) {
+            return filterStartingWith(List.of("add", "remove", "list", "clear"), args[2]);
+        }
+
+        if (args.length == 4 && sub.equals("breakable")
+                && (args[2].equalsIgnoreCase("add") || args[2].equalsIgnoreCase("remove"))) {
+            return filterStartingWith(List.of("DIRT", "GRASS_BLOCK", "STONE", "SAND", "GRAVEL",
+                    "COBBLESTONE", "OAK_LOG", "SNOW", "SNOW_BLOCK", "TERRACOTTA"), args[3].toUpperCase(Locale.ROOT));
         }
 
         if (args.length == 2 && sub.equals("points")) {

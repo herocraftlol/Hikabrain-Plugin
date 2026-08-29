@@ -1,14 +1,14 @@
 name: HikaBrain
-version: 1.0.30
+version: 1.0.33
 main: com.hikabrain.plugin.HikaBrainPlugin
 api-version: 1.21
 author: herocraftlol
-description: Plugin de minijeu Hikabrain pour Paper 1.21.1 - Capture de zone par équipes (Rouge vs Bleu), tournois automatisés avec bracket, boutique de cosmétiques, jukebox musical NBS à lecture aléatoire intelligente, niveaux & perks, leaderboards holographiques (dont par format 1v1/2v2/3v3/4v4), hologrammes de statistiques personnelles au style entièrement configurable et personnalisés par joueur (chacun voit ses propres stats), et rematch en un clic en fin de partie.
+description: Plugin de minijeu Hikabrain pour Paper 1.21.1 - Capture de zone par équipes (Rouge vs Bleu), tournois automatisés avec bracket, boutique de cosmétiques, jukebox musical NBS à lecture aléatoire intelligente, niveaux & perks, leaderboards holographiques (dont par format 1v1/2v2/3v3/4v4), hologrammes de statistiques personnelles au style entièrement configurable et personnalisés par joueur(chacun voit ses propres stats), blocs de map cassables configurables et respawn instantané sur tous les mondes, et rematch en un clic en fin de partie.
 
 commands:
   hb:
     description: Commande principale du plugin Hikabrain
-    usage: /hb <create|copy|delete|list|arenas|setlobby|setspectatorspawn|setspawn|delspawn|setcapture|setgamezone|setminplayers|guislot|music|start|stop|join|joinrandom|leave|spectate|unspectate|info|stats|top|points|perk|force|cosmetics|leaderboard|statshologram|rematch|rematchcancel>
+    usage: /hb <create|copy|delete|list|arenas|setlobby|setspectatorspawn|setspawn|delspawn|setcapture|setgamezone|setminplayers|guislot|music|breakable|start|stop|join|joinrandom|leave|spectate|unspectate|info|stats|top|points|perk|force|cosmetics|leaderboard|statshologram>
   arenas:
     description: Ouvre le GUI de sélection d'arène
     usage: /arenas

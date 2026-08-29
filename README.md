@@ -1,6 +1,6 @@
 # 🎮 HikaBrain Plugin
 
-![Version](https://img.shields.io/badge/version-1.0.30-blue)
+![Version](https://img.shields.io/badge/version-1.0.33-blue)
 ![Paper](https://img.shields.io/badge/Paper-1.21.1-orange)
 ![Java](https://img.shields.io/badge/Java-21-red)
 
@@ -19,6 +19,7 @@
 - **Compte à Rebours Configurable** - Lobby avec freeze des joueurs
 - **Items de Jeu** - Bouton forcer le démarrage 🔵 et quitter la partie 🔴
 - **Rematch en un Clic** - À la fin de chaque partie, deux boutons cliquables dans le chat : « ▶ REJOUER » (relance une partie du même format 1v1/2v2/3v3…) et « ✖ QUITTER » (rester au lobby)
+- **Blocs de Map Cassables Configurables** - Autorisez certains blocs de base de l'arène (erre, pierre…) à être cassés pendant les rounds (`/hb breakable`), tout en gardant la protection du reste de la map.
 
 ### 🏆 Système de Tournoi
 - **Tournois Automatisés** - Créez et gérez des tournois compétitifs
@@ -46,6 +47,7 @@
 - **Achat avec points** dépensables (sans jamais baisser le niveau ni le classement)
 - **Niveau minimum requis** pour éviter le « farming » intensif
 - **Purement visuel** — aucun avantage en jeu, et invisibles pendant les parties HikaBrain
+- **Titres (TAG) affichés dans le chat** — le titre équipé s'affiche à côté de votre pseudo à chaque message
 
 ### ⚔️ Système de Kit
 - **Kits Configurables** - Équipement personnalisé par équipe
@@ -83,6 +85,7 @@
 | `/hb points` | Voir ses points et son niveau |
 | `/hb perk` | Gérer ses perks équipés |
 | `/hb music` | Gérer la musique de l'arène |
+| `/hb breakable <arène> <add\|remove\|list\|clear> [matériau]` | Autoriser ou interdire la casse de certains blocs de base de l'arène (ex : terre, pierre) |
 | `/hb leaderboard <victoires\|kills\|kd\|parties\|1v1\|2v2\|3v3\|4v4>` | Poser un leaderboard top 10 à votre position |
 | `/hb leaderboard <catégorie> [remove\|size <taille>]` | Supprimer ou redimensionner le leaderboard le plus proche |
 | `/hb statshologram` | Poser un hologramme de statistiques personnelles |
@@ -102,7 +105,100 @@
 | `hikabrain.play` | Jouer au HikaBrain | Tous |
 | `hikabrain.tournament.join` | S'inscrire à un tournoi | Tous |
 
-## 🆕 Dernière Mise à Jour (v1.0.30)
+## 🆕 Dernière Mise à Jour (v1.0.33)
+
+Cette version enrichit le gameplay d'arène : les **blocs de base de la map** (ceux déjà présents lors de la configuration) peuvent désormais être **autorisés à être cassés** arène par arène, la **pioche du kit** creuse enfin **vite** (Efficacité II), et le **respawn instantané** s'applique automatiquement à **tous les mondes**, y compris ceux chargés après le démarrage du plugin.
+
+
+
+---
+
+### ✨ Nouveautés de la v1.0.33
+
+#### ⛏️ Blocs de base cassables configurables (`/hb breakable`)
+- Jusqu'ici, **aucun bloc de base de la map** ne pouvait être cassé dans la zone de jeu, même pour creuser sous ses pieds dans de la terre ou de la pierre. Nouveau : un administrateur peut **autoriser certains matériaux** arène par arène.
+- **`/hb breakable <arène> add <matériau>`** — autorise la casse de ce matériau (ex : `DIRT` pour pouvoir creuser sous ses pieds) ; **`remove`** pour retirer l'autorisation ; **`list`** pour voir les matériaux autorisés ; **`clear`** pour tout retirer.
+- La **protection reste active** pour tout le reste : seuls les matériaux explicitement autorisés deviennent cassables, et ils **réapparaissent comme n'importe quel autre bloc de la map** à chaque round reset / début de partie (restauration complète du snapshot).
+
+#### 🧱 Pioche du kit Efficacité II
+- La pioche en fer du kit est toujours **incassable**, mais elle est désormais enchantée **Efficacité II** sur toutes les arènes — elle creuse beaucoup plus vite, ce qui rend notamment les blocs de base autorisés (erre, pierre…) réellement exploitables en jeu.
+
+
+
+#### 🌍 Respawn instantané sur tous les mondes
+- Le plugin appliquait le `DO_IMMEDIATE_RESPAWN` **uniquement aux mondes déjà chargés** au démarrage : un monde chargé plus tard (arène dans un monde à part, par exemple) pouvait redemander un clic manuel sur « Respawn » après chaque mort. C'est corrigé : un nouveau listener applique la règle **à tout monde chargé ensuite**, automatiquement.
+
+
+
+#### 🛠️ Détails techniques
+| Fichier | Changement |
+|---------|------------|
+| `HikaBrainCommand` | Nouvelle commande `/hb breakable <add\|remove\|list\|clear>` |
+| `Arena` | Nouvelle liste `breakableMaterials` (matériaux de blocs de base autorisés à être cassés) + getters/add/remove |
+| `ArenaProtectionListener` | La protection des blocs de base est ignorée pour les matériaux autorisés |
+| `KitManager` | Pioche du kit : incassable + **Efficacité II** (nouvelle `makeEfficiencyPickaxe()`) |
+| `WorldLoadListener` | **Nouveau** — applique le `DO_IMMEDIATE_RESPAWN` à tout monde chargé après le démarrage du plugin |
+| `HikaBrainPlugin` | Enregistre le nouveau `WorldLoadListener` |
+| `plugin.yml` / `pom.xml` | Version → **1.0.33** |
+
+---
+
+## 🆕 Dernière Mise à Jour (v1.0.32)
+
+Cette version donne enfin vie aux **cosmétiques de type « TAG »** : le titre acheté et équipé s'affiche désormais **à côté de votre pseudo dans le chat**. Il s'agissait d'un bug : le titre existait bien en boutique (achat et équipement fonctionnaient), mais il n'était **jamais réellement affiché** nulle part en jeu. C'est maintenant corrigé.
+
+---
+
+### ✨ Nouveautés de la v1.0.32
+
+#### 🏷️ Titres cosmétiques affichés dans le chat
+- Le **titre (TAG)** que vous équipez dans la boutique (`/cosmetics`) s'affiche désormais **à côté de votre pseudo à chaque message** envoyé dans le chat, pour tous les destinataires.
+- Comme pour tous les cosmétiques, il ne s'affiche **que quand il est actif pour vous** — donc jamais pendant une partie HikaBrain (il est automatiquement masqué en arène).
+- Les titres supportent les **codes couleurs** (`&c`, `&l`…) grâce à la nouvelle conversion Adventure.
+
+#### ℹ️ Descriptions d'effet dans la boutique
+- Chaque cosmétique de la boutique affiche maintenant une **description claire de son effet** dans son lore — vous savez exactement ce que vous achetez avant de dépenser vos points (ex : « Fait tourbillonner un halo de particules au-dessus de ta tête », « Affiche ce titre à côté de ton pseudo »…).
+- Le texte est automatiquement **découpé en plusieurs lignes** pour rester lisible, sans couper un mot.
+
+#### 🛠️ Détails techniques
+| Fichier | Changement |
+|---------|------------|
+| `CosmeticChatListener` | **Nouveau** — affiche le titre TAG équipé après le pseudo de l'expéditeur dans le chat (`AsyncChatEvent` + rendu Adventure) |
+| `Cosmetic` | Nouvelle méthode `getEffectDescription()` : décrit en une phrase l'effet de chaque cosmétique |
+| `CosmeticShopGUI` | Affiche la description d'effet dans le lore de chaque item + `wrapLore()` pour un découpage lisible |
+| `MessageUtil` | Nouvelle conversion legacy → `Component` Adventure (`formatComponent`) |
+| `HikaBrainPlugin` | Enregistre le nouveau listener `CosmeticChatListener` |
+| `plugin.yml` / `pom.xml` | Version → **1.0.32** |
+
+---
+
+## 🆕 Mise à jour précédente (v1.0.31)
+
+Cette version corrige définitivement le **clignotement des hologrammes de statistiques personnelles** : certains joueurs voyaient leur hologramme disparaître puis réapparaître en boucle, surtout lorsqu'ils se tenaient à la limite du rayon de détection.
+
+---
+
+### ✨ Hologrammes personnels désormais stables et plus réactifs
+
+#### 🚫 Avant
+- **Rayon de détection très court (5 blocs)** : l'hologramme personnel n'apparaissait qu'au tout dernier moment
+- Un joueur **pile à la limite du rayon** voyait son hologramme **supprimé puis recréé à chaque micro-mouvement** (léger regard, tremblement de position…) — un va-et-vient permanent qui donnait l'impression d'un clignotement constant
+- Si le client Minecraft cessait de « suivre » l'entité (limite de distance de rendu, changement de chunk…), l'hologramme pouvait **rester invisible** jusqu'à sa recréation complète
+
+#### ✨ Maintenant
+- **Rayon de détection porté à 20 blocs** : l'hologramme personnel apparaît bien plus tôt quand un joueur s'approche
+- **Hystérésis anti-va-et-vient** : l'hologramme n'est retiré qu'au-delà d'un **rayon de sortie plus large (23 blocs)** que le rayon de détection — cette marge de 3 blocs empêche tout cycle supprimer/recréer pour un joueur qui bouge à la limite
+- **Visibilité ré-affirmée en continu** : à chaque cycle de rafraîchissement (toutes les 2 secondes), le plugin redit au client « cet hologramme est visible pour toi » (`Player#showEntity`, sans coût si déjà visible) — fini les disparitions après un changement de chunk ou un dépassement de distance de rendu
+- **Suppression propre** : l'entité personnelle n'est retirée qu'en cas de **déconnexion** ou de **véritable sortie** du rayon de sortie
+
+#### 🛠️ Détails techniques
+| Fichier | Changement |
+|---------|------------|
+| `StatsHologramManager` | `DETECTION_RADIUS` 5.0 → 20.0, nouveau `REMOVAL_RADIUS` (détection + 3 blocs) avec hystérésis, ré-affirmation de la visibilité à chaque rafraîchissement, suppression uniquement sur déconnexion ou sortie réelle |
+
+---
+
+## 🆕 Mise à jour précédente (v1.0.30)
 
 Cette version perfectionne les **hologrammes de statistiques personnelles** : lorsque plusieurs joueurs s'approchent du même hologramme, **chacun voit désormais ses propres statistiques en même temps**, et plus seulement celles du joueur le plus proche.
 
@@ -418,7 +514,7 @@ mvn clean package
 ## 📝 Auteur
 
 - **Développeur**: herocraftlol
-- **Version**: 1.0.30
+- **Version** : 1.0.33
 
 ## 📄 Licence
 

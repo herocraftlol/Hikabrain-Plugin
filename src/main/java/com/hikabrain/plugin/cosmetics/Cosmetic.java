@@ -128,4 +128,19 @@ public class Cosmetic {
     public Particle getParticle() { return particle; }
     public Color getParticleColor() { return particleColor; }
     public String getTagText() { return tagText; }
+
+    /**
+     * Décrit en une phrase exactement ce que fait ce cosmétique une fois équipé — affiché
+     * dans le lore de la boutique (voir CosmeticShopGUI), pour qu'un joueur sache
+     * précisément ce qu'il achète avant de dépenser ses points.
+     */
+    public String getEffectDescription() {
+        return switch (category) {
+            case HAT -> "Remplace ton casque par cette tête/ce chapeau, visible par tout le monde.";
+            case PARTICLE -> "Fait tourbillonner un halo de particules au-dessus de ta tête en continu.";
+            case TRAIL -> "Laisse une traînée de particules au sol derrière toi quand tu marches.";
+            case TAG -> "Affiche ce titre à côté de ton pseudo à chaque message envoyé dans le chat.";
+            case ENTRANCE -> "Déclenche une explosion de particules autour de toi à chaque retour au lobby.";
+        };
+    }
 }

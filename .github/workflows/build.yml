@@ -24,10 +24,10 @@ jobs:
       run: rm -rf ~/.m2/repository/com/hikabrain && mvn clean package -DskipTests
     
     - name: Rename JAR
-      run: mv target/HikaBrain.jar target/HikaBrain-1.0.28.jar
+      run: mv target/HikaBrain.jar target/HikaBrain-1.0.33.jar
     
     - name: Upload JAR
       uses: actions/upload-artifact@v4
       with:
         name: HikaBrain-JAR
-        path: target/HikaBrain-1.0.28.jar
+        path: target/HikaBrain-1.0.33.jar

@@ -250,7 +250,7 @@ public final class KitManager {
         inv.clear();
 
         inv.setItem(SWORD_SLOT, makeUnbreakable(new ItemStack(Material.IRON_SWORD)));
-        inv.setItem(PICKAXE_SLOT, makeUnbreakable(new ItemStack(Material.IRON_PICKAXE)));
+        inv.setItem(PICKAXE_SLOT, makeEfficiencyPickaxe());
         inv.setItem(GAPPLE_SLOT, new ItemStack(Material.GOLDEN_APPLE, 1));
         inv.setItem(BLOCK_HOTBAR_SLOT, new ItemStack(OFFHAND_BLOCK_MATERIAL, OFFHAND_BLOCK_AMOUNT));
 
@@ -328,5 +328,22 @@ public final class KitManager {
             item.setItemMeta(meta);
         }
         return item;
+    }
+
+    /**
+     * Pioche du kit : incassable, avec Efficacité II par défaut sur TOUTES les arènes
+     * (creuse plus vite, notamment utile pour les blocs de base autorisés à être cassés,
+     * voir Arena#getBreakableMaterials / ArenaProtectionListener).
+     */
+    private static ItemStack makeEfficiencyPickaxe() {
+        ItemStack pickaxe = new ItemStack(Material.IRON_PICKAXE);
+        ItemMeta meta = pickaxe.getItemMeta();
+        if (meta != null) {
+            meta.setUnbreakable(true);
+            meta.addItemFlags(ItemFlag.HIDE_UNBREAKABLE);
+            meta.addEnchant(org.bukkit.enchantments.Enchantment.EFFICIENCY, 2, true);
+            pickaxe.setItemMeta(meta);
+        }
+        return pickaxe;
     }
 }

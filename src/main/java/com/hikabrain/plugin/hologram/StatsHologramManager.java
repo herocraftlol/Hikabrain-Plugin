@@ -59,7 +59,15 @@ import java.util.UUID;
  */
 public class StatsHologramManager {
 
-    private static final double DETECTION_RADIUS = 5.0;
+    private static final double DETECTION_RADIUS = 20.0;
+    /**
+     * Rayon de SORTIE, volontairement plus large que le rayon de détection/création
+     * (DETECTION_RADIUS) : sans cette marge ("hystérésis"), un joueur qui se tient pile
+     * à la limite du rayon pouvait faire supprimer puis recréer son hologramme à chaque
+     * micro-mouvement (léger regard, tremblement de position...), ce qui donnait
+     * l'impression qu'il disparaissait/réapparaissait sans arrêt.
+     */
+    private static final double REMOVAL_RADIUS = DETECTION_RADIUS + 3.0;
     private static final long REFRESH_INTERVAL_TICKS = 40L; // 2 secondes
     private static final String HOLOGRAMS_FILE = "personal-holograms.yml";
     private static final String PDC_VALUE = "personal-stats";
@@ -255,24 +263,35 @@ public class StatsHologramManager {
 
     private void refreshAll() {
         for (HologramInstance instance : instances) {
-            Set<UUID> nowInRange = new HashSet<>();
-
-            for (Player player : findPlayersInRange(instance.location)) {
-                UUID uuid = player.getUniqueId();
-                nowInRange.add(uuid);
-
+            // Étape 1 : tout joueur dans le rayon de DÉTECTION obtient/garde son
+            // hologramme personnel, et on lui RE-confirme la visibilité à CHAQUE cycle
+            // (voir getOrCreatePersonalDisplay) — c'est le vrai correctif du
+            // clignotement : le "showEntity" initial ne suffit pas forcément dans la
+            // durée si le client re-suit/dé-suit l'entité (limite de distance de rendu,
+            // changement de chunk, etc.), donc on le réaffirme en continu plutôt qu'une
+            // seule fois à la création.
+            for (Player player : findPlayersInRange(instance.location, DETECTION_RADIUS)) {
                 TextDisplay display = getOrCreatePersonalDisplay(instance, player);
                 if (display != null) {
                     renderPlayerStats(display, player);
                 }
             }
 
-            // Retire l'entité personnelle de tout joueur qui n'est plus à proximité
-            // (ou qui s'est déconnecté) : plus aucune trace pour lui à cet endroit.
+            // Étape 2 : on ne retire l'hologramme personnel d'un joueur que s'il est
+            // sorti du rayon de SORTIE, plus large que celui de détection (hystérésis).
+            // Sans cette marge, un joueur pile à la limite du rayon de détection ferait
+            // supprimer/recréer son hologramme à chaque minuscule mouvement.
+            Set<UUID> stillWithinRemovalRadius = new HashSet<>();
+            for (Player player : findPlayersInRange(instance.location, REMOVAL_RADIUS)) {
+                stillWithinRemovalRadius.add(player.getUniqueId());
+            }
+
             java.util.Iterator<Map.Entry<UUID, UUID>> it = instance.playerDisplays.entrySet().iterator();
             while (it.hasNext()) {
                 Map.Entry<UUID, UUID> entry = it.next();
-                if (!nowInRange.contains(entry.getKey())) {
+                Player player = Bukkit.getPlayer(entry.getKey());
+                boolean stillConnected = player != null && player.isOnline();
+                if (!stillConnected || !stillWithinRemovalRadius.contains(entry.getKey())) {
                     Entity entity = Bukkit.getEntity(entry.getValue());
                     if (entity != null) entity.remove();
                     it.remove();
@@ -284,13 +303,18 @@ public class StatsHologramManager {
     /**
      * Récupère l'entité TextDisplay personnelle déjà créée pour ce joueur à cet endroit,
      * ou en crée une nouvelle (cachée à tout le monde, montrée uniquement à lui) s'il
-     * vient d'arriver à portée.
+     * vient d'arriver à portée. Dans tous les cas, RÉ-AFFIRME sa visibilité pour lui à
+     * chaque appel (showEntity est sans effet si déjà visible, donc sans coût), ce qui
+     * évite qu'elle redevienne invisible pour lui suite à un dé-suivi/re-suivi côté client.
      */
     private TextDisplay getOrCreatePersonalDisplay(HologramInstance instance, Player player) {
         UUID existingId = instance.playerDisplays.get(player.getUniqueId());
         if (existingId != null) {
             Entity existing = Bukkit.getEntity(existingId);
-            if (existing instanceof TextDisplay display) return display;
+            if (existing instanceof TextDisplay display) {
+                player.showEntity(plugin, display);
+                return display;
+            }
             instance.playerDisplays.remove(player.getUniqueId()); // entité disparue entre-temps, on la recrée
         }
 
@@ -309,10 +333,10 @@ public class StatsHologramManager {
         return display;
     }
 
-    private List<Player> findPlayersInRange(Location location) {
+    private List<Player> findPlayersInRange(Location location, double radius) {
         List<Player> players = new ArrayList<>();
         if (location.getWorld() == null) return players;
-        BoundingBox box = BoundingBox.of(location, DETECTION_RADIUS, DETECTION_RADIUS, DETECTION_RADIUS);
+        BoundingBox box = BoundingBox.of(location, radius, radius, radius);
         for (Entity entity : location.getWorld().getNearbyEntities(box)) {
             if (entity instanceof Player player) players.add(player);
         }

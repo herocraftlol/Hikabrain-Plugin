@@ -100,10 +100,12 @@ public class HikaBrainPlugin extends JavaPlugin {
         this.tournamentGUI = new TournamentGUI(this);
         this.tournamentRoomsGUI = new TournamentRoomsGUI(this);
 
-        // Respawn instantané
+        // Respawn instantané (mondes déjà chargés)
         for (World world : getServer().getWorlds()) {
             world.setGameRule(GameRule.DO_IMMEDIATE_RESPAWN, true);
         }
+        // ... et pour tout monde chargé PLUS TARD (voir WorldLoadListener)
+        getServer().getPluginManager().registerEvents(new com.hikabrain.plugin.listeners.WorldLoadListener(), this);
 
         // Commandes
         HikaBrainCommand commandExecutor = new HikaBrainCommand(this);
@@ -138,6 +140,7 @@ public class HikaBrainPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new com.hikabrain.plugin.listeners.QuickChatListener(this), this);
         getServer().getPluginManager().registerEvents(new com.hikabrain.plugin.listeners.CosmeticShopListener(this), this);
         getServer().getPluginManager().registerEvents(new com.hikabrain.plugin.listeners.CosmeticVisibilityListener(this), this);
+        getServer().getPluginManager().registerEvents(new com.hikabrain.plugin.listeners.CosmeticChatListener(this), this);
         getServer().getPluginManager().registerEvents(new ArenaGUIListener(this, arenaGUI), this);
         getServer().getPluginManager().registerEvents(new TeamSelectGUIListener(this), this);
         getServer().getPluginManager().registerEvents(new TournamentListener(this), this);

@@ -52,6 +52,16 @@ public class Arena {
      */
     private int minPlayers = -1;
 
+    /**
+     * Matériaux de blocs "de base" (déjà présents dans la map à la capture du snapshot)
+     * explicitement autorisés à être cassés — voir ArenaProtectionListener. Par défaut,
+     * AUCUN bloc de base n'est cassable (comportement historique inchangé) : seuls les
+     * matériaux ajoutés ici via /hb breakable le deviennent. Ils réapparaissent comme
+     * n'importe quel autre bloc de base à chaque round reset/début de partie, puisque la
+     * restauration du snapshot (voir ArenaSnapshot#restore) ne fait pas de distinction.
+     */
+    private final java.util.Set<org.bukkit.Material> breakableMaterials = java.util.EnumSet.noneOf(org.bukkit.Material.class);
+
     public Arena() {
         teamSpawns.put(Team.RED, new ArrayList<>());
         teamSpawns.put(Team.BLUE, new ArrayList<>());
@@ -89,6 +99,28 @@ public class Arena {
      */
     public void setMinPlayers(int minPlayers) {
         this.minPlayers = minPlayers <= 0 ? -1 : minPlayers;
+    }
+
+    /**
+     * Vue non modifiable des matériaux de blocs "de base" (déjà présents dans la map)
+     * explicitement autorisés à être cassés dans cette arène.
+     */
+    public java.util.Set<org.bukkit.Material> getBreakableMaterials() {
+        return java.util.Collections.unmodifiableSet(breakableMaterials);
+    }
+
+    /** Autorise ce matériau à être cassé même s'il fait partie du snapshot d'origine. Renvoie false s'il l'était déjà. */
+    public boolean addBreakableMaterial(org.bukkit.Material material) {
+        return breakableMaterials.add(material);
+    }
+
+    /** Retire ce matériau de la liste des blocs de base cassables. Renvoie false s'il n'y était pas. */
+    public boolean removeBreakableMaterial(org.bukkit.Material material) {
+        return breakableMaterials.remove(material);
+    }
+
+    public boolean isBreakableMaterial(org.bukkit.Material material) {
+        return breakableMaterials.contains(material);
     }
 
     /**
@@ -247,6 +279,9 @@ public class Arena {
         } else {
             config.set("arena.min-players", null);
         }
+        List<String> materialNames = new ArrayList<>();
+        for (org.bukkit.Material m : breakableMaterials) materialNames.add(m.name());
+        config.set("arena.breakable-materials", materialNames);
     }
 
     public void loadFromConfig(FileConfiguration config) {
@@ -261,6 +296,14 @@ public class Arena {
         this.gameZone = loadRegion(config, "arena.gamezone");
         this.maxPlayers = config.isSet("arena.max-players") ? config.getInt("arena.max-players") : -1;
         this.minPlayers = config.isSet("arena.min-players") ? config.getInt("arena.min-players") : -1;
+        breakableMaterials.clear();
+        for (String name : config.getStringList("arena.breakable-materials")) {
+            try {
+                breakableMaterials.add(org.bukkit.Material.valueOf(name));
+            } catch (IllegalArgumentException ignored) {
+                // matériau invalide/renommé entre deux versions de Minecraft : on l'ignore proprement
+            }
+        }
     }
 
     /**
