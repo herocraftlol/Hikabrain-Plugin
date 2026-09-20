@@ -1,0 +1,91 @@
+# =========================================================
+#  CabinTransport - configuration des trajets
+# =========================================================
+# Chaque trajet transporte un joueur du point "start" au point "end"
+# a bord d'une cabine qui suit une trajectoire en arc (comme un grand
+# saut / un voyage en nuage), en temps reel, sur une duree definie.
+#
+# arc-height : hauteur (en blocs) ajoutee au sommet de la parabole
+#              au-dessus de la ligne droite start->end. Mettre 0 pour
+#              un trajet plat, ou une grande valeur pour un "grand saut".
+#
+# particle : nom d'une Particle Bukkit (ex: CLOUD, END_ROD, SNOWFLAKE...)
+# sound-start / sound-loop / sound-end : noms de Sound Bukkit
+# cabin-visual : true pour afficher une petite plateforme/cabine
+#                (BlockDisplay) autour du joueur pendant le trajet
+# cabin-block : le bloc utilise pour la plateforme si cabin-visual: true
+#
+# Visite de découverte jouée automatiquement au premier join.
+# L'admin crée/modifie le trajet indiqué ci-dessous avec les commandes /transport.
+discovery:
+  enabled: true
+  route: lobby-tour
+  message: "&b&lBienvenue ! &7Découverte du lobby en cours..."
+
+routes:
+  # Créez ce trajet avec :
+  # /transport create lobby-tour Visite du lobby
+  # /transport setstart lobby-tour
+  # /transport setend lobby-tour
+  # /transport setduration lobby-tour 25
+  # /transport setheight lobby-tour 8
+  exemple:
+    display-name: "Village -> Chateau"
+    world: world
+    start:
+      x: 0.5
+      y: 100.0
+      z: 0.5
+      yaw: 0.0
+      pitch: 0.0
+    end:
+      x: 60.5
+      y: 110.0
+      z: 40.5
+      yaw: 0.0
+      pitch: 0.0
+    duration-seconds: 10
+    arc-height: 25.0
+    particle: CLOUD
+    sound-start: ENTITY_ENDER_DRAGON_FLAP
+    sound-loop: BLOCK_AMETHYST_BLOCK_CHIME
+    sound-end: ENTITY_PLAYER_LEVELUP
+    cabin-visual: true
+    cabin-block: OAK_PLANKS
+    # true : la caméra du joueur suit la direction du trajet (effet "vehicule")
+    # false : le joueur garde le contrôle de sa caméra pendant le trajet
+    lock-camera: true
+
+  # Exemple de parcours multi-points : chaque point possède son angle de caméra.
+  # transition-seconds indique la durée entre ce point et le suivant.
+  lobby-tour:
+    display-name: "Visite du lobby"
+    world: world
+    points:
+      - {x: 0.5, y: 100.0, z: 0.5, yaw: 90.0, pitch: 0.0, transition-seconds: 3.0}
+      - {x: 12.5, y: 102.0, z: 0.5, yaw: 45.0, pitch: -8.0, transition-seconds: 4.0}
+      - {x: 25.5, y: 101.0, z: 12.5, yaw: -30.0, pitch: 5.0, transition-seconds: 4.0}
+      - {x: 8.5, y: 100.0, z: 25.5, yaw: 180.0, pitch: 0.0, transition-seconds: 3.0}
+    cabin-visual: false
+    lock-camera: true
+
+messages:
+  prefix: "&b&lTransport &8» &r"
+  no-permission: "&cVous n'avez pas la permission de faire cela."
+  unknown-route: "&cCe trajet n'existe pas : &f%route%"
+  route-list-header: "&bTrajets disponibles :"
+  already-traveling: "&cVous etes deja en train de voyager."
+  not-traveling: "&cVous n'etes pas en train de voyager."
+  journey-start: "&aDecollage vers &f%route%&a !"
+  journey-end: "&aArrivee a destination !"
+  journey-cancelled: "&eVoyage annule."
+  route-created: "&aTrajet &f%route%&a cree. Utilisez /transport setstart et setend."
+  route-deleted: "&aTrajet &f%route%&a supprime."
+  route-updated: "&aTrajet &f%route%&a mis a jour."
+  point-set: "&aPoint &f%point%&a du trajet &f%route%&a defini a votre position."
+  config-reloaded: "&aConfiguration rechargee."
+  config-saved: "&aConfiguration sauvegardee."
+  different-world-error: "&cLe depart et l'arrivee doivent etre dans le meme monde."
+  world-not-loaded: "&cLe monde de ce trajet n'est pas charge actuellement."
+  route-incomplete: "&cCe trajet n'a pas de point de depart et/ou d'arrivee defini."
+  player-only: "&cCette commande doit etre executee par un joueur."

@@ -1,9 +1,9 @@
 name: HikaBrain
-version: 1.0.33
+version: 1.1.0
 main: com.hikabrain.plugin.HikaBrainPlugin
 api-version: 1.21
 author: herocraftlol
-description: Plugin de minijeu Hikabrain pour Paper 1.21.1 - Capture de zone par équipes (Rouge vs Bleu), tournois automatisés avec bracket, boutique de cosmétiques, jukebox musical NBS à lecture aléatoire intelligente, niveaux & perks, leaderboards holographiques (dont par format 1v1/2v2/3v3/4v4), hologrammes de statistiques personnelles au style entièrement configurable et personnalisés par joueur(chacun voit ses propres stats), blocs de map cassables configurables et respawn instantané sur tous les mondes, et rematch en un clic en fin de partie.
+description: Plugin Paper 1.21.1 tout-en-un regroupant HikaBrain, SpaceShip et la Cinématique de Découverte (CabinTransport). Capture de zone par équipes (Rouge vs Bleu), tournois automatisés avec bracket, boutique de cosmétiques, jukebox musical NBS à lecture aléatoire intelligente, niveaux & perks, leaderboards holographiques par format (1v1/2v2/3v3/4v4), hologrammes de statistiques personnelles au style entièrement configurable (chacun voit ses propres stats), blocs de map cassables configurables, respawn instantané sur tous les mondes, rematch en un clic, SpaceShip multi-zones Noir vs Blanc avec mode Domination et classement des plus longues parties, et une visite cinématique automatique du lobby à la première connexion grâce à la nouvelle Caméra de Découverte.
 
 commands:
   hb:
@@ -21,6 +21,21 @@ commands:
     description: Commande du système de tournoi automatisé
     usage: /tournament <create|join|leave|start|forcestart|cancel|delete|list|info|bracket|matches|spectate|unspectate|top|history|gui|rooms|arena|sethologram|removehologram>
     aliases: [tournoi]
+  ss:
+    description: Commande principale du mini-jeu SpaceShip intégré
+    usage: /ss <create|delete|list|arenas|start|stop|join|leave|spectate|stats|leaderboard>
+    aliases: [spaceship]
+  ssarenas:
+    description: Ouvre le GUI de sélection d'arène SpaceShip
+    usage: /ssarenas
+  sstournament:
+    description: Gère les tournois SpaceShip intégrés
+    usage: /sstournament <create|join|leave|start|cancel|list|info>
+    aliases: [sstourney, sst]
+  transport:
+    description: Configure les trajets et la cinématique de découverte du lobby
+    aliases: [cabine, ctransport]
+    usage: /transport <list|go|cancel|create|setstart|setend|addpoint|clearpoints|setpointduration|setduration|setheight|setcabin|setcamera|delete|reload|save>
 
 permissions:
   hikabrain.admin:
@@ -32,3 +47,18 @@ permissions:
   hikabrain.tournament.join:
     description: Permission pour s'inscrire à un tournoi
     default: true
+  spaceship.admin:
+    description: Permission d'administration SpaceShip
+    default: op
+  spaceship.play:
+    description: Permission pour jouer au SpaceShip
+    default: true
+  spaceship.tournament.admin:
+    description: Permission d'administration des tournois SpaceShip
+    default: op
+  transport.use:
+    description: Autorise l'utilisation des trajets et de la visite du lobby
+    default: true
+  transport.admin:
+    description: Autorise la configuration des trajets et de la cinématique
+    default: op
