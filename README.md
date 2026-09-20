@@ -1,12 +1,13 @@
-# 🎮 HikaBrain Plugin
+# 🎮 HikaBrain + SpaceShip Plugin
 
-![Version](https://img.shields.io/badge/version-1.0.33-blue)
+![Version](https://img.shields.io/badge/version-1.1.0-blue)
 ![Paper](https://img.shields.io/badge/Paper-1.21.1-orange)
 ![Java](https://img.shields.io/badge/Java-21-red)
+![Modes](https://img.shields.io/badge/modes-HikaBrain%20%2B%20SpaceShip-8A2BE2)
 
-> Un plugin Minecraft complet pour Paper 1.21.1 — Capture de zone par équipes, tournois automatisés, boutique de cosmétiques, musique NBS, niveaux & perks, **leaderboards holographiques par format (1v1/2v2/3v3/4v4)**, **hologrammes de statistiques personnelles au style entièrement configurable et personnalisés pour chaque joueur**, et **rematch en un clic en fin de partie**.
+> Le plugin **tout-en-un** pour Paper 1.21.1 : **HikaBrain**, **SpaceShip** et la **Caméra de Découverte** réunis dans un seul JAR. Capture de zone par équipes, Domination multi-salles façon vaisseau spatial, tournois automatisés, boutique de cosmétiques, musique NBS, niveaux & perks, **leaderboards holographiques par format (1v1/2v2/3v3/4v4)**, **hologrammes de statistiques personnelles au style entièrement configurable et personnalisés pour chaque joueur**, **rematch en un clic**, et désormais **une visite cinématique automatique du lobby à la première connexion grâce à la Caméra de Découverte**.
 
-**HikaBrain** est un minijeu palpitant où deux équipes (Rouge vs Bleu) s'affrontent pour contrôler une zone centrale. Inspiré par le style Screaming Bedwars, ce plugin offre une expérience compétitive avec des statistiques détaillées, des classements holographiques (globaux **et par format d'équipe**), des **hologrammes de statistiques personnelles** (chaque joueur voit ses propres stats en s'approchant) construits sur les **TextDisplay natifs** — une seule entité, aucun scintillement, apparence configurable —, un système de tournoi intégré, une véritable **boutique de cosmétiques** pour récompenser l'investissement des joueurs, et un **bouton « Rejouer »** qui relance instantanément une partie du même format à la fin de chaque match.
+**HikaBrain + SpaceShip** rassemble **deux modes de jeu compétitifs** dans un seul plugin, plus une **cinématique de découverte du lobby** qui accueille automatiquement chaque nouveau joueur. Côté **HikaBrain**, deux équipes (Rouge vs Bleu) s'affrontent pour contrôler une zone centrale, avec statistiques détaillées, classements holographiques (globaux **et par format d'équipe**), **hologrammes de statistiques personnelles** au style configurable (chaque joueur voit ses propres stats en s'approchant) construits sur les **TextDisplay natifs** — une seule entité, aucun scintillement —, système de tournoi intégré, véritable **boutique de cosmétiques** pour récompenser les joueurs fidèles, et un **bouton « Rejouer »** qui relance instantanément une partie du même format. Côté **SpaceShip**, le mode **Domination multi-zones** oppose deux équipes (Noir vs Blanc) dans un vaisseau spatial composé de **5, 7 ou 9 salles** alignées (Mid neutre au centre puis Bases de chaque côté) : capturez les salles adverses, défendez les vôtres, faites-les basculer sous votre couleur et empêchez l'ennemi de prendre le Mid. Enfin, la **Caméra de Découverte** embarque chaque nouveau joueur dans une cabine virtuelle (construite en `BlockDisplay`) qui survole le lobby selon un trajet configurable à l'arc parabolique — points de vue successifs, sons d'ambiance, particules — pour leur faire découvrir la map avant leur première partie.
 
 ---
 
@@ -60,6 +61,29 @@
 - **Commande `/hb music`** - Gestion complète de la musique
 - **Support des fichiers NBS** personnalisés
 
+### 🚀 SpaceShip — Domination Multi-Zones (NOUVEAU)
+- **Vaisseau à 5, 7 ou 9 salles** — Mid neutre au centre puis Bases (Base1 → Base4) de chaque côté, alignées le long d'un couloir central
+- **Deux équipes : Noir vs Blanc** — chacune avec ses propres spawns dans chaque salle, ses propres zones-but à capturer et à défendre
+- **Mode Domination** — chaque salle peut basculer sous le contrôle d'une équipe : restez-y pour grignoter du terrain, reprenez les salles perdues, bloquez l'adversaire au Mid
+- **Confinement des spectateurs** — un rayon paramétrable (`spectator-confinement-radius`) les recale automatiquement dans la salle en cours s'ils s'éloignent du point de vue
+- **Protection des spawns** — un rayon (`spawn-protection-radius`) interdit la pose de blocs autour de CHAQUE spawn, toutes salles / équipes confondues (fini les joueurs coincés dans leur base)
+- **Tournois SpaceShip** — bracket à élimination directe avec `/sstournament`, chaque match est une vraie partie jouée sur une arène existante
+- **Classement des plus longues parties** — hologramme dédié des records de durée (`/ss longestgames`)
+- **Hologrammes de statistiques** — leaderboards par catégorie (`/ss leaderboard`) et records de parties (`/ss longestgames`) avec style configurable
+- **Commande `/ss`** — gestion complète des arènes, configuration des zones, démarrage/arrêt, rejoindre, spectateur…
+- **Données isolées** — `spaceship-arenas/` et fichiers préfixés `spaceship-` pour ne jamais se mélanger à HikaBrain
+
+### 🎬 Caméra de Découverte (NOUVEAU)
+- **Cinématique automatique au premier join** — chaque joueur qui se connecte pour la première fois embarque dans une cabine virtuelle qui survole le lobby selon un trajet préconfiguré (`discovery.enabled` dans `cabin-config.yml`)
+- **Cabine en `BlockDisplay`** — petite plateforme construite avec des entités natives Minecraft, aucun bloc posé : invisible pour les autres joueurs et nettoyée parfaitement à la fin
+- **Trajets à l'arc parabolique** — chaque route part d'un point A, arrive à un point B, avec une `arc-height` qui fait grimper la cabine au-dessus de la ligne droite avant de redescendre (effet « grand saut »)
+- **Trajets multi-points** — option avancée : `/transport addpoint <route> <secondes>` ajoute des points de vue intermédiaires avec leur propre durée de transition et leur propre angle de caméra
+- **Caméra suiveuse** — `lock-camera: true` oriente la caméra du passager dans le sens du déplacement (effet véhicule), ou la laisse libre s'il préfère garder le contrôle
+- **Particules & sons d'ambiance** — `particle`, `sound-start`, `sound-loop` et `sound-end` configurables par trajet (CLOUD, END_ROD, ENTITY_ENDER_DRAGON_FLAP, BLOCK_AMETHYST_BLOCK_CHIME…)
+- **Téléportation tick-par-tick** — le joueur suit la trajectoire de façon fluide et continue, pas de « véhicule » qui se désynchronise côté client
+- **Commande `/transport`** — administration complète des trajets (`create`, `setstart`, `setend`, `setduration`, `setheight`, `setcabin`, `setcamera`, `addpoint`, `clearpoints`, `setpointduration`, `delete`, `reload`, `save`, `go`, `cancel`)
+- **Jouée une seule fois par joueur** — la liste est persistée dans `discovery-seen.yml`, mais un admin peut la réinitialiser et `/transport go <route>` lance manuellement n'importe quel trajet existant
+
 ---
 
 ## 📋 Fonctionnalités Détaillées
@@ -95,7 +119,11 @@
 | `/hb rematchcancel` | Rester au lobby (déclenché par le bouton « ✖ QUITTER ») |
 | `/arenas` | Ouvrir le GUI de sélection d'arène |
 | `/cosmetics` | Ouvrir la boutique de cosmétiques |
-| `/tournament` | Système de tournoi automatisé |
+| `/tournament` | Système de tournoi HikaBrain (bracket à élimination directe) |
+| `/ss` | **NOUVEAU** — Commande principale du mode SpaceShip (création d'arène multi-zones, configuration des salles / spawns / zones-but, démarrage, statistiques, leaderboards, longestgames…) |
+| `/ssarenas` | **NOUVEAU** — Ouvre le GUI de sélection d'arène SpaceShip |
+| `/sstournament` | **NOUVEAU** — Gestion des tournois SpaceShip (bracket à élimination directe), alias `/sstourney`, `/sst` |
+| `/transport` | **NOUVEAU** — Configure et lance les trajets de la Caméra de Découverte (`list`, `go`, `cancel`, `create`, `setstart`, `setend`, `addpoint`, `clearpoints`, `setpointduration`, `setduration`, `setheight`, `setcabin`, `setcamera`, `delete`, `reload`, `save`) |
 
 ## Permissions
 
@@ -104,8 +132,59 @@
 | `hikabrain.admin` | Administration du jeu, hologrammes, setup arènes, tournoi | OP |
 | `hikabrain.play` | Jouer au HikaBrain | Tous |
 | `hikabrain.tournament.join` | S'inscrire à un tournoi | Tous |
+| `hikabrain.cosmetics.use` | Accéder à la boutique de cosmétiques | Tous |
+| `spaceship.admin` | Administration du jeu SpaceShip | OP |
+| `spaceship.play` | Jouer à SpaceShip | Tous |
+| `spaceship.tournament.admin` | Créer / démarrer / annuler les tournois SpaceShip | OP |
+| `transport.use` | Utiliser les trajets et la visite du lobby | Tous |
+| `transport.admin` | Configurer les trajets et la cinématique | OP |
 
-## 🆕 Dernière Mise à Jour (v1.0.33)
+## 🆕 Dernière Mise à Jour (v1.1.0)
+
+Cette version majeure **fusionne HikaBrain, SpaceShip et la Caméra de Découverte en un seul plugin** et apporte une expérience d'accueil cinématographique au lobby. Un nouveau JAR unique suffit désormais : retirez vos anciens `HikaBrain.jar` / `SpaceShip.jar` et installez **uniquement** `HikaBrain-SpaceShip.jar` pour éviter les conflits de commandes et de listeners. Chaque sous-système conserve ses propres fichiers de données et de configuration — rien n'est mélangé.
+
+### 🚀 SpaceShip intégré au plugin
+
+Le mode **SpaceShip** (Domination multi-zones Noir vs Blanc) est maintenant entièrement intégré au JAR principal. Il disposait jusqu'ici de son propre plugin ; il s'installe désormais automatiquement au démarrage d'HikaBrain et partage le même cycle de vie (commandes, listeners, sauvegardes).
+
+- **Vaisseau à 5, 7 ou 9 salles** — Mid neutre au centre puis Bases (Base1 → Base4) alignées de chaque côté ; chaque salle a ses propres spawns par équipe et ses propres zones-but
+- **Domination** — chaque salle peut basculer sous le contrôle d'une équipe ; restez-y pour grignoter du terrain, reprenez les salles perdues, bloquez l'adversaire au Mid
+- **Tournois SpaceShip** — `/sstournament` (alias `/sstourney`, `/sst`) gère un bracket à élimination directe où chaque match est une vraie partie jouée sur une arène existante
+- **Protection des spawns** — un rayon `spawn-protection-radius` autour de CHAQUE spawn (toutes salles / équipes confondues) empêche de boucher ou piéger un joueur (le sien ou celui de l'adversaire)
+- **Confinement des spectateurs** — un rayon `spectator-confinement-radius` les recale automatiquement dans la salle en cours s'ils s'éloignent du point de vue
+- **Classement des plus longues parties** — `/ss longestgames` pose un hologramme dédié des records de durée, mis à jour en place comme les autres leaderboards
+- **Données isolées** — `spaceship-arenas/` et fichiers préfixés `spaceship-` (`spaceship-config.yml`, `spaceship-stats.yml`, etc.) pour ne jamais empiéter sur les données HikaBrain
+
+### 🎬 Caméra de Découverte (CabinTransport)
+
+À la première connexion d'un joueur, le plugin déclenche automatiquement une **cinématique d'accueil** qui embarque le joueur dans une cabine virtuelle survolant le lobby. Plus qu'une scène passive : c'est un **trajet paramétrable** que l'administrateur dessine et configure au préalable.
+
+- **Déclenchement automatique au premier join** — chaque joueur qui se connecte pour la première fois voit la cabine l'embarquer et survoler le lobby selon le trajet `discovery.route` (par défaut `lobby-tour`)
+- **Cabine en `BlockDisplay`** — petite plateforme construite avec des entités natives Minecraft, aucun bloc posé : invisible pour les autres joueurs et nettoyée parfaitement à la fin du trajet
+- **Trajets à l'arc parabolique** — chaque route part d'un point A et arrive à un point B, avec une `arc-height` qui fait grimper la cabine au-dessus de la ligne droite avant de redescendre (effet « grand saut »)
+- **Trajets multi-points** — option avancée : `/transport addpoint <route> <secondes>` ajoute des points de vue intermédiaires avec leur propre durée de transition et leur propre angle de caméra (yaw / pitch indépendants par point)
+- **Caméra suiveuse** — `lock-camera: true` oriente la caméra du passager dans le sens du déplacement (effet véhicule), ou la laisse libre s'il préfère garder le contrôle
+- **Particules & sons d'ambiance** — `particle`, `sound-start`, `sound-loop` et `sound-end` configurables par trajet (CLOUD, END_ROD, ENTITY_ENDER_DRAGON_FLAP, BLOCK_AMETHYST_BLOCK_CHIME…)
+- **Téléportation tick-par-tick** — le joueur suit la trajectoire de façon fluide et continue, pas de « véhicule » qui se désynchronise côté client
+- **Jouée une seule fois par joueur** — la liste des joueurs ayant déjà vu la découverte est persistée dans `discovery-seen.yml` ; un admin peut `/transport go <route>` pour relancer manuellement n'importe quel trajet
+
+### 🛠️ Détails techniques
+| Fichier | Changement |
+|---------|------------|
+| `pom.xml` | ArtifactId `HikaBrain` → `HikaBrain-SpaceShip`, version → **1.1.0-discovery-camera** |
+| `plugin.yml` | Description enrichie (HikaBrain + SpaceShip + Découverte), version → **1.1.0**, nouvelles commandes `ss` / `ssarenas` / `sstournament` / `transport`, nouvelles permissions `spaceship.*` et `transport.*` |
+| `HikaBrainPlugin` | Nouvelle classe principale **unique** : initialise HikaBrain + SpaceShip + CabinTransport, gère les cycles de vie (sauvegarde / arrêt) de chacun |
+| `com.hikabrain.plugin.*` | Code HikaBrain conservé (cosmétiques, leaderboards, statistiques, tournois, hologrammes, musique NBS, kits, rematch, breakable…) |
+| `com.spaceship.plugin.*` | **Nouveau sous-package** — code SpaceShip intégré (arènes multi-zones, scoreboard, statistiques, historique, hologrammes, tournois, listeners) |
+| `fr.cabintransport.*` | **Nouveau sous-package** — code CabinTransport (modèles `Route` / `CameraPoint` / `CabinPart` / `PointRef`, `RouteManager`, `JourneyManager`, `DiscoveryManager`, `TransportCommand`, `JourneyListener`) |
+| `resources/spaceship-config.yml` | **Nouveau** — configuration SpaceShip (min/max joueurs, durée des comptes à rebours, scoreboard, messages) |
+| `resources/cabin-config.yml` | **Nouveau** — configuration CabinTransport (section `discovery`, liste des `routes`, `messages`) |
+| `resources/plugin.yml` | Mise à jour des commandes et permissions (intégration des sous-systèmes) |
+| **OBSOLÈTE** `SpaceShipPlugin.java` | **Supprimé** — SpaceShip n'est plus un plugin séparé, il est démarré par `HikaBrainPlugin` |
+
+---
+
+## 🆕 Mise à jour précédente (v1.0.33)
 
 Cette version enrichit le gameplay d'arène : les **blocs de base de la map** (ceux déjà présents lors de la configuration) peuvent désormais être **autorisés à être cassés** arène par arène, la **pioche du kit** creuse enfin **vite** (Efficacité II), et le **respawn instantané** s'applique automatiquement à **tous les mondes**, y compris ceux chargés après le démarrage du plugin.
 
@@ -480,20 +559,33 @@ Cette mise à jour majeure introduit un tout nouveau **système de cosmétiques*
 
 ## 📖 Installation
 
-1. Téléchargez le JAR depuis la [dernière release](https://github.com/herocraftlol/Hikabrain-Plugin/releases/latest)
-2. Placez le fichier `HikaBrain.jar` dans le dossier `plugins` de votre serveur Paper 1.21.1
-3. Redémarrez le serveur
-4. Configurez les arènes avec `/hb create <nom>`
+1. Téléchargez le JAR `HikaBrain-SpaceShip-1.1.0-discovery-camera.jar` depuis la [dernière release](https://github.com/herocraftlol/Hikabrain-Plugin/releases/latest)
+2. **Supprimez** tout ancien JAR HikaBrain ou SpaceShip du dossier `plugins/` pour éviter les conflits de commandes et de listeners
+3. Placez **uniquement** `HikaBrain-SpaceShip-1.1.0-discovery-camera.jar` dans le dossier `plugins/` de votre serveur Paper 1.21.1
+4. Redémarrez le serveur
+5. Configurez vos arènes HikaBrain avec `/hb create <nom>`, vos arènes SpaceShip avec `/ss create <nom>`, et votre trajet de découverte avec `/transport create lobby-tour` (puis `setstart`, `setend`, `setduration`)
 
 ## ⚙️ Configuration
 
-Le fichier `config.yml` permet de personnaliser :
-- Nombre de joueurs minimum/maximum par arène
-- Durée des comptes à rebours (lobby et round)
-- Points nécessaires pour gagner
-- Apparence complète du scoreboard (titre, lignes, couleurs)
-- **Apparence des hologrammes** (section `hologram-style` : fond, ombre, orientation, échelle…)
-- Messages personnalisés avec préfixe
+Trois fichiers de configuration cohabitent dans `plugins/HikaBrain-SpaceShip/` :
+
+- **`config.yml`** — HikaBrain
+  - Nombre de joueurs minimum/maximum par arène
+  - Durée des comptes à rebours (lobby et round)
+  - Points nécessaires pour gagner
+  - Apparence complète du scoreboard (titre, lignes, couleurs)
+  - **Apparence des hologrammes** (section `hologram-style` : fond, ombre, orientation, échelle…)
+  - Messages personnalisés avec préfixe
+- **`spaceship-config.yml`** — SpaceShip
+  - Min/max joueurs, durée des comptes à rebours (`lobby-countdown-min-reached`, `lobby-countdown-fast`, `round-reset-countdown`)
+  - Protection des spawns (`spawn-protection-radius`)
+  - Confinement des spectateurs (`spectator-confinement-radius`)
+  - Scoreboard dédié, préfixes & messages
+- **`cabin-config.yml`** — Caméra de Découverte
+  - Section `discovery` (`enabled`, `route`, `message`)
+  - Liste des `routes` (start / end / durée / arc-height / particle / sons / cabine / lock-camera)
+  - Points de caméra supplémentaires (mode multi-points)
+  - Messages dédiés
 
 ## 🛠️ Compilation
 
@@ -506,15 +598,15 @@ Le fichier `config.yml` permet de personnaliser :
 git clone https://github.com/herocraftlol/Hikabrain-Plugin.git
 
 # Compiler
-mvn clean package
+mvn clean package -DskipTests
 
-# Le JAR sera dans target/HikaBrain.jar
+# Le JAR sera dans target/HikaBrain-SpaceShip-1.1.0-discovery-camera.jar
 ```
 
 ## 📝 Auteur
 
 - **Développeur**: herocraftlol
-- **Version** : 1.0.33
+- **Version** : 1.1.0 (build `1.1.0-discovery-camera`)
 
 ## 📄 Licence
 

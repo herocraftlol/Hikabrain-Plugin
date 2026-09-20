@@ -43,6 +43,8 @@ import com.hikabrain.plugin.web.LeaderboardExportServer;
 import org.bukkit.GameRule;
 import org.bukkit.World;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.configuration.file.YamlConfiguration;
+import java.io.File;
 
 public class HikaBrainPlugin extends JavaPlugin {
 
@@ -67,10 +69,29 @@ public class HikaBrainPlugin extends JavaPlugin {
     private TournamentManager         tournamentManager;
     private TournamentGUI             tournamentGUI;
     private TournamentRoomsGUI        tournamentRoomsGUI;
+    private org.bukkit.configuration.file.FileConfiguration spaceConfig;
+    private com.spaceship.plugin.game.ArenaManager spaceArenaManager;
+    private com.spaceship.plugin.scoreboard.ScoreboardManager spaceScoreboardManager;
+    private com.spaceship.plugin.stats.StatsManager spaceStatsManager;
+    private com.spaceship.plugin.gui.ArenaGUI spaceArenaGUI;
+    private com.spaceship.plugin.gui.TeamSelectGUI spaceTeamSelectGUI;
+    private com.spaceship.plugin.hologram.CategoryLeaderboardManager spaceLeaderboardManager;
+    private com.spaceship.plugin.hologram.LongestGamesLeaderboardManager spaceLongestGames;
+    private com.spaceship.plugin.stats.GameHistoryManager spaceHistoryManager;
+    private com.spaceship.plugin.tournament.TournamentManager spaceTournamentManager;
+    private org.bukkit.configuration.file.FileConfiguration cabinConfig;
+    private fr.cabintransport.manager.RouteManager cabinRouteManager;
+    private fr.cabintransport.manager.JourneyManager cabinJourneyManager;
+    private fr.cabintransport.manager.DiscoveryManager cabinDiscoveryManager;
+    private fr.cabintransport.util.Messages cabinMessages;
 
     @Override
     public void onEnable() {
         saveDefaultConfig();
+        saveResource("spaceship-config.yml", false);
+        this.spaceConfig = YamlConfiguration.loadConfiguration(new File(getDataFolder(), "spaceship-config.yml"));
+        saveResource("cabin-config.yml", false);
+        this.cabinConfig = YamlConfiguration.loadConfiguration(new File(getDataFolder(), "cabin-config.yml"));
 
         this.arenaManager      = new ArenaManager(this);
         this.arenaManager.loadAll();
@@ -147,6 +168,47 @@ public class HikaBrainPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new TournamentGUIListener(this, tournamentGUI), this);
         getServer().getPluginManager().registerEvents(new TournamentRoomsGUIListener(this), this);
 
+        // SpaceShip intégré dans le même plugin, avec ses propres gestionnaires et fichiers.
+        spaceArenaManager = new com.spaceship.plugin.game.ArenaManager(this); spaceArenaManager.loadAll();
+        spaceScoreboardManager = new com.spaceship.plugin.scoreboard.ScoreboardManager(this);
+        spaceStatsManager = new com.spaceship.plugin.stats.StatsManager(this);
+        spaceLeaderboardManager = new com.spaceship.plugin.hologram.CategoryLeaderboardManager(this);
+        spaceLongestGames = new com.spaceship.plugin.hologram.LongestGamesLeaderboardManager(this);
+        spaceHistoryManager = new com.spaceship.plugin.stats.GameHistoryManager(this);
+        com.spaceship.plugin.game.KitManager.init(this);
+        spaceArenaGUI = new com.spaceship.plugin.gui.ArenaGUI(this);
+        spaceTeamSelectGUI = new com.spaceship.plugin.gui.TeamSelectGUI(this);
+        spaceTournamentManager = new com.spaceship.plugin.tournament.TournamentManager(this); spaceTournamentManager.loadAll();
+        com.spaceship.plugin.commands.SpaceShipCommand ssCommand = new com.spaceship.plugin.commands.SpaceShipCommand(this);
+        getCommand("ss").setExecutor(ssCommand); getCommand("ss").setTabCompleter(ssCommand);
+        getCommand("ssarenas").setExecutor((sender, command, label, args) -> { ssCommand.onCommand(sender, command, label, new String[]{"arenas"}); return true; });
+        com.spaceship.plugin.tournament.TournamentCommand ssTournament = new com.spaceship.plugin.tournament.TournamentCommand(this);
+        getCommand("sstournament").setExecutor(ssTournament); getCommand("sstournament").setTabCompleter(ssTournament);
+        getServer().getPluginManager().registerEvents(new com.spaceship.plugin.listeners.PlayerConnectionListener(this), this);
+        getServer().getPluginManager().registerEvents(new com.spaceship.plugin.listeners.PlayerDamageListener(this), this);
+        getServer().getPluginManager().registerEvents(new com.spaceship.plugin.listeners.PlayerMoveListener(this), this);
+        getServer().getPluginManager().registerEvents(new com.spaceship.plugin.listeners.PlayerDeathListener(this), this);
+        getServer().getPluginManager().registerEvents(new com.spaceship.plugin.listeners.TeamSelectListener(this), this);
+        getServer().getPluginManager().registerEvents(new com.spaceship.plugin.listeners.ArenaProtectionListener(this), this);
+        getServer().getPluginManager().registerEvents(new com.spaceship.plugin.listeners.ForceStartItemListener(this), this);
+        getServer().getPluginManager().registerEvents(new com.spaceship.plugin.listeners.LeaveItemListener(this), this);
+        getServer().getPluginManager().registerEvents(new com.spaceship.plugin.listeners.PlayerItemListener(this), this);
+        getServer().getPluginManager().registerEvents(new com.spaceship.plugin.gui.ArenaGUIListener(this, spaceArenaGUI), this);
+        getServer().getPluginManager().registerEvents(new com.spaceship.plugin.gui.TeamSelectGUIListener(this), this);
+        getServer().getPluginManager().registerEvents(new com.spaceship.plugin.listeners.SpectatorListener(this), this);
+        getServer().getPluginManager().registerEvents(new com.spaceship.plugin.tournament.TournamentListener(this), this);
+
+        // Cinématique de découverte du lobby intégrée au plugin principal.
+        cabinRouteManager = new fr.cabintransport.manager.RouteManager(this);
+        cabinRouteManager.load();
+        cabinJourneyManager = new fr.cabintransport.manager.JourneyManager(this);
+        cabinDiscoveryManager = new fr.cabintransport.manager.DiscoveryManager(this);
+        cabinMessages = new fr.cabintransport.util.Messages(this);
+        fr.cabintransport.command.TransportCommand transportCommand = new fr.cabintransport.command.TransportCommand(this);
+        getCommand("transport").setExecutor(transportCommand);
+        getCommand("transport").setTabCompleter(transportCommand);
+        getServer().getPluginManager().registerEvents(new fr.cabintransport.listener.JourneyListener(this), this);
+
         getLogger().info("HikaBrain activé ! (" + arenaManager.getNames().size() + " arène(s) chargée(s))");
     }
 
@@ -163,6 +225,14 @@ public class HikaBrainPlugin extends JavaPlugin {
         if (headToHeadManager != null) headToHeadManager.save();
         if (levelManager      != null) levelManager.save();
         if (arenaManager      != null) { arenaManager.stopAll(); arenaManager.saveAll(); }
+        if (spaceTournamentManager != null) { spaceTournamentManager.shutdown(); spaceTournamentManager.saveAll(); }
+        if (spaceLeaderboardManager != null) spaceLeaderboardManager.despawnAll();
+        if (spaceLongestGames != null) spaceLongestGames.despawnAll();
+        if (spaceScoreboardManager != null) spaceScoreboardManager.stop();
+        if (spaceStatsManager != null) spaceStatsManager.saveStats();
+        if (spaceArenaManager != null) { spaceArenaManager.stopAll(); spaceArenaManager.saveAll(); }
+        if (cabinJourneyManager != null) cabinJourneyManager.shutdown();
+        if (cabinRouteManager != null) cabinRouteManager.save();
         getLogger().info("HikaBrain désactivé.");
     }
 
@@ -186,4 +256,20 @@ public class HikaBrainPlugin extends JavaPlugin {
     public TournamentManager         getTournamentManager()         { return tournamentManager; }
     public TournamentGUI             getTournamentGUI()             { return tournamentGUI; }
     public TournamentRoomsGUI        getTournamentRoomsGUI()        { return tournamentRoomsGUI; }
+    public org.bukkit.configuration.file.FileConfiguration getSpaceConfig() { return spaceConfig; }
+    public com.spaceship.plugin.game.ArenaManager getSpaceArenaManager() { return spaceArenaManager; }
+    public com.spaceship.plugin.scoreboard.ScoreboardManager getSpaceScoreboardManager() { return spaceScoreboardManager; }
+    public com.spaceship.plugin.stats.StatsManager getSpaceStatsManager() { return spaceStatsManager; }
+    public com.spaceship.plugin.gui.ArenaGUI getSpaceArenaGUI() { return spaceArenaGUI; }
+    public com.spaceship.plugin.gui.TeamSelectGUI getSpaceTeamSelectGUI() { return spaceTeamSelectGUI; }
+    public com.spaceship.plugin.hologram.CategoryLeaderboardManager getSpaceLeaderboardManager() { return spaceLeaderboardManager; }
+    public com.spaceship.plugin.hologram.LongestGamesLeaderboardManager getSpaceLongestGamesLeaderboardManager() { return spaceLongestGames; }
+    public com.spaceship.plugin.stats.GameHistoryManager getSpaceGameHistoryManager() { return spaceHistoryManager; }
+    public com.spaceship.plugin.tournament.TournamentManager getSpaceTournamentManager() { return spaceTournamentManager; }
+    public org.bukkit.configuration.file.FileConfiguration getCabinConfig() { return cabinConfig; }
+    public void saveCabinConfig() { try { cabinConfig.save(new File(getDataFolder(), "cabin-config.yml")); } catch (java.io.IOException e) { getLogger().warning("Impossible de sauvegarder cabin-config.yml: " + e.getMessage()); } }
+    public fr.cabintransport.manager.RouteManager getRouteManager() { return cabinRouteManager; }
+    public fr.cabintransport.manager.JourneyManager getJourneyManager() { return cabinJourneyManager; }
+    public fr.cabintransport.manager.DiscoveryManager getDiscoveryManager() { return cabinDiscoveryManager; }
+    public fr.cabintransport.util.Messages getMessages() { return cabinMessages; }
 }
