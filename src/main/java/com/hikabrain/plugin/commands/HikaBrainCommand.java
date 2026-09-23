@@ -89,6 +89,7 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
             case "guislot" -> handleGuiSlot(sender, args);
             case "music" -> handleMusic(sender, args);
             case "breakable" -> handleBreakable(sender, args);
+            case "lobby" -> handleLobby(sender, args);
             case "cosmetics", "cosmetic", "shop" -> handleCosmetics(sender, args);
             case "rematch" -> handleRematch(sender, args);
             case "rematchcancel" -> handleRematchCancel(sender);
@@ -725,6 +726,127 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
             }
             default -> MessageUtil.send(sender, "&cAction inconnue. Utilise: add, remove, list ou clear.");
         }
+    }
+
+    /**
+     * /hb lobby generate [monde] [x] [y] [z]  : construit le lobby (structure + titres HikaBrain/SpaceShip + emplacements PNJ + trajet caméra)
+     * /hb lobby npcspots                       : liste les 3 coordonnées réservées aux PNJ SpaceShip
+     * /hb lobby tour <on|off>                  : active/désactive la visite de découverte automatique à la connexion
+     * /hb lobby tour test                      : rejoue la visite sur soi-même immédiatement (teste sans attendre une vraie 1ère connexion)
+     */
+    private void handleLobby(CommandSender sender, String[] args) {
+        if (!sender.hasPermission("hikabrain.admin")) {
+            MessageUtil.send(sender, "&cTu n'as pas la permission.");
+            return;
+        }
+        if (args.length < 2) {
+            MessageUtil.send(sender, "&cUsage: /hb lobby <generate|npcspots|tour>");
+            return;
+        }
+
+        switch (args[1].toLowerCase(Locale.ROOT)) {
+            case "generate" -> handleLobbyGenerate(sender, args);
+            case "npcspots" -> handleLobbyNpcSpots(sender);
+            case "tour" -> handleLobbyTour(sender, args);
+            default -> MessageUtil.send(sender, "&cSous-commande inconnue. Utilise: generate, npcspots ou tour.");
+        }
+    }
+
+    private void handleLobbyGenerate(CommandSender sender, String[] args) {
+        org.bukkit.World world;
+        int x, y, z;
+
+        if (args.length >= 6) {
+            world = org.bukkit.Bukkit.getWorld(args[2]);
+            if (world == null) {
+                MessageUtil.send(sender, "&cMonde inconnu: '" + args[2] + "'.");
+                return;
+            }
+            try {
+                x = Integer.parseInt(args[3]);
+                y = Integer.parseInt(args[4]);
+                z = Integer.parseInt(args[5]);
+            } catch (NumberFormatException e) {
+                MessageUtil.send(sender, "&cCoordonnées invalides. Usage: /hb lobby generate <monde> <x> <y> <z>");
+                return;
+            }
+        } else if (args.length == 2) {
+            world = org.bukkit.Bukkit.getWorlds().get(0);
+            x = 350000;
+            y = 101;
+            z = 350000;
+        } else {
+            MessageUtil.send(sender, "&cUsage: /hb lobby generate [monde] [x] [y] [z]");
+            return;
+        }
+
+        MessageUtil.send(sender, "&7Génération du lobby en cours (monde '" + world.getName() + "', " + x + ", " + y + ", " + z + ")...");
+        plugin.getLobbyManager().generate(world, x, y, z);
+        MessageUtil.send(sender, "&aLobby généré ! Titres &6HikaBrain&a (gauche) et &bSpaceShip&a (droite) posés à la même taille, "
+                + "3 emplacements réservés pour tes PNJ SpaceShip (voir &e/hb lobby npcspots&a), "
+                + "trajet de visite caméra 'lobby-tour' reconfiguré (~10s).");
+        MessageUtil.send(sender, "&7La visite automatique à la connexion reste DÉSACTIVÉE pour l'instant — teste-la "
+                + "d'abord avec &f/hb lobby tour test&7, puis active-la avec &f/hb lobby tour on&7 quand tu es prêt.");
+    }
+
+    private void handleLobbyNpcSpots(CommandSender sender) {
+        var manager = plugin.getLobbyManager();
+        if (!manager.isGenerated()) {
+            MessageUtil.send(sender, "&cAucun lobby généré pour le moment. Utilise /hb lobby generate d'abord.");
+            return;
+        }
+        var spots = manager.getSpaceshipNpcSpots();
+        MessageUtil.send(sender, "&8&m----------&r &b&lEmplacements PNJ SpaceShip &8&m----------");
+        int i = 1;
+        for (org.bukkit.Location loc : spots) {
+            MessageUtil.send(sender, "&b#" + i + " &7- &f" + loc.getWorld().getName() + " "
+                    + round(loc.getX()) + ", " + round(loc.getY()) + ", " + round(loc.getZ())
+                    + " &7(yaw " + round(loc.getYaw()) + ")");
+            i++;
+        }
+        MessageUtil.send(sender, "&7Pose tes PNJ à ces coordonnées exactes (ex: avec Citizens).");
+    }
+
+    private void handleLobbyTour(CommandSender sender, String[] args) {
+        if (args.length < 3) {
+            MessageUtil.send(sender, "&cUsage: /hb lobby tour <on|off|test>");
+            return;
+        }
+        String action = args[2].toLowerCase(Locale.ROOT);
+
+        if (action.equals("test")) {
+            if (!(sender instanceof Player player)) {
+                MessageUtil.send(sender, "&cCette commande doit être exécutée par un joueur.");
+                return;
+            }
+            if (!plugin.getLobbyManager().isGenerated()) {
+                MessageUtil.send(sender, "&cAucun lobby généré. Utilise /hb lobby generate d'abord.");
+                return;
+            }
+            fr.cabintransport.model.Route route = plugin.getRouteManager().get("lobby-tour");
+            if (route == null || !route.isReady()) {
+                MessageUtil.send(sender, "&cLe trajet 'lobby-tour' n'est pas prêt (monde non chargé ?).");
+                return;
+            }
+            boolean started = plugin.getJourneyManager().startDiscovery(player, route);
+            MessageUtil.send(sender, started ? "&aTest de la visite lancé !" : "&cImpossible de démarrer le test (un voyage est déjà en cours ?).");
+            return;
+        }
+
+        if (!action.equals("on") && !action.equals("off")) {
+            MessageUtil.send(sender, "&cUsage: /hb lobby tour <on|off|test>");
+            return;
+        }
+
+        boolean enabled = action.equals("on");
+        plugin.getCabinConfig().set("discovery.enabled", enabled);
+        plugin.saveCabinConfig();
+        MessageUtil.send(sender, "&aVisite automatique de découverte " + (enabled ? "&aactivée" : "&cdésactivée")
+                + "&a pour les nouveaux joueurs.");
+    }
+
+    private String round(double value) {
+        return String.valueOf(Math.round(value * 10.0) / 10.0);
     }
 
     /**
@@ -1772,6 +1894,9 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
             MessageUtil.send(sender, "&c/hb guislot <page> <emplacement 1-45> <arène|clear> &7- Placer une arène à un emplacement précis d'une page du menu /arenas");
             MessageUtil.send(sender, "&c/hb music [arène] [fichier.nbs|random|off|reset] &7- Régler la musique d'ambiance d'une arène");
             MessageUtil.send(sender, "&c/hb breakable <arène> <add|remove|list|clear> [matériau] &7- Rendre certains blocs de base cassables (ex: DIRT)");
+            MessageUtil.send(sender, "&c/hb lobby generate [monde] [x] [y] [z] &7- Générer le lobby central (structure + titres + emplacements PNJ + trajet caméra)");
+            MessageUtil.send(sender, "&c/hb lobby npcspots &7- Lister les 3 emplacements réservés aux PNJ SpaceShip");
+            MessageUtil.send(sender, "&c/hb lobby tour <on|off|test> &7- Activer/désactiver la visite auto, ou la tester sur toi-même");
             MessageUtil.send(sender, "&c/hb start <nom> &7- Forcer le démarrage");
             MessageUtil.send(sender, "&c/hb stop <nom> &7- Forcer l'arrêt");
             MessageUtil.send(sender, "&c/hb resetstats &7- Réinitialiser les statistiques");
@@ -1794,7 +1919,7 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
         if (args.length == 1) {
             List<String> options = new ArrayList<>(List.of("join", "joinrandom", "leave", "spectate", "unspectate", "info", "list", "arenas", "stats", "top", "points", "perk", "force", "cosmetics"));
             if (sender.hasPermission("hikabrain.admin")) {
-                options.addAll(List.of("create", "copy", "delete", "setlobby", "setspectatorspawn", "setspawn", "delspawn", "setcapture", "setgamezone", "setmaxplayers", "setminplayers", "guislot", "music", "breakable", "start", "stop"));
+                options.addAll(List.of("create", "copy", "delete", "setlobby", "setspectatorspawn", "setspawn", "delspawn", "setcapture", "setgamezone", "setmaxplayers", "setminplayers", "guislot", "music", "breakable", "lobby", "start", "stop"));
                 options.addAll(List.of("setsbserver", "setsbgame", "setsbtitle", "setsblines", "reloadsb", "sbinfo"));
                 options.addAll(List.of("resetstats", "leaderboard", "statshologram"));
             }
@@ -1874,6 +1999,20 @@ public class HikaBrainCommand implements CommandExecutor, TabCompleter {
                 && (args[2].equalsIgnoreCase("add") || args[2].equalsIgnoreCase("remove"))) {
             return filterStartingWith(List.of("DIRT", "GRASS_BLOCK", "STONE", "SAND", "GRAVEL",
                     "COBBLESTONE", "OAK_LOG", "SNOW", "SNOW_BLOCK", "TERRACOTTA"), args[3].toUpperCase(Locale.ROOT));
+        }
+
+        if (args.length == 2 && sub.equals("lobby")) {
+            return filterStartingWith(List.of("generate", "npcspots", "tour"), args[1]);
+        }
+
+        if (args.length == 3 && sub.equals("lobby") && args[1].equalsIgnoreCase("tour")) {
+            return filterStartingWith(List.of("on", "off", "test"), args[2]);
+        }
+
+        if (args.length == 3 && sub.equals("lobby") && args[1].equalsIgnoreCase("generate")) {
+            List<String> worldNames = new ArrayList<>();
+            for (org.bukkit.World w : org.bukkit.Bukkit.getWorlds()) worldNames.add(w.getName());
+            return filterStartingWith(worldNames, args[2]);
         }
 
         if (args.length == 2 && sub.equals("points")) {

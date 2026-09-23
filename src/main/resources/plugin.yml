@@ -1,14 +1,14 @@
 name: HikaBrain
-version: 1.1.0
+version: 1.2.0
 main: com.hikabrain.plugin.HikaBrainPlugin
 api-version: 1.21
 author: herocraftlol
-description: Plugin Paper 1.21.1 tout-en-un regroupant HikaBrain, SpaceShip et la Cinématique de Découverte (CabinTransport). Capture de zone par équipes (Rouge vs Bleu), tournois automatisés avec bracket, boutique de cosmétiques, jukebox musical NBS à lecture aléatoire intelligente, niveaux & perks, leaderboards holographiques par format (1v1/2v2/3v3/4v4), hologrammes de statistiques personnelles au style entièrement configurable (chacun voit ses propres stats), blocs de map cassables configurables, respawn instantané sur tous les mondes, rematch en un clic, SpaceShip multi-zones Noir vs Blanc avec mode Domination et classement des plus longues parties, et une visite cinématique automatique du lobby à la première connexion grâce à la nouvelle Caméra de Découverte.
+description: Plugin Paper 1.21.1 tout-en-un regroupant HikaBrain, SpaceShip, la Cinématique de Découverte (CabinTransport) et un nouveau Générateur de Lobby automatique. Capture de zone par équipes (Rouge vs Bleu), tournois automatisés avec bracket, boutique de cosmétiques, jukebox musical NBS à lecture aléatoire intelligente, niveaux & perks, leaderboards holographiques par format (1v1/2v2/3v3/4v4), hologrammes de statistiques personnelles au style entièrement configurable (chacun voit ses propres stats), blocs de map cassables configurables, respawn instantané sur tous les mondes, rematch en un clic, SpaceShip multi-zones Noir vs Blanc avec mode Domination et classement des plus longues parties, une visite cinématique automatique du lobby à la première connexion grâce à la Caméra de Découverte, et désormais un lobby central généré en une commande avec titres flottants HikaBrain/SpaceShip, emplacements PNJ réservés et trajet caméra préconfiguré (/hb lobby generate).
 
 commands:
   hb:
     description: Commande principale du plugin Hikabrain
-    usage: /hb <create|copy|delete|list|arenas|setlobby|setspectatorspawn|setspawn|delspawn|setcapture|setgamezone|setminplayers|guislot|music|breakable|start|stop|join|joinrandom|leave|spectate|unspectate|info|stats|top|points|perk|force|cosmetics|leaderboard|statshologram>
+    usage: /hb <create|copy|delete|list|arenas|setlobby|setspectatorspawn|setspawn|delspawn|setcapture|setgamezone|setminplayers|guislot|music|breakable|lobby|start|stop|join|joinrandom|leave|spectate|unspectate|info|stats|top|points|perk|force|cosmetics|leaderboard|statshologram>
   arenas:
     description: Ouvre le GUI de sélection d'arène
     usage: /arenas

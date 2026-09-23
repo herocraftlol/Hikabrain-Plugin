@@ -1,13 +1,13 @@
 # 🎮 HikaBrain + SpaceShip Plugin
 
-![Version](https://img.shields.io/badge/version-1.1.0-blue)
+![Version](https://img.shields.io/badge/version-1.2.0-blue)
 ![Paper](https://img.shields.io/badge/Paper-1.21.1-orange)
 ![Java](https://img.shields.io/badge/Java-21-red)
 ![Modes](https://img.shields.io/badge/modes-HikaBrain%20%2B%20SpaceShip-8A2BE2)
 
-> Le plugin **tout-en-un** pour Paper 1.21.1 : **HikaBrain**, **SpaceShip** et la **Caméra de Découverte** réunis dans un seul JAR. Capture de zone par équipes, Domination multi-salles façon vaisseau spatial, tournois automatisés, boutique de cosmétiques, musique NBS, niveaux & perks, **leaderboards holographiques par format (1v1/2v2/3v3/4v4)**, **hologrammes de statistiques personnelles au style entièrement configurable et personnalisés pour chaque joueur**, **rematch en un clic**, et désormais **une visite cinématique automatique du lobby à la première connexion grâce à la Caméra de Découverte**.
+> Le plugin **tout-en-un** pour Paper 1.21.1 : **HikaBrain**, **SpaceShip**, la **Caméra de Découverte** et un tout nouveau **Générateur de Lobby** réunis dans un seul JAR. Capture de zone par équipes, Domination multi-salles façon vaisseau spatial, tournois automatisés, boutique de cosmétiques, musique NBS, niveaux & perks, **leaderboards holographiques par format (1v1/2v2/3v3/4v4)**, **hologrammes de statistiques personnelles au style entièrement configurable et personnalisés pour chaque joueur**, **rematch en un clic**, **visite cinématique automatique du lobby à la première connexion grâce à la Caméra de Découverte**, et désormais un **lobby central généré en une commande** avec titres flottants HikaBrain/SpaceShip, emplacements PNJ réservés pour SpaceShip et trajet caméra préconfiguré.
 
-**HikaBrain + SpaceShip** rassemble **deux modes de jeu compétitifs** dans un seul plugin, plus une **cinématique de découverte du lobby** qui accueille automatiquement chaque nouveau joueur. Côté **HikaBrain**, deux équipes (Rouge vs Bleu) s'affrontent pour contrôler une zone centrale, avec statistiques détaillées, classements holographiques (globaux **et par format d'équipe**), **hologrammes de statistiques personnelles** au style configurable (chaque joueur voit ses propres stats en s'approchant) construits sur les **TextDisplay natifs** — une seule entité, aucun scintillement —, système de tournoi intégré, véritable **boutique de cosmétiques** pour récompenser les joueurs fidèles, et un **bouton « Rejouer »** qui relance instantanément une partie du même format. Côté **SpaceShip**, le mode **Domination multi-zones** oppose deux équipes (Noir vs Blanc) dans un vaisseau spatial composé de **5, 7 ou 9 salles** alignées (Mid neutre au centre puis Bases de chaque côté) : capturez les salles adverses, défendez les vôtres, faites-les basculer sous votre couleur et empêchez l'ennemi de prendre le Mid. Enfin, la **Caméra de Découverte** embarque chaque nouveau joueur dans une cabine virtuelle (construite en `BlockDisplay`) qui survole le lobby selon un trajet configurable à l'arc parabolique — points de vue successifs, sons d'ambiance, particules — pour leur faire découvrir la map avant leur première partie.
+**HikaBrain + SpaceShip** rassemble **deux modes de jeu compétitifs** dans un seul plugin, plus une **cinématique de découverte du lobby** qui accueille automatiquement chaque nouveau joueur et un **générateur de lobby** qui pose en une commande toute la structure d'accueil — plateforme centrale, titres flottants HikaBrain (à gauche) et SpaceShip (à droite), trois emplacements réservés pour vos PNJ SpaceShip et le trajet de caméra prêt à l'emploi. Côté **HikaBrain**, deux équipes (Rouge vs Bleu) s'affrontent pour contrôler une zone centrale, avec statistiques détaillées, classements holographiques (globaux **et par format d'équipe**), **hologrammes de statistiques personnelles** au style configurable (chaque joueur voit ses propres stats en s'approchant) construits sur les **TextDisplay natifs** — une seule entité, aucun scintillement —, système de tournoi intégré, véritable **boutique de cosmétiques** pour récompenser les joueurs fidèles, et un **bouton « Rejouer »** qui relance instantanément une partie du même format. Côté **SpaceShip**, le mode **Domination multi-zones** oppose deux équipes (Noir vs Blanc) dans un vaisseau spatial composé de **5, 7 ou 9 salles** alignées (Mid neutre au centre puis Bases de chaque côté) : capturez les salles adverses, défendez les vôtres, faites-les basculer sous votre couleur et empêchez l'ennemi de prendre le Mid. Enfin, la **Caméra de Découverte** embarque chaque nouveau joueur dans une cabine virtuelle (construite en `BlockDisplay`) qui survole le lobby selon un trajet configurable à l'arc parabolique — points de vue successifs, sons d'ambiance, particules — pour leur faire découvrir la map avant leur première partie.
 
 ---
 
@@ -84,6 +84,14 @@
 - **Commande `/transport`** — administration complète des trajets (`create`, `setstart`, `setend`, `setduration`, `setheight`, `setcabin`, `setcamera`, `addpoint`, `clearpoints`, `setpointduration`, `delete`, `reload`, `save`, `go`, `cancel`)
 - **Jouée une seule fois par joueur** — la liste est persistée dans `discovery-seen.yml`, mais un admin peut la réinitialiser et `/transport go <route>` lance manuellement n'importe quel trajet existant
 
+### 🏛️ Générateur de Lobby (NOUVEAU v1.2.0)
+- **Construction du lobby en une commande** — `/hb lobby generate [world] [x] [y] [z]` pose en un coup toute la structure d'accueil : plateforme centrale, deux titres flottants (`HikaBrain` à gauche, `SpaceShip` à droite, **même taille exacte** grâce à `TITLE_SCALE = 4.0`), 3 emplacements PNJ réservés pour SpaceShip, et un trajet caméra `lobby-tour` automatiquement reconfiguré
+- **`/hb lobby npcspots`** — affiche les 3 coordonnées exactes (monde + x/y/z + yaw) où poser vos PNJ SpaceShip
+- **`/hb lobby tour <on|off|test>`** — active / désactive la visite automatique de découverte à la première connexion, ou la teste **immédiatement sur l'admin** sans avoir à se déconnecter / reconnecter
+- **Sécurité par défaut** — la visite automatique reste **désactivée** après la génération : l'admin peut construire, tester et décorer tranquillement avant de l'activer pour de vrai
+- **Persistance** — la structure générée et les 3 spots PNJ sont sauvegardés dans `lobby-state.yml` et restaurés au redémarrage
+- **Déclenchement câblé** — un `LobbyJoinListener` appelle `DiscoveryManager.tryStart` au join avec un délai de 30 ticks (1,5s) pour laisser le client finir de charger le monde
+
 ---
 
 ## 📋 Fonctionnalités Détaillées
@@ -124,6 +132,7 @@
 | `/ssarenas` | **NOUVEAU** — Ouvre le GUI de sélection d'arène SpaceShip |
 | `/sstournament` | **NOUVEAU** — Gestion des tournois SpaceShip (bracket à élimination directe), alias `/sstourney`, `/sst` |
 | `/transport` | **NOUVEAU** — Configure et lance les trajets de la Caméra de Découverte (`list`, `go`, `cancel`, `create`, `setstart`, `setend`, `addpoint`, `clearpoints`, `setpointduration`, `setduration`, `setheight`, `setcabin`, `setcamera`, `delete`, `reload`, `save`) |
+| `/hb lobby <generate\|npcspots\|tour>` | **NOUVEAU v1.2.0** — Génère le lobby central (plateforme + titres flottants HikaBrain/SpaceShip + 3 emplacements PNJ SpaceShip + trajet caméra `lobby-tour`), liste les coordonnées des emplacements PNJ, ou active/désactive/teste la visite automatique de découverte à la première connexion |
 
 ## Permissions
 
@@ -139,7 +148,47 @@
 | `transport.use` | Utiliser les trajets et la visite du lobby | Tous |
 | `transport.admin` | Configurer les trajets et la cinématique | OP |
 
-## 🆕 Dernière Mise à Jour (v1.1.0)
+## 🆕 Dernière Mise à Jour (v1.2.0)
+
+Cette version ajoute un **Générateur de Lobby** complet au plugin : d'une simple commande, vous posez toute la structure d'accueil du serveur (plateforme centrale, titres flottants, emplacements PNJ SpaceShip et trajet de caméra préconfiguré). Vous n'avez plus qu'à placer vos PNJ et activer la visite. Côté technique, la correction du déclenchement automatique de la Caméra de Découverte à la première connexion d'un joueur (`LobbyJoinListener`) comble un trou : le `DiscoveryManager.tryStart` existait déjà mais n'était jamais appelé — c'est désormais chose faite.
+
+### 🏛️ Générateur de Lobby
+
+Plus besoin de construire votre lobby à la main, bloc par bloc : **`/hb lobby generate`** pose en une seule commande toute la structure d'accueil autour du point de spawn, parfaitement cohérente avec la Caméra de Découverte.
+
+#### 🎯 Ce qui est posé automatiquement
+- **Plateforme centrale** autour du point fourni (monde / x / y / z, par défaut le monde principal à 350000, 101, 350000)
+- **Deux titres flottants** à gauche et à droite, de **même taille exacte** (`TITLE_SCALE = 4.0`) — `HikaBrain` à gauche, `SpaceShip` à droite — construits en `TextDisplay` natifs Minecraft, alignés sur le regard du joueur
+- **3 emplacements PNJ SpaceShip** sauvegardés avec leurs coordonnées exactes (yaw inclus) — listables via `/hb lobby npcspots` pour poser vos PNJ (Citizens, etc.) au bon endroit
+- **Trajet de caméra `lobby-tour`** automatiquement reconfiguré pour correspondre à la structure fraîchement posée (~10s, point de vue adapté)
+
+#### 🧠 Logique de la commande
+1. `/hb lobby generate [world] [x] [y] [z]` — génère tout le lobby. Sans argument, place le lobby au point par défaut (monde principal, 350000 / 101 / 350000)
+2. `/hb lobby npcspots` — affiche les 3 coordonnées exactes (monde + x/y/z + yaw) où poser vos PNJ SpaceShip
+3. `/hb lobby tour <on|off|test>` — active ou désactive la visite automatique à la première connexion (`on` / `off`), ou la **teste immédiatement sur l'admin qui lance la commande** (`test`) sans avoir à attendre une vraie 1ʳᵉ connexion
+
+#### 🔒 Sécurité : désactivée par défaut après génération
+La génération **n'active jamais** la visite automatique : elle reste **désactivée** après la pose. L'admin peut ainsi construire / tester / décorer le lobby tranquillement, puis lancer un `/hb lobby tour test` pour voir ce que les nouveaux joueurs vivront, et **uniquement quand tout est prêt**, taper `/hb lobby tour on` pour activer la découverte automatique. Un message d'aide le rappelle explicitement à chaque génération.
+
+#### 🛠️ Détails techniques
+- Nouveau fichier `com/hikabrain/plugin/lobby/LobbyManager.java` — génère la plateforme, les deux `TextDisplay`, les trois emplacements PNJ et le trajet de caméra
+- Nouveau fichier `com/hikabrain/plugin/lobby/LobbyJoinListener.java` — déclenche `DiscoveryManager.tryStart` au join, avec un délai de 30 ticks (1,5s) pour laisser le client charger
+- `HikaBrainPlugin` intègre le `LobbyManager` et expose `getLobbyManager()`
+- `HikaBrainCommand` ajoute la sous-commande `/hb lobby <generate|npcspots|tour>` avec auto-complétion (sous-commandes + noms de mondes)
+- Persistance dans `lobby-state.yml` (génération + coordonnées des titres + 3 spots PNJ)
+- Le `LobbyManager` ré-applique automatiquement le `route: lobby-tour` au démarrage du plugin si le fichier `cabin-config.yml` ne contient pas encore la route
+
+### 🎬 Câblage de la Caméra de Découverte
+
+Auparavant, la Caméra de Découverte pouvait être déclenchée manuellement (`/transport go <route>`) mais **n'était jamais appelée à la connexion d'un nouveau joueur** — le `DiscoveryManager.tryStart` existait mais sans caller. Le `LobbyJoinListener` introduit en v1.2.0 corrige précisément ce maillon manquant.
+
+- **Délai de 30 ticks (1,5s)** au join avant de tenter la découverte — laisse au client le temps de finir de charger le monde, sinon le trajet démarre dans un chunk pas encore prêt et le joueur « tombe » avant le décollage
+- **Rejouable par l'admin** via `/hb lobby tour test` sans avoir à se déconnecter / reconnecter (utile pour valider un parcours ou débugger une ambiance)
+- **Toggle global** via `/hb lobby tour on` / `off` — écrit dans `cabin-config.yml#discovery.enabled` et sauvegarde immédiatement
+
+---
+
+## 🆕 Mise à jour précédente (v1.1.0)
 
 Cette version majeure **fusionne HikaBrain, SpaceShip et la Caméra de Découverte en un seul plugin** et apporte une expérience d'accueil cinématographique au lobby. Un nouveau JAR unique suffit désormais : retirez vos anciens `HikaBrain.jar` / `SpaceShip.jar` et installez **uniquement** `HikaBrain-SpaceShip.jar` pour éviter les conflits de commandes et de listeners. Chaque sous-système conserve ses propres fichiers de données et de configuration — rien n'est mélangé.
 
@@ -559,11 +608,11 @@ Cette mise à jour majeure introduit un tout nouveau **système de cosmétiques*
 
 ## 📖 Installation
 
-1. Téléchargez le JAR `HikaBrain-SpaceShip-1.1.0-discovery-camera.jar` depuis la [dernière release](https://github.com/herocraftlol/Hikabrain-Plugin/releases/latest)
+1. Téléchargez le JAR `HikaBrain-SpaceShip-1.2.0-lobby-generator.jar` depuis la [dernière release](https://github.com/herocraftlol/Hikabrain-Plugin/releases/latest)
 2. **Supprimez** tout ancien JAR HikaBrain ou SpaceShip du dossier `plugins/` pour éviter les conflits de commandes et de listeners
-3. Placez **uniquement** `HikaBrain-SpaceShip-1.1.0-discovery-camera.jar` dans le dossier `plugins/` de votre serveur Paper 1.21.1
+3. Placez **uniquement** `HikaBrain-SpaceShip-1.2.0-lobby-generator.jar` dans le dossier `plugins/` de votre serveur Paper 1.21.1
 4. Redémarrez le serveur
-5. Configurez vos arènes HikaBrain avec `/hb create <nom>`, vos arènes SpaceShip avec `/ss create <nom>`, et votre trajet de découverte avec `/transport create lobby-tour` (puis `setstart`, `setend`, `setduration`)
+5. Générez votre lobby en une commande : `/hb lobby generate` (par défaut au spawn du monde principal) puis placez vos PNJ SpaceShip aux coordonnées indiquées par `/hb lobby npcspots`, et configurez vos arènes HikaBrain (`/hb create <nom>`) et SpaceShip (`/ss create <nom>`)
 
 ## ⚙️ Configuration
 
@@ -600,13 +649,13 @@ git clone https://github.com/herocraftlol/Hikabrain-Plugin.git
 # Compiler
 mvn clean package -DskipTests
 
-# Le JAR sera dans target/HikaBrain-SpaceShip-1.1.0-discovery-camera.jar
+# Le JAR sera dans target/HikaBrain-SpaceShip-1.2.0-lobby-generator.jar
 ```
 
 ## 📝 Auteur
 
 - **Développeur**: herocraftlol
-- **Version** : 1.1.0 (build `1.1.0-discovery-camera`)
+- **Version** : 1.2.0 (build `1.2.0-lobby-generator`)
 
 ## 📄 Licence
 

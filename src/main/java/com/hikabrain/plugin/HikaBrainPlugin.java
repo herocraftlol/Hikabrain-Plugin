@@ -83,6 +83,7 @@ public class HikaBrainPlugin extends JavaPlugin {
     private fr.cabintransport.manager.RouteManager cabinRouteManager;
     private fr.cabintransport.manager.JourneyManager cabinJourneyManager;
     private fr.cabintransport.manager.DiscoveryManager cabinDiscoveryManager;
+    private com.hikabrain.plugin.lobby.LobbyManager lobbyManager;
     private fr.cabintransport.util.Messages cabinMessages;
 
     @Override
@@ -162,6 +163,7 @@ public class HikaBrainPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new com.hikabrain.plugin.listeners.CosmeticShopListener(this), this);
         getServer().getPluginManager().registerEvents(new com.hikabrain.plugin.listeners.CosmeticVisibilityListener(this), this);
         getServer().getPluginManager().registerEvents(new com.hikabrain.plugin.listeners.CosmeticChatListener(this), this);
+        getServer().getPluginManager().registerEvents(new com.hikabrain.plugin.lobby.LobbyJoinListener(this), this);
         getServer().getPluginManager().registerEvents(new ArenaGUIListener(this, arenaGUI), this);
         getServer().getPluginManager().registerEvents(new TeamSelectGUIListener(this), this);
         getServer().getPluginManager().registerEvents(new TournamentListener(this), this);
@@ -203,6 +205,7 @@ public class HikaBrainPlugin extends JavaPlugin {
         cabinRouteManager.load();
         cabinJourneyManager = new fr.cabintransport.manager.JourneyManager(this);
         cabinDiscoveryManager = new fr.cabintransport.manager.DiscoveryManager(this);
+        lobbyManager = new com.hikabrain.plugin.lobby.LobbyManager(this);
         cabinMessages = new fr.cabintransport.util.Messages(this);
         fr.cabintransport.command.TransportCommand transportCommand = new fr.cabintransport.command.TransportCommand(this);
         getCommand("transport").setExecutor(transportCommand);
@@ -271,5 +274,6 @@ public class HikaBrainPlugin extends JavaPlugin {
     public fr.cabintransport.manager.RouteManager getRouteManager() { return cabinRouteManager; }
     public fr.cabintransport.manager.JourneyManager getJourneyManager() { return cabinJourneyManager; }
     public fr.cabintransport.manager.DiscoveryManager getDiscoveryManager() { return cabinDiscoveryManager; }
+    public com.hikabrain.plugin.lobby.LobbyManager getLobbyManager() { return lobbyManager; }
     public fr.cabintransport.util.Messages getMessages() { return cabinMessages; }
 }
