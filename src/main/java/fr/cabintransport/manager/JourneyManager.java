@@ -38,6 +38,14 @@ public class JourneyManager {
     private final Map<UUID, Boolean> previousAllowFlight = new HashMap<>();
     private final Map<UUID, Boolean> previousFlying = new HashMap<>();
     private final Map<UUID, Boolean> previousInvisible = new HashMap<>();
+    /**
+     * Position du joueur juste AVANT le début d'un voyage de découverte (voir
+     * startDiscovery) — utilisée pour l'y ramener exactement à la fin, plutôt que de le
+     * laisser au dernier point caméra du trajet (voir #finish). C'était le comportement
+     * manquant : sans ce suivi, "finish" téléportait systématiquement vers la fin du
+     * trajet, quel que soit le type de voyage.
+     */
+    private final Map<UUID, Location> discoveryOriginLocation = new HashMap<>();
     private final java.util.Set<UUID> discoveryJourneys = new java.util.HashSet<>();
 
     public JourneyManager(HikaBrainPlugin plugin) {
@@ -83,6 +91,7 @@ public class JourneyManager {
         previousInvisible.put(player.getUniqueId(), player.isInvisible());
         if (discovery) {
             discoveryJourneys.add(player.getUniqueId());
+            discoveryOriginLocation.put(player.getUniqueId(), player.getLocation().clone());
             player.setInvisible(true);
             player.setInvulnerable(true);
             player.setCollidable(false);
@@ -205,12 +214,20 @@ public class JourneyManager {
 
     private void finish(Journey journey, Player player) {
         Route route = journey.getRoute();
-        Location end = route.hasCameraPath() ? route.locationAt(1) : route.getEndLocation();
+        boolean discovery = discoveryJourneys.contains(player.getUniqueId());
+
+        // Pour un voyage de DÉCOUVERTE (visite automatique du lobby), on ramène le
+        // joueur exactement là où il était AVANT le début de la visite — jamais au
+        // dernier point caméra du trajet, qui n'a aucune raison d'être un endroit sûr/
+        // pertinent pour laisser le joueur (voir startDiscovery / discoveryOriginLocation).
+        Location end = discovery
+                ? discoveryOriginLocation.get(player.getUniqueId())
+                : (route.hasCameraPath() ? route.locationAt(1) : route.getEndLocation());
         if (end == null) {
             cleanup(journey, true);
             return;
         }
-        if (!route.isLockCamera()) {
+        if (!discovery && !route.isLockCamera()) {
             end.setYaw(player.getLocation().getYaw());
             end.setPitch(player.getLocation().getPitch());
         }
@@ -252,6 +269,7 @@ public class JourneyManager {
             Boolean allowFlight = previousAllowFlight.remove(journey.getPlayerUuid());
             Boolean flying = previousFlying.remove(journey.getPlayerUuid());
             Boolean invisible = previousInvisible.remove(journey.getPlayerUuid());
+            discoveryOriginLocation.remove(journey.getPlayerUuid());
             boolean discovery = discoveryJourneys.remove(journey.getPlayerUuid());
             if (player.getGameMode() != GameMode.CREATIVE && player.getGameMode() != GameMode.SPECTATOR) {
                 player.setFlying(flying != null && flying);
@@ -267,6 +285,7 @@ public class JourneyManager {
             previousAllowFlight.remove(journey.getPlayerUuid());
             previousFlying.remove(journey.getPlayerUuid());
             previousInvisible.remove(journey.getPlayerUuid());
+            discoveryOriginLocation.remove(journey.getPlayerUuid());
             discoveryJourneys.remove(journey.getPlayerUuid());
         }
         if (removeFromMap) {
